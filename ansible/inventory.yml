@@ -216,6 +216,9 @@ all:
     #email_ssl_keyfile:
     #email_use_ssl:
     #email_use_tls:    
+
+    # --- Web Proxy setting
+    # proxy_url: https://X.X.X.X:PPPP
     
     # ------------------------------------------------------------------------------------------------ #
     # --------------------------------------- Integrations-------------------------------------------- #
@@ -359,7 +362,7 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:241121.01
+    omnileads_img: docker.io/omnileads/omlapp:241128.01
     asterisk_img: docker.io/omnileads/asterisk:240920.01
 
 ##############################################################################################################

@@ -2,7 +2,7 @@
 
 #################### containers img tags  ################################
 
-fastagi_img: docker.io/omnileads/fastagi:241017.01
+fastagi_img: docker.io/omnileads/fastagi:241209.01
 sentiment_analysis_img: docker.io/omnileads/sentiment_analysis:240427.01
 interaction_processor_img: docker.io/omnileads/interaction_processor:240506.01
 asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:240729.01
@@ -24,7 +24,7 @@ rabbitmq_img: docker.io/rabbitmq:3.12
 postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
 redis_prometheus_img: docker.io/oliver006/redis_exporter:latest
 nginxcgi_img: docker.io/omnileads/nginxqa:231117.01
-pstn_emulator_img: docker.io/omnileads/pstn_emulator:240229.01
+pstn_emulator_img: docker.io/omnileads/pstn_emulator:241209.01
 wombat_img: docker.io/freetechsolutions/wombat:21.06.4-9
 mysql_img: docker.io/bitnami/mariadb:latest
 survey_worker_img: docker.io/omnileads/survey_worker:231201.01

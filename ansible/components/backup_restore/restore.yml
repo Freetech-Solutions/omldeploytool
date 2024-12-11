@@ -61,6 +61,12 @@
       when:
         - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']  
 
+    - name: RESTORE postgres DB pg_restore
+      shell: "podman run --name pgsql_bk_{{ restore_file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ restore_file_timestamp }}.sql --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_restore.sh"
+      when:
+        - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+        - omnileads_ha is not defined      
+    
     - name: RESTORE DJANGO Restart systemd service
       systemd:
         name: omnileads.service
@@ -84,7 +90,7 @@
         - inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is defined
 
-    - name: RESTORE postgres DB pg_restore
+    - name: RESTORE postgres DB pg_restore HA scenary
       shell: "podman run --name pgsql_bk_{{ restore_file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ restore_file_timestamp }}.sql -e PGHOST={{ aio_1 }} --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_restore.sh"
       when:
         - inventory_hostname in groups['omnileads_aio']
