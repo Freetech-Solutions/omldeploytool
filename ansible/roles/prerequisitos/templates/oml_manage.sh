@@ -12,7 +12,7 @@ case $1 in
     echo "init Environment with some data"
     docker exec -it oml-uwsgi-server python3 /opt/omnileads/ominicontacto/manage.py inicializar_entorno
     ;;
---regenerar_asterisk)
+  --regenerar_asterisk)
     echo "regenerate redis asterisk data"
     docker exec -it oml-uwsgi-server python3 /opt/omnileads/ominicontacto/manage.py regenerar_asterisk
     ;;
@@ -29,7 +29,7 @@ case $1 in
     ;;
   --generate_call)
     echo "generate an ibound call through PSTN-Emulator container"
-    docker exec -it oml-pstn-server sipp -sn uac 127.0.0.1:5060 -s stress -m 1 -r 1 -d 60000 -l 1
+    docker exec -it oml-pstn-emulator sipp -sn uac pbxemulator:5070 -s test -m 1 -r 1 -d 60000 -l 1
     ;;
   --show_bucket)
     docker exec -it oml-uwsgi-server aws --endpoint-url ${S3_ENDPOINT} s3 ls --recursive s3://${S3_BUCKET_NAME}
@@ -78,7 +78,10 @@ case $1 in
     ;;
   --pgsql)
     docker exec -it oml-uwsgi-server psql
-    ;;    
+    ;;
+  --psql_reindex)
+    podman exec -it --env-file /etc/default/django.env oml-uwsgi-server bash -c 'psql -c "reindex database ${PGDATABASE};"'
+    ;;
   --sentinel_logs)
     docker logs -f oml-sentinel-server
     ;;
@@ -158,13 +161,16 @@ case $1 in
     ;;
   --generate_call)
     echo "generate an ibound call through PSTN-Emulator container"
-    podman run -it docker.io/omnileads:pstn_emulator:latest sipp -sn uac 127.0.0.1:5060 -s stress -m 1 -r 1 -d 60000 -l 1
+    podman run -it docker.io/omnileads:pstn_emulator:241209.01 sipp -sn uac 127.0.0.1:5060 -s stress -m 1 -r 1 -d 60000 -l 1    
     ;;
   --show_bucket)
     podman exec -it oml-uwsgi-server aws --endpoint-url ${S3_ENDPOINT} s3 ls --recursive s3://${S3_BUCKET_NAME}
     ;;  
   --psql)
     podman exec -it oml-uwsgi-server psql
+    ;;
+  --psql_reindex)
+    podman exec -it --env-file /etc/default/django.env oml-uwsgi-server bash -c 'psql -c "reindex database ${PGDATABASE};"'
     ;;
   --redis_cli)
     podman run -it --name oml-redis-cli docker.io/redis redis-cli -h $(cat /etc/default/django.env |grep REDIS | awk -F= '{print $2}')
@@ -216,6 +222,7 @@ USAGE:
   --redis_clean: clean cache  
   --redis_cli: launch redis CLI 
   --psql: launch psql CLI 
+  --psql_reindex: reindex database
   --asterisk_cli: launch asterisk CLI 
   --asterisk_bash: launch asterisk container bash shell 
   --kamailio_logs: show container logs 
