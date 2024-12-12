@@ -47,3 +47,23 @@
       - install
       - upgrade
       - restart
+  
+  - name: ADDON WALLBOARD-WORKER Copy systemd service
+    template:
+      src: "{{ addons_repo_path }}templates/wallboard_worker.service"
+      dest: /etc/systemd/system/wallboard_worker.service
+    tags:
+      - install
+      - upgrade
+      - update
+
+  - name: ADDON WALLBOARD Enable and start systemd service
+    systemd:
+      name: wallboard_worker.service
+      state: restarted
+      enabled: yes
+      daemon_reload: yes
+    tags:
+      - install
+      - upgrade
+      - restart
