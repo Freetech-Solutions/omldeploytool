@@ -1,0 +1,539 @@
+services:
+  django_app:
+    build:
+      target: run
+      context: ${REPO_PATH}/omlapp
+    image: omnileads/omlapp:dev
+    container_name: oml-app
+    depends_on:
+      - postgresql
+      - redis
+      - acd
+      - minio
+    dns: 8.8.8.8
+    env_file: .env
+    environment:
+      - DJANGO_ALLOW_ASYNC_UNSAFE=true
+      - CRON_ENABLE=false
+      - DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
+    command: /opt/omnileads/bin/init_devenv.sh
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+    volumes:
+      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+      - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
+    
+  daphne:
+    container_name: oml-daphne
+    depends_on:
+      - redis
+      - django_app
+    dns: 8.8.8.8
+    env_file: .env
+    environment:
+      - DAPHNE_ENABLE=True
+      - DJANGO_HOSTNAME=daphne
+    image: omnileads/omlapp:dev
+    command: /opt/omnileads/bin/init_daphne.sh
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 1m30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+
+  omlcron:
+    container_name: oml-cron
+    depends_on:
+      - django_app
+      - postgresql
+      - acd 
+      - minio
+      - redis
+    dns: 8.8.8.8
+    env_file: .env
+    environment:
+      - UWSGI_PORT=8097
+      - DJANGO_HOSTNAME=omlcron
+    image: omnileads/omlapp:dev
+    command: /opt/omnileads/bin/docker-entrypoint.sh
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 1m30s
+    tty: true
+    working_dir: /opt/omnileads
+
+  fastagi:
+    build:
+      target: run
+      context: ${REPO_PATH}/omlfastagi
+    image: omnileads/fastagi:dev
+    container_name: oml-fastagi
+    command: python /app/fastagi.py
+    environment:
+      - TZ=${TZ}
+      - PGHOST=${PGHOST}
+      - PGPORT=${PGPORT}
+      - PGUSER=${PGUSER}
+      - PGDATABASE=${PGDATABASE}
+      - PGPASSWORD=${PGPASSWORD}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_PORT=${REDIS_PORT}    
+    restart: on-failure
+    networks:
+      - omnileads
+    volumes:
+      - ${REPO_PATH}/omlfastagi/fastagi.py:/app/fastagi.py  
+
+  ami:
+    build:
+      target: run
+      context: ${REPO_PATH}/omlami
+    image: omnileads/astami:dev
+    container_name: oml-astami
+    environment:
+      - TZ=${TZ}
+      - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
+      - AMI_USER=${AMI_USER}
+      - AMI_PASSWORD=${AMI_PASSWORD}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+    restart: on-failure    
+    networks:
+      - omnileads
+
+  acd_config_generator:
+    build:
+      context: ${REPO_PATH}/acd_retrieve_conf
+    image: omnileads/acd_retrieve_conf:dev
+    container_name: oml-acd-conf
+    depends_on:
+      - websockets
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - ASTERISK_LOCATION=
+      - ARI_HOST=${ASTERISK_HOSTNAME}
+      - ARI_USER=${AMI_USER}
+      - ARI_PASS=${AMI_PASSWORD}
+      - OMNILEADS_HOSTNAME=${OMNILEADS_HOSTNAME}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    volumes:      
+      - asterisk_conf:/home/omnileads/astconf
+      - asterisk_sounds:/home/omnileads/sounds
+
+  acd:
+    build:
+      target: run
+      context: ${REPO_PATH}/omlacd
+    image: omnileads/asterisk:dev
+    container_name: oml-acd
+    depends_on:
+      - fastagi
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}      
+      - ENV=${ENV}
+      - DIALER_HOST=${DIALER_SIP_ADDR}
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
+      - FASTAGI=${FASTAGI_HOSTNAME}
+      - AMI_USER=${AMI_USER}
+      - AMI_PASSWORD=${AMI_PASSWORD}
+      - HOMER_ENABLE=False
+      - HOMERHOST=${HOMERHOST}
+      - HOMERPORT=${HOMERPORT}
+      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 30s
+    volumes:
+      - ${REPO_PATH}/omlacd/source/astconf:/etc/asterisk
+      - ${REPO_PATH}/omlacd/source/scripts:/opt/asterisk/scripts
+      - ${REPO_PATH}/omlacd/source/agi-bin/:/var/lib/asterisk/agi-bin/
+      - asterisk_callrec:/var/spool/asterisk/monitor/
+      - asterisk_conf:/etc/asterisk/retrieve_conf
+      - asterisk_sounds:/var/lib/asterisk/sounds/oml
+      #- ./asterisk_custom/google_credential.json:/tmp/google_credential.json
+      - ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
+    working_dir: /etc/asterisk
+
+  interaction_processor:
+    build:
+      target: run
+      context: ${REPO_PATH}/oml_interactions_processor
+    image: omnileads/interaction_processor:dev
+    container_name: oml-post-interactions
+    depends_on:
+      - minio
+      - rabbitmq
+      - acd
+    dns: 8.8.8.8
+    environment:
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
+      - TZ=${TZ}
+      - CALLREC_DEVICE=${CALLREC_DEVICE}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    command: python /app/app.py
+    volumes:
+      - asterisk_callrec:/var/spool/asterisk/monitor/
+
+  chan_tel_logger:
+    build:
+      target: run
+      context: ${REPO_PATH}/tel_call_logger
+    image: omnileads/call_log_processor:dev
+    container_name: oml-chan-tel-logger
+    depends_on:
+      - rabbitmq
+      - postgresql
+    dns: 8.8.8.8
+    environment:
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
+      - PGHOST=${PGHOST}
+      - PGPORT=${PGPORT}
+      - PGUSER=${PGUSER}
+      - PGDATABASE=${PGDATABASE}
+      - PGPASSWORD=${PGPASSWORD}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_PORT=${REDIS_PORT}  
+      - TZ=${TZ}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    command: python /app/app.py
+    volumes:
+      - ${REPO_PATH}/tel_call_logger/src:/app
+
+  kamailio:
+    build:
+      target: run
+      context: ${REPO_PATH}/omlkamailio
+    image: omnileads/kamailio:dev
+    container_name: oml-kamailio
+    depends_on:
+      - redis
+      - acd
+      - rtpengine
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - AUTHEPH_SK=${AUTHEPH_SK}
+      - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
+      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
+      - SHM_SIZE=${SHM_SIZE}
+      - PKG_SIZE=${PKG_SIZE}
+      - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+
+  nginx:
+    build:
+      target: run
+      context: ${REPO_PATH}/omlnginx
+    image: omnileads/nginx:dev
+    container_name: oml-nginx
+    depends_on:
+      - django_app
+      - kamailio
+      - websockets
+    dns: 8.8.8.8
+    environment:
+      - ENV=devenv
+      - TZ=${TZ}
+      - DJANGO_HOSTNAME=${DJANGO_HOSTNAME}
+      - WSGI_PORT=${UWSGI_PORT}
+      - DAPHNE_HOSTNAME=${DJANGO_HOSTNAME}
+      - ASGI_PORT=${UWSGI_PORT}
+      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
+      - KAMAILIO_PORT=14443
+      - WEBSOCKETS_HOSTNAME=${WEBSOCKET_HOSTNAME}
+      - WEBSOCKETS_PORT=8000
+      - CALLREC_DEVICE=${CALLREC_DEVICE}
+      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
+      - WEBUI_MODE=rproxy
+      - WALLBOARD_WEBUI_HOST=kamailio
+    networks:
+      - omnileads
+    privileged: true
+    ports:
+      - ${NGINX_EXT_PORT}:443/tcp
+    restart: on-failure
+    stop_grace_period: 15s
+    volumes:
+      - django_static:/opt/omnileads/static
+      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+      - ${REPO_PATH}/omlnginx/source/conf:/etc/nginx/
+      - ${REPO_PATH}/omlnginx/templates:/etc/nginx/templates/
+      - ${REPO_PATH}/omlnginx/source/set_environment.sh:/docker-entrypoint.d/set_environment.sh
+
+  rtpengine:
+    build:
+      context: ${REPO_PATH}/omlrtpengine
+    image: omnileads/rtpengine:dev
+    container_name: oml-rtpengine
+    dns: 8.8.8.8
+    environment:
+      - ENV=devenv
+      - TZ=${TZ}
+    networks:
+      - omnileads    
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    # command: rtpengine --config-file /etc/rtpengine.conf   
+    # volumes:
+    #   - ../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
+
+  websockets:
+    #build:
+    #  target: run
+    #  context: ${REPO_PATH}/omnileads-websockets/etc/fts/oml/services/websockets
+    tty: true
+    container_name: oml-websockets
+    image: ${OMLWS_IMG}
+    depends_on:
+      - redis
+    environment:
+      - BIND_ADDRESS=0.0.0.0:8000
+      - EVENT_LOOP=uvloop
+      - LOGGERS=${WEBSOCKET_LOGGER}
+      - REDIS_HOST=${WEBSOCKET_REDIS_HOSTNAME}
+      - PYTHONUNBUFFERED=1
+    networks:
+      - omnileads
+    stop_grace_period: 30s  
+    volumes:
+      - ${REPO_PATH}/omnileads-websockets/source/:/opt/services/webapp/src/
+
+  postgresql:
+    container_name: oml-postgres
+    image: ${OMLPGSQL_IMG}
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - POSTGRES_USER=${PGUSER}
+      - POSTGRES_PASSWORD=${PGPASSWORD}
+      - POSTGRES_DB=${PGDATABASE}
+    networks:
+      - omnileads
+    ports:
+      - ${PG_EXT_PORT}:5432/tcp
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 1m30s
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+
+  redis:
+    container_name: oml-redis
+    image: ${OMLREDIS_IMG}
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - BIND_IP=0.0.0.0
+    networks:
+      - omnileads    
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 1m30s
+    volumes:
+      - redis:/data
+
+  vue-cli:
+    tty: true
+    container_name: oml-vuejs-cli
+    image: ${OMLVUEJS_IMG}
+    ports:
+      - 8081:8080
+    networks:
+      - omnileads
+    volumes:
+      - ${REPO_PATH}/omlapp/omnileads_ui/:/home/oml_frontend/
+      - ${REPO_PATH}/survey_app/:/home/survey/
+      
+  rabbitmq:
+    container_name: oml-rabbit-mq
+    image: rabbitmq:management
+    networks:
+      - omnileads
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+
+  minio:
+    tty: true
+    container_name: oml-object-storage
+    image: ${OMLMINIO_IMG}
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${S3_HTTP_ADMIN_USER}
+      - MINIO_ROOT_PASSWORD=${S3_HTTP_ADMIN_PASS}
+      #- MINIO_SERVER_URL=${S3_ENDPOINT}
+      - MINIO_PROMETHEUS_AUTH_TYPE="public"
+    networks:
+      - omnileads
+    ports:
+      - 9001:9001
+      - 9000:9000
+    volumes:
+      - minio:/data
+
+  createbuckets:
+    tty: true
+    image: minio/mc
+    container_name: oml-initminio
+    depends_on:
+      - minio
+    networks:
+      - omnileads
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host rm local;
+      /usr/bin/mc config host add --quiet --api s3v4 local http://minio:9000 minio s3minio123;
+      /usr/bin/mc mb --quiet local/omnileads/;
+      /usr/bin/mc admin user add local omlminio s3omnileads123;
+      /usr/bin/mc admin policy attach local readwrite --user omlminio;
+      exit 0;
+      "
+
+  pbxemulator:
+    build:
+      context: ${REPO_PATH}/omlqa/pstn_emulator
+    container_name: oml-pstn-emulator
+    hostname: pbxemulator
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - INBOUND_CALL_MODE=${PSTN_EMULATOR_MODE}
+    image: omnileads/pstn_emulator:dev
+    networks:
+      - omnileads
+    ports:
+      - 4569:4569/udp
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    # volumes:
+      # - ${REPO_PATH}/omlqa/pstn_emulator/conf:/etc/asterisk/
+      # - ./.conf/pstn_emulator_extensions.conf:/etc/asterisk/extensions.conf:ro
+    
+    
+  nginx_qa:
+    build:
+      context: ${REPO_PATH}/omlqa/nginx
+    container_name: oml-nginxqa
+    image: ${OMLNGINXQA_IMG}
+    hostname: nginxcgi
+    dns: 8.8.8.8
+    environment:
+      - PGHOST=${PGHOST}
+      - PGPASSWORD=${PGPASSWORD}
+      - PSTN_HOSTNAME=pbxemulator
+    networks:
+      - omnileads
+    ports:
+      - 8877:8888
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 10s
+    tty: true
+
+  videocalls:
+    container_name: oml-videocalls-widget
+    dns: 8.8.8.8
+    image: ${OMLVIDEOCALLS_WIDGET_IMG}
+    environment:
+      - CLIENT_USERNAME=${VIDEOCALLS_USERNAME}
+      - CLIENT_PASSWORD=${VIDEOCALLS_PASSWORD}
+    networks:
+      - omnileads
+    ports:
+      - 8889:5000
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 1m30s
+    tty: true
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@domain.com
+      PGADMIN_DEFAULT_PASSWORD: catsarecool
+    restart: on-failure
+    networks:
+      - omnileads
+
+  redisinsight:
+    container_name: redisinsight
+    image: redis/redisinsight:latest
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - BIND_IP=0.0.0.0
+    networks:
+      - omnileads
+    ports:
+      - '7963:5540'    
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 1m30s
+    volumes:
+      - redis_redisinsight:/data
+
+networks:
+  omnileads:
+    ipam:
+      driver: default
+      config:
+        - subnet: "${SUBNET}"
+
+volumes:
+  postgresql:
+  mariadb:
+  redis:
+  redis_redisinsight:
+  minio:
+  django_static:
+  django_callrec_zip:
+  asterisk_callrec:
+  asterisk_sounds:
+  asterisk_conf:

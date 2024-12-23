@@ -2,7 +2,10 @@
 
 #################### containers img tags  ################################
 
-fastagi_img: docker.io/omnileads/fastagi:241209.01
+fastagi_img: docker.io/omnileads/fastagi:241017.01
+dialer_api_img: docker.io/freetechsolutions/dialer_api:dev
+dialer_worker_img: docker.io/freetechsolutions/dialer_worker:dev
+dialer_ws_img: docker.io/freetechsolutions/dialer_ws:dev
 sentiment_analysis_img: docker.io/omnileads/sentiment_analysis:240427.01
 interaction_processor_img: docker.io/omnileads/interaction_processor:240506.01
 asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:240729.01

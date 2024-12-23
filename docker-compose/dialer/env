@@ -1,0 +1,41 @@
+REPO=freetechsolutions
+API_IMG=${REPO}/dialer_api:241121.01
+LISTENER_IMG=${REPO}/dialer_listener:241121.01
+WORKER_IMG=${REPO}/dialer_worker:241121.01
+DIALPLAN_IMG=${REPO}/dialer_dialplan:241121.01
+ASTERISK_IMG=${REPO}/dialer_asterisk:241121.01
+
+TZ=America/Argentina/Cordoba
+ASTERISK_USER=omnileadsami
+ASTERISK_PASS=5_MeO_DMT
+ASTERISK_HOST=dialer_asterisk
+ASTERISK_PORT=8888
+ASTERISK_APP_DIALER=call_manager_dialer
+ASTERISK_APP=call_manager
+REDIS_OML_SERVER=oml-redis
+REDIS_OML_PORT=6379
+REDIS_DIALER_SERVER=oml-redis
+REDIS_DIALER_PORT=6379
+POSTGRES_OML_PASSWORD=admin123
+POSTGRES_OML_SERVER=oml-postgres
+POSTGRES_OML_PORT=5432
+GEARMAN_JOB_SERVERS=gearman_job_server_1:4730
+GEARMAN_JOBS=start-campaign|stop-campaign|resume-campaign|process-contact|schedule-contact|process-event|create-campaign|edit-campaign|pause-campaign|delete-campaign|send-reports|add-incidence-rule-disposition|create-incidence-rule|process-campaign
+PYTHON_LOGLEVEL=debug
+DIALER_ACD_HOST=pstn_gateway
+POSTGRES_DIALER_USER=omnidialer
+POSTGRES_DIALER_PASSWORD=dialer456
+POSTGRES_DIALER_SERVER=oml-postgres #dialer-postgres
+POSTGRES_DIALER_PORT=5432 #5433
+POSTGRES_DIALER_DB=omnidialer
+NETWORK=oml_omnileads
+ 
+# Asterisk
+# PSTNGW_REGISTER=yes
+# PSTNGW_SIP_AUTH=yes
+# PSTNGW_SIP_USER=01177660020
+# PSTNGW_SIP_PASS=omnileads
+# PSTNGW_HOSTNAME=oml-pbxemulator:5070
+### ACD omnileads asterisk ACD SIP Peer (for dialer_asterisk)
+OMLACD_SIP_ADDR=oml-acd:5260
+ASTERISK_IPV4=10.22.22.199

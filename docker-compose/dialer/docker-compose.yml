@@ -1,0 +1,269 @@
+services:
+  api:
+    image: ${API_IMG}  
+    container_name: omnidialer-api
+    ports:
+      - '1440:1440'
+    networks:
+      - network1
+    stop_signal: SIGINT
+    tty: true
+    stdin_open: true
+    depends_on:
+      - job_server
+      - postgresql
+    environment:
+      - GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS}
+
+  job_server:
+    image: artefactual/gearmand:1.1.18-alpine
+    container_name: gearman_job_server_1
+    ports:
+      - '4730:4730'
+    networks:
+      - network1
+    command: gearmand -t 1
+
+  worker:
+    image: ${WORKER_IMG}
+    networks:
+      - network1
+    tty: true
+    stdin_open: true
+    environment:
+      - ASTERISK_HOST=${ASTERISK_HOST}
+      - ASTERISK_PORT=${ASTERISK_PORT}
+      - ASTERISK_USER=${ASTERISK_USER}
+      - ASTERISK_PASS=${ASTERISK_PASS}
+      - ASTERISK_APP=${ASTERISK_APP}
+      - REDIS_OML_SERVER=${REDIS_OML_SERVER}
+      - REDIS_OML_PORT=${REDIS_OML_PORT}
+      - REDIS_DIALER_SERVER=${REDIS_DIALER_SERVER}
+      - REDIS_DIALER_PORT=${REDIS_DIALER_PORT}
+      - POSTGRES_OML_PASSWORD=${POSTGRES_OML_PASSWORD}
+      - POSTGRES_OML_SERVER=${POSTGRES_OML_SERVER}
+      - POSTGRES_OML_PORT=${POSTGRES_OML_PORT}
+      - POSTGRES_DIALER_PASSWORD=${POSTGRES_DIALER_PASSWORD}
+      - POSTGRES_DIALER_SERVER=${POSTGRES_DIALER_SERVER}
+      - POSTGRES_DIALER_PORT=${POSTGRES_DIALER_PORT}
+      - TZ=${TZ}
+      - GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS}
+      - GEARMAN_JOBS=start-campaign
+      - PYTHON_LOGLEVEL=${PYTHON_LOGLEVEL}
+      - DIALER_ACD_HOST=${DIALER_ACD_HOST}
+    depends_on:
+      - job_server
+      - postgresql
+ 
+  postgresql:
+    container_name: dialer-postgres
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - POSTGRES_USER=${POSTGRES_DIALER_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_DIALER_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DIALER_DB}
+      - PGPORT=5433
+    image: postgres:14.9-bullseye
+    networks:
+      - network1
+    expose:
+      - "5433"
+    ports:
+      - ${POSTGRES_DIALER_PORT}:5433
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 1m30s
+    volumes:
+      - omnidialer-postgresql:/var/lib/postgresql/data
+      - ./omnidialer.sql:/docker-entrypoint-initdb.d/init.sql
+
+  websocket_ari:
+    container_name: omnidialer_websocket_ari
+    image: ${LISTENER_IMG}  
+    networks:
+      - network1
+    tty: true
+    stdin_open: true
+    environment:
+      - ASTERISK_HOST=${ASTERISK_HOST}
+      - ASTERISK_PORT=${ASTERISK_PORT}
+      - ASTERISK_USER=${ASTERISK_USER}
+      - ASTERISK_PASS=${ASTERISK_PASS}
+      - ASTERISK_APP=${ASTERISK_APP}
+      - ASTERISK_APP_DIALER=${ASTERISK_APP_DIALER}
+      - TZ=${TZ}
+      - GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS}
+    depends_on:
+      - job_server
+      - postgresql
+      - worker
+
+  process_contact_worker:
+    image: ${WORKER_IMG}
+    deploy:
+      replicas: 3
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=process-contact
+    networks:
+      - network1
+
+  process_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: process-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=process-campaign
+    networks:
+      - network1
+
+  create_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: create-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=create-campaign
+    networks:
+      - network1
+
+  resume_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: resume-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=resume-campaign
+    networks:
+      - network1
+
+  edit_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: edit-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=edit-campaign
+    networks:
+      - network1
+
+  stop_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: stop-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=stop-campaign
+    networks:
+      - network1
+
+  pause_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: pause-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=pause-campaign
+    networks:
+      - network1
+
+  delete_campaign_worker:
+    image: ${WORKER_IMG}
+    container_name: delete-campaign-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=delete-campaign
+    networks:
+      - network1
+
+  process_event_worker:
+    image: ${WORKER_IMG}
+    container_name: process-event-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=process-event
+    networks:
+      - network1
+
+  schedule_contact_worker:
+    image: ${WORKER_IMG}
+    container_name: schedule-contact-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=schedule-contact
+    networks:
+      - network1
+
+  send_reports_worker:
+    image: ${WORKER_IMG}
+    container_name: send-reports-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=send-reports
+    networks:
+      - network1
+
+  add_incidence_rule_disposition_worker:
+    image: ${WORKER_IMG}
+    container_name: add-incidence-rule-disposition-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=add-incidence-rule-disposition
+    networks:
+      - network1
+
+  create_incidence_rule_worker:
+    image: ${WORKER_IMG}
+    container_name: create-incidence-rule-1
+    env_file: .env
+    environment:
+      - GEARMAN_JOBS=create-incidence-rule
+    networks:
+      - network1
+
+  dialer_asterisk:
+    image: ${ASTERISK_IMG}  
+    container_name: dialer_asterisk  
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - ARI_USER=${ASTERISK_USER}
+      - ARI_PASS=${ASTERISK_PASS}
+      - ASTERISK_DIALER_HOSTNAME=0.0.0.0
+      - OMLACD_HOSTNAME=${OMLACD_SIP_ADDR}
+      # - PSTNGW_SIP_USER=${PSTNGW_SIP_USER}
+      # - PSTNGW_SIP_PASS=${PSTNGW_SIP_PASS}
+      # - PSTNGW_HOSTNAME=${PSTNGW_HOSTNAME}
+      # - PSTNGW_REGISTER=${PSTNGW_REGISTER}
+      # - PSTNGW_SIP_AUTH=${PSTNGW_SIP_AUTH}
+    networks:
+      network1:
+          ipv4_address: ${ASTERISK_IPV4}
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 30s
+    working_dir: /etc/asterisk
+     
+  dialer_dialplan:
+    image: ${DIALPLAN_IMG}  
+    container_name: omnidialer-dialplan
+    depends_on:
+      - dialer_asterisk
+    environment:
+      - TZ=${TZ}
+      - REDIS_HOSTNAME=${REDIS_OML_SERVER}
+      - REDIS_PORT=${REDIS_OML_PORT}
+      - ARI_HOST=${ASTERISK_HOST}
+      - ARI_PORT=${ASTERISK_PORT}
+      - ARI_USER=${ASTERISK_USER}
+      - ARI_PASS=${ASTERISK_PASS}
+    restart: on-failure
+    stop_grace_period: 30s
+    networks:
+      - network1  
+
+networks:
+  network1:
+    name: ${NETWORK}
+    external: true
+
+volumes:
+  omnidialer-postgresql:
+  redis_redisinsight:
+  redis_omnidialer:

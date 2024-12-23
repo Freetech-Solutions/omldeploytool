@@ -1,0 +1,34 @@
+[Unit]
+Description=Podman Omnidialer API
+Documentation=man:podman-generate-systemd(1)
+Wants=network-online.target
+After=network.target job_server.service dialer_redis.service dialer_postgresql.service
+Requires=network.target job_server.service dialer_redis.service dialer_postgresql.service
+RequiresMountsFor=%t/containers
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Restart=on-failure
+TimeoutStopSec=70
+ExecStartPre=/bin/rm -f %t/%n.ctr-id
+ExecStart=/usr/bin/podman run \
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --replace \
+  --detach \
+  --network=omldialer \
+  --port=1440:1440 \
+  --env-file=/etc/default/dialer.env \
+  -e GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS} \
+  --name=oml-dialer-api \
+  --rm  \
+  {{ dialer_api_img }}
+ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
+ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
+Type=notify
+NotifyAccess=all
+StandardOutput=journal
+StandardError=journal
+[Install]
+WantedBy=default.target

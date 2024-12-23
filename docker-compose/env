@@ -1,48 +1,49 @@
 #############################
 #   Name of the project     #
 #############################
-COMPOSE_PROJECT_NAME=omnileads
+COMPOSE_PROJECT_NAME=oml
 
+#############################
+#   Name of the project     #
+#############################
 # --- "cloud" instance (access through public IP)
 # --- "lan" instance (access through private IP)
 # ---- "nat" instance (access through NAT)
 # --- "devenv" is for run on docker-desktop (access through localhost)
 ENV=devenv
+REPO_PATH=./omnileads-repos
 
+# iPV4 address of the host
 PUBLIC_IP=
+PRIVATE_IP=
 
+REPO=omnileads
 #############################################################
 #               Components image version                    #
 #           versions of each image to deploy                #
 #############################################################
 
-REPO=omnileads
+OMLAPP_IMG=freetechsolutions/omlapp:241211.01
+OMLACD_IMG=freetechsolutions/asterisk:241211.01
+OMLACD_RETRIEVE_CONF_IMG=omnileads/acd_retrieve_conf:240729.01
+OMLFASTAGI_IMG=omnileads/fastagi:241017.01
+OMLAMI_IMG=omnileads/astami:241017.01
+OMLNGINX_IMG=omnileads/nginx:241009.01
+OMLKAM_IMG=freetechsolutions/kamailio:241109.01
+OMLRTPENGINE_IMG=freetechsolutions/rtpengine:241128.01
+OMLWS_IMG=omnileads/websockets:240705.01
+OMLINTERACTION_PROC_IMG=omnileads/interaction_processor:240506.01
+OMLCHAN_TEL_LOGGER_IMG=omnileads/chan_tel_logger:241220.01
 
-OMLAPP_IMG=${REPO}/omlapp:241217.01
-OMLACD_IMG=${REPO}/asterisk:240920.01
-OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:240729.01
-OMLFASTAGI_IMG=${REPO}/fastagi:241209.01
-OMLAMI_IMG=${REPO}/astami:241017.01
-OMLNGINX_IMG=${REPO}/nginx:241009.01
-OMLKAM_IMG=${REPO}/kamailio:240625.01
-OMLRTPENGINE_IMG=${REPO}/rtpengine:240625.01
-OMLWS_IMG=${REPO}/websockets:240705.01
-OMLREDIS_IMG=${REPO}/redis:231125.01
-OMLSENTIMENT_IMG=${REPO}/sentiment_analysis:240427.01
-OMLINTERACTION_PROC_IMG=${REPO}/interaction_processor:240506.01
+OMLPSTNEMULATOR_IMG=omnileads/pstn_emulator:241209.01
+OMLVIDEOCALLS_WIDGET_IMG=omnileads/videocalls_widget:230905.01
+OMLVUEJS_IMG=freetechsolutions/vue-cli:develop
+OMLNGINXQA_IMG=omnileads/nginxqa:241028.01
 
-OMLDIALER_ACD_IMG=${REPO}/asterisk_dialer:240820.01
-OMLDIALER_CALL_MANAGER_IMG=freetechsolutions/omlcall_manager_dialer:240729.01
-
-OMLPSTNEMULATOR_IMG=${REPO}/pstn_emulator:241209.01
-OMLVIDEOCALLS_WIDGET_IMG=${REPO}/videocalls_widget:230905.01
-
+OMLREDIS_IMG=redislabs/redisgears:1.0.9
 OMLPGSQL_IMG=postgres:14.9-bullseye
 OMLMINIO_IMG=quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
-MARIADB_IMG=bitnami/mariadb:latest
-WOMBAT_IMG=freetechsolutions/wombat:21.06.4-9
-
-
+OMLPROMETHEUS_IMG=prom/prometheus:v3.0.1
 
 ################################
 # Timezone for the environment #
@@ -64,8 +65,21 @@ CALLREC_DEVICE=s3-minio
 ###################################################################################################
 
 # --- IP or hostname that each instance will invoke when locating the other    
-DJANGO_HOSTNAME=app
-DAPHNE_HOSTNAME=channels
+DJANGO_HOSTNAME=django_app
+DAPHNE_HOSTNAME=daphne
+
+# Scale UWSGI
+#UWSGI_CUSTOM=True
+#UWSGI_PROCESSES=4
+#UWSGI_THREADS=1
+#UWSGI_LISTEN_QUEUE_SIZE=2048
+#UWSGI_WORKER_RELOAD_MERCY=60
+#UWSGI_MAX_WORKER_LIFETIME=7200
+#UWSGI_MAX_WORKER_LIFETIME_DELTA=300
+#UWSGI_RELOAD_ON_RSS=1024
+#UWSGI_RELOAD_ON_AS=2048
+#UWSGI_EVIL_RELOAD_ON_RSS=3096
+#UWSGI_MAX_REQUESTS=2000
 
 # Session Cookie Age (SCA) is the time in seconds that will last the https session when inactivity
 # is detected in the session (by default is 1 hour)
@@ -81,7 +95,7 @@ AUTHEPH_SK=SUp3rS3cr3tK3y
 # Django logs (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 DJANGO_LOG_LEVEL=INFO
 
-DJANGO_PORT=8099
+UWSGI_PORT=8099
 DAPHNE_PORT=8098
 ##################################
 # Name of the agenda disposition #
@@ -99,6 +113,7 @@ LOGIN_FAILURE_LIMIT=10
 
 # --- IP or hostname that each instance will invoke when locating the other    
 ASTERISK_HOSTNAME=acd
+ACD_CONTAINER_IPV4=10.22.22.99
 
 AMI_USER=omnileadsami
 AMI_PASSWORD=5_MeO_DMT
@@ -108,6 +123,8 @@ SIP_EXT_PORT=5060
 FASTAGI_HOSTNAME=fastagi
 
 SCALE=false
+
+CALLREC_SPLIT_CHANNELS=false
 #####################################################################################################
 #                                       POSTGRESQL                                                  #
 #####################################################################################################
@@ -149,40 +166,33 @@ WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 #########################################################################################################
 #                                           KAMAILIO                                                    #
 #########################################################################################################
-
 # --- IP or hostname that each instance will invoke when locating the other    
 KAMAILIO_HOSTNAME=kamailio
 KAMAILIO_HTTPS_PORT=14443
+KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
 
 # Variables for Kamailio memory. SHM is the maximum memory ammount.
 # PKG is the minimum memory ammount
-
 SHM_SIZE=64
 PKG_SIZE=8
 
-
+s
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - RABBITMQ                            #
 #########################################################################################################
-# -----------------------------------------------------------------------------
-
-# ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
-# ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
-# *** nginx or app_lb in case of HA *** #
-
 # --- IP or hostname that each instance will invoke when locating the other    
 OMNILEADS_HOSTNAME=nginx
-
 NGINX_EXT_PORT=443
 
 # -----------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 REDIS_HOSTNAME=redis
+REDIS_PORT=6379
 
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 RTPENGINE_HOSTNAME=rtpengine
-
+RTPENGINE_CONTAINER_IPV4=10.22.22.98
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 RABBITMQ_HOSTNAME=rabbitmq
@@ -219,37 +229,17 @@ S3_ENDPOINT_MINIO=http://minio:9000
 HOMER_ENABLE=false
 
 # --- IP or hostname that each instance will invoke when locating the other    
-HOMERHOST=heplify-server
+HOMER_HOSTNAME=heplify-server
 
-HOMERPORT=9060
+HOMER_PORT=9060
 
 #########################################################################################################
 #                                    DIALER                                                             #
 #########################################################################################################
 
-# --- Wombat Dialer hostname/IP and API user / pass
-WOMBAT_HOSTNAME=wombat
-
-WOMBAT_USER=demoadmin
-WOMBAT_PASSWORD=demo
-
-# --- Wombat Dialer mysql params
-WOMBAT_DB=wombat
-WOMBAT_DB_USER=wombat
-WOMBAT_DB_PASS=dials
-
-# MARIADB
-
-# --- IP or hostname that each instance will invoke when locating the other    
-MYSQL_HOST=mariadb
-MYSQL_ROOT_PASS=admin123
-
-# --- OMni Dialer
-
-DIALER_ACD_SIP_USER=omnidialer
-DIALER_ACD_SIP_PASS=OMn1P455098#
-ACD_SIP_TRUNK_ADDR=acd:5060
-DIALER_ACD_HOST=dialer_acd
+OML_DIALER_ENGINE=omnidialer
+OMNIDIALER_HOST=omnidialer-api:1440
+DIALER_SIP_ADDR=10.22.22.199:5060
 
 #########################################################################################################
 #                                          VIDEO CALLS                                                  #
@@ -279,20 +269,52 @@ OPENAI_API_KEY=fghsfdghshj5e4hjg2hj432ghj423ghj
 
 
 #########################################################################################################
+#                                          Monitoring                                                   #
+#########################################################################################################
+
+HOMER_ENABLE=false
+
+# --- IP or hostname that each instance will invoke when locating the other    
+HOMERHOST=heplify-server
+
+HOMERPORT=9060
+
+
+#########################################################################################################
 #       Subnet for the docker bridge network, change it if this subnet conflicts with yours             #
 #########################################################################################################
-SUBNET=10.12.12.0/24
-GATEWAY=10.12.12.254
+NETWORK_NAME=omnileads
+SUBNET=10.22.22.0/24
+GATEWAY=10.22.22.254
 
 #########################################################################################################
 #                                       Django default settings                                         #
 #########################################################################################################
-OMLAPP_VERSION=240201.01
+OMLAPP_VERSION=241121
 DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
 PYTHONPATH=/opt/omnileads/ominicontacto
 INSTALL_PREFIX=/opt/omnileads/
 OML_COMMIT=XCOMIT
 OML_BRANCH=docker-compose
-OML_BUILD_DATE="20240403"
-KAMAILIO_CERTS_LOCATION=/etc/omnileads/certs
+OML_BUILD_DATE="241121"
 MONITORFORMAT=mp3
+S3_STORAGE_ENABLED=true
+
+#########################################################################################################
+#                                       QA & Testing                                                    #
+#########################################################################################################
+# --- PSTN EMULATOR
+
+# ---default: 100% of the calls are answered.
+# ---dial2softphone: 100% of the calls are sent to the testing softphone.
+# ---ans_busy: 50% of the calls are answered, while the other 50% return BUSY.
+# ---ans_busy_congestion_noans: 25% of the calls are answered, while another 25% return BUSY, 25% return CONGESTION, and 25% return NO ANSWER.
+# ---advanced: in this mode, calls are processed according to the last digit:
+# ---       0: BUSY
+# ---       2: ANSWER a call lasting 15 seconds.
+# ---       3: Waits 35 seconds, then ANSWER a call lasting 100 seconds.
+# ---       5: NO ANSWER
+# ---       7: ANSWER a call lasting 27 seconds.
+# ---       9: CONGESTION
+
+PSTN_EMULATOR_MODE=default
