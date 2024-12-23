@@ -1,0 +1,17 @@
+[Unit]
+Description=Podman Gearman Job Server
+After=network.target
+Requires=network.target
+
+[Service]
+Restart=always
+ExecStartPre=-/usr/bin/podman rm -f gearman_job_server
+ExecStart=/usr/bin/podman run --name gearman_job_server \
+  --network omnidialer-network \
+  -p 4730:4730 \
+  --rm -d \
+  docker.io/artefactual/gearmand:1.1.18-alpine gearmand -t 1
+ExecStop=/usr/bin/podman stop gearman_job_server
+
+[Install]
+WantedBy=multi-user.target

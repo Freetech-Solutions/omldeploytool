@@ -1,0 +1,24 @@
+[Unit]
+Description=Podman PostgreSQL Service
+After=network.target
+Requires=network.target
+
+[Service]
+Restart=always
+Environment=POSTGRES_USER=your_db_user
+Environment=POSTGRES_PASSWORD=your_db_password
+Environment=POSTGRES_DB=your_db_name
+ExecStartPre=-/usr/bin/podman rm -f dialer-postgres
+ExecStart=/usr/bin/podman run --name dialer-postgres \
+  --network omnidialer-network \
+  -p 5433:5433 \
+  -v omnidialer-postgresql:/var/lib/postgresql/data \
+  -e POSTGRES_USER=${POSTGRES_USER} \
+  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+  -e POSTGRES_DB=${POSTGRES_DB} \
+  --rm -d \
+  docker.io/postgres:14.9-bullseye -p 5433
+ExecStop=/usr/bin/podman stop dialer-postgres
+
+[Install]
+WantedBy=multi-user.target

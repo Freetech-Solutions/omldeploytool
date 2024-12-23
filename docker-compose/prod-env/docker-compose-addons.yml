@@ -1,0 +1,20 @@
+services:
+
+  wallboard_server:
+    image: "{{ omnileads_img }}"
+    container_name: oml-wallboard-server
+    restart: unless-stopped
+    env_file: 
+      - /etc/default/django.env
+    environment:
+      - GOOGLE_MAPS_CENTER={{ google_maps_center }}
+    command: python /opt/omnileads/ominicontacto/manage.py wallboard_events_listener
+    remove: true
+
+  survey_worker_server:
+    image: "{{ survey_worker_img }}"
+    container_name: oml-survey_worker-server
+    restart: unless-stopped
+    env_file: 
+      - /etc/default/fastagi.env
+    remove: true
