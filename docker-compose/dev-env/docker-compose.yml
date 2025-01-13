@@ -3,7 +3,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/omlapp
-    image: omnileads/omlapp:dev
+    image: omlapp:dev
     container_name: oml-app
     depends_on:
       - postgresql
@@ -28,7 +28,7 @@ services:
     volumes:
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
       - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
-    
+      
   daphne:
     container_name: oml-daphne
     depends_on:
@@ -39,7 +39,7 @@ services:
     environment:
       - DAPHNE_ENABLE=True
       - DJANGO_HOSTNAME=daphne
-    image: omnileads/omlapp:dev
+    image: omlapp:dev
     command: /opt/omnileads/bin/init_daphne.sh
     networks:
       - omnileads
@@ -63,7 +63,7 @@ services:
     environment:
       - UWSGI_PORT=8097
       - DJANGO_HOSTNAME=omlcron
-    image: omnileads/omlapp:dev
+    image: omlapp:dev
     command: /opt/omnileads/bin/docker-entrypoint.sh
     networks:
       - omnileads
@@ -78,7 +78,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/omlfastagi
-    image: omnileads/fastagi:dev
+    image: fastagi:dev
     container_name: oml-fastagi
     command: python /app/fastagi.py
     environment:
@@ -100,7 +100,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/omlami
-    image: omnileads/astami:dev
+    image: astami:dev
     container_name: oml-astami
     environment:
       - TZ=${TZ}
@@ -115,7 +115,7 @@ services:
   acd_config_generator:
     build:
       context: ${REPO_PATH}/acd_retrieve_conf
-    image: omnileads/acd_retrieve_conf:dev
+    image: acd_retrieve_conf:dev
     container_name: oml-acd-conf
     depends_on:
       - websockets
@@ -140,7 +140,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/omlacd
-    image: omnileads/asterisk:dev
+    image: asterisk:dev
     container_name: oml-acd
     depends_on:
       - fastagi
@@ -169,15 +169,15 @@ services:
       - asterisk_callrec:/var/spool/asterisk/monitor/
       - asterisk_conf:/etc/asterisk/retrieve_conf
       - asterisk_sounds:/var/lib/asterisk/sounds/oml
-      #- ./asterisk_custom/google_credential.json:/tmp/google_credential.json
-      - ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
+      # - ./asterisk_custom/google_credential.json:/tmp/google_credential.json
+      # - ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
     working_dir: /etc/asterisk
 
   interaction_processor:
     build:
       target: run
       context: ${REPO_PATH}/oml_interactions_processor
-    image: omnileads/interaction_processor:dev
+    image: interaction_processor:dev
     container_name: oml-post-interactions
     depends_on:
       - minio
@@ -206,7 +206,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/tel_call_logger
-    image: omnileads/call_log_processor:dev
+    image: call_log_processor:dev
     container_name: oml-chan-tel-logger
     depends_on:
       - rabbitmq
@@ -235,7 +235,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/omlkamailio
-    image: omnileads/kamailio:dev
+    image: kamailio:dev
     container_name: oml-kamailio
     depends_on:
       - redis
@@ -262,7 +262,7 @@ services:
     build:
       target: run
       context: ${REPO_PATH}/omlnginx
-    image: omnileads/nginx:dev
+    image: nginx:dev
     container_name: oml-nginx
     depends_on:
       - django_app
@@ -301,7 +301,7 @@ services:
   rtpengine:
     build:
       context: ${REPO_PATH}/omlrtpengine
-    image: omnileads/rtpengine:dev
+    image: rtpengine:dev
     container_name: oml-rtpengine
     dns: 8.8.8.8
     environment:
@@ -379,6 +379,7 @@ services:
       - 8081:8080
     networks:
       - omnileads
+    working_dir: /home/oml_frontend
     volumes:
       - ${REPO_PATH}/omlapp/omnileads_ui/:/home/oml_frontend/
       - ${REPO_PATH}/survey_app/:/home/survey/
@@ -437,7 +438,7 @@ services:
     environment:
       - TZ=${TZ}
       - INBOUND_CALL_MODE=${PSTN_EMULATOR_MODE}
-    image: omnileads/pstn_emulator:dev
+    image: pstn_emulator:dev
     networks:
       - omnileads
     ports:

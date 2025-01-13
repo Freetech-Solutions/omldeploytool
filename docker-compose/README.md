@@ -39,14 +39,19 @@ In this folder, we will find three Docker Compose environments.
 
 In this environment, the Django application runs using the framework's development mode. Additionally, Docker binding is used to mount the code of each component into its respective container.
 
+If you want to set up the development environment on a Linux machine, simply run the docker_install_linux.sh script to install the necessary tools.
+
+```
+$ ./docker_install_linux.sh
+```
+
+
 With the following sequence of commands, you will have an environment ready to start using your development setup:
 
 ```
 $ cd dev-env
-$ ./deploy.sh --gitlab_clone=https|ssh
-$ docker-compose build
+$ ./deploy.sh --gitlab_clone=https or ssh
 $ ../oml_manage --reset_pass
-$ ../oml_manage --init_env
 ```
 
 Once the environment is up, you can proceed to log in at https://localhost using the username admin and password admin
@@ -76,7 +81,7 @@ operate behind an SBC (Session Border Controller) exposed to the Internet.
 
 However, we can intelligently use the **Cloud Firewall** technology when operating over VPS exposed to the Internet.
 
-![Diagrama security](../ansible/png/security.png)
+<img src="../ansible/png/security.png" alt="Security" width="700">
 
 Below are the Firewall rules to be applied on All In One instance:
 
@@ -98,7 +103,7 @@ This environment is ideal for quickly and simple deploy on production. For insta
 #### deploy.sh script based deploy
 
 ```
-$ curl -o deploy.sh -L "https://gitlab.com/omnileads/omldeploytool/-/raw/oml-2679-dev-discador-oml/docker-compose/prod-env/deploy.sh?ref_type=heads" && chmod +x  deploy.sh
+$ curl -o deploy.sh -L "https://gitlab.com/omnileads/omldeploytool/-/raw/main/docker-compose/prod-env/deploy.sh?ref_type=heads" && chmod +x  deploy.sh
 ```
 
 Upon the availability of the deploy.sh script, we will trigger its execution.

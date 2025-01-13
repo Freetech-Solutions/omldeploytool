@@ -23,22 +23,22 @@ REPO=omnileads
 #           versions of each image to deploy                #
 #############################################################
 
-OMLAPP_IMG=freetechsolutions/omlapp:241211.01
-OMLACD_IMG=freetechsolutions/asterisk:241211.01
-OMLACD_RETRIEVE_CONF_IMG=omnileads/acd_retrieve_conf:240729.01
-OMLFASTAGI_IMG=omnileads/fastagi:241017.01
-OMLAMI_IMG=omnileads/astami:241017.01
-OMLNGINX_IMG=omnileads/nginx:241009.01
-OMLKAM_IMG=freetechsolutions/kamailio:241109.01
-OMLRTPENGINE_IMG=freetechsolutions/rtpengine:241128.01
-OMLWS_IMG=omnileads/websockets:240705.01
-OMLINTERACTION_PROC_IMG=omnileads/interaction_processor:240506.01
-OMLCHAN_TEL_LOGGER_IMG=omnileads/chan_tel_logger:241220.01
+OMLAPP_IMG=${REPO}/omlapp:241230.01
+OMLACD_IMG=freetechsolutions/asterisk:250107.01
+OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:240729.01
+OMLFASTAGI_IMG=${REPO}/fastagi:241209.01
+OMLAMI_IMG=${REPO}/astami:241017.01
+OMLNGINX_IMG=${REPO}/nginx:241009.01
+OMLKAM_IMG=${REPO}/kamailio:241109.01
+OMLRTPENGINE_IMG=${REPO}/rtpengine:241128.01
+OMLWS_IMG=${REPO}/websockets:240705.01
+OMLINTERACTION_PROC_IMG=${REPO}/interaction_processor:240506.01
+OMLCHAN_TEL_LOGGER_IMG=${REPO}/chan_tel_logger:241221.01
 
-OMLPSTNEMULATOR_IMG=omnileads/pstn_emulator:241209.01
-OMLVIDEOCALLS_WIDGET_IMG=omnileads/videocalls_widget:230905.01
+OMLPSTNEMULATOR_IMG=${REPO}/pstn_emulator:241209.01
+OMLVIDEOCALLS_WIDGET_IMG=${REPO}/videocalls_widget:230905.01
 OMLVUEJS_IMG=freetechsolutions/vue-cli:develop
-OMLNGINXQA_IMG=omnileads/nginxqa:241028.01
+OMLNGINXQA_IMG=${REPO}/nginxqa:latest
 
 OMLREDIS_IMG=redislabs/redisgears:1.0.9
 OMLPGSQL_IMG=postgres:14.9-bullseye
@@ -240,6 +240,9 @@ HOMER_PORT=9060
 OML_DIALER_ENGINE=omnidialer
 OMNIDIALER_HOST=omnidialer-api:1440
 DIALER_SIP_ADDR=10.22.22.199:5060
+
+WOMBAT_USER=demoadmin
+WOMBAT_PASSWORD=demo
 
 #########################################################################################################
 #                                          VIDEO CALLS                                                  #

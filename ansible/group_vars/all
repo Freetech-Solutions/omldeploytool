@@ -2,7 +2,7 @@
 
 #################### containers img tags  ################################
 
-fastagi_img: docker.io/omnileads/fastagi:241017.01
+fastagi_img: docker.io/omnileads/fastagi:241209.01
 dialer_api_img: docker.io/freetechsolutions/dialer_api:dev
 dialer_worker_img: docker.io/freetechsolutions/dialer_worker:dev
 dialer_ws_img: docker.io/freetechsolutions/dialer_ws:dev
@@ -12,8 +12,8 @@ asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:240729.01
 astami_img: docker.io/omnileads/astami:241017.01
 nginx_img: docker.io/omnileads/nginx:241009.01
 websockets_img: docker.io/omnileads/websockets:240705.01
-kamailio_img: docker.io/omnileads/kamailio:240625.01
-rtpengine_img: docker.io/omnileads/rtpengine:240625.01
+kamailio_img: docker.io/omnileads/kamailio:241109.01
+rtpengine_img: docker.io/omnileads/rtpengine:241128.01
 redis_img: docker.io/omnileads/redis:231125.01
 postgres_img: docker.io/postgres:14.9-bullseye
 postgres_ha_img: docker.io/omnileads/postgres:240902.02
@@ -26,7 +26,7 @@ minio_img: quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
 rabbitmq_img: docker.io/rabbitmq:3.12
 postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
 redis_prometheus_img: docker.io/oliver006/redis_exporter:latest
-nginxcgi_img: docker.io/omnileads/nginxqa:231117.01
+nginxcgi_img: docker.io/omnileads/nginxqa:latest
 pstn_emulator_img: docker.io/omnileads/pstn_emulator:241209.01
 wombat_img: docker.io/freetechsolutions/wombat:21.06.4-9
 mysql_img: docker.io/bitnami/mariadb:latest

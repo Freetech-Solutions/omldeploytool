@@ -1,4 +1,4 @@
-#!/bin/bash
+                                                                                                                                                                                                                                                                                                                                                                                                    #!/bin/bash
 
 set -e
 
@@ -53,7 +53,7 @@ log_error() {
 }
 
 setup_networking() {
-    log_info "*** Configurando direcciones de red ***"
+    log_info "*** Network settings ***"
     if [[ -z "$lan_addr" ]]; then
         lan_ipv4=$(ip addr show "$oml_nic" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1) || log_error "No se pudo obtener la dirección privada."
     else
@@ -66,7 +66,7 @@ setup_networking() {
 }
 
 setup_os_dependencies() {
-    log_info "*** Instalando dependencias del sistema operativo ***"
+    log_info "*** Install docker and others dependencies ***"
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         OS_ID=$ID
@@ -85,34 +85,34 @@ setup_os_dependencies() {
         systemctl start docker
         systemctl enable docker
     else
-        log_error "Distribución no soportada."
+        log_error "Linux distro not found. Please install Docker manually."
     fi
 
     ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose
 }
 
 deploy_omnileads() {
-    log_info "*** Clonando y desplegando Omnileads ***"
+    log_info "Cloning the OML deploy tool repository"
     git clone https://gitlab.com/omnileads/omldeploytool.git || log_error "Error al clonar el repositorio."
 
-    cd omldeploytool || log_error "No se pudo acceder al directorio 'omldeploytool'."
+    cd omldeploytool || log_error "Canot access the 'omldeploytool' directory."
     
     if [[ "$branch" != "main" ]]; then
         git checkout "$branch" || log_error "Error al cambiar a la rama '$branch'."
     fi
     
     cp docker-compose/oml_manage /usr/local/bin/oml_manage
-    cd docker-compose/prod-env || log_error "No se pudo acceder al directorio 'prod-env'."
+    cd docker-compose/prod-env || log_error "Canot access the 'prod-env' directory."
 
     cp ../env ./.env
     sed -i "s/ENV=devenv/ENV=${env}/g" .env
     sed -i "s/PRIVATE_IP=/PRIVATE_IP=${lan_ipv4}/g" .env
 
-    docker-compose up -d || log_error "Error al iniciar los contenedores con Docker Compose."
+    docker-compose up -d || log_error "Error while executing docker-compose up -d."
 }
 
 setup_iptables() {
-    log_info "*** Configurando iptables y persistencia con rc.local ***"
+    log_info "Iptables RTP rules setup"
 
     # Crear reglas de iptables
     iptables -t nat -A PREROUTING -p udp --dport 5060 -j DNAT --to-destination 10.22.22.99
@@ -139,21 +139,21 @@ iptables -t nat -A PREROUTING -p udp --dport 20000:30000 -j DNAT --to-destinatio
 iptables -A FORWARD -p udp -d 10.22.22.98 --dport 20000:30000 -j ACCEPT' /etc/rc.local
         log_info "Reglas de iptables añadidas a rc.local."
     else
-        log_info "Las reglas de iptables ya están configuradas en rc.local."
+        log_info "The iptables rules already exist in rc.local."
     fi
 }
 
 wait_for_env() {
-    log_info "*** Esperando que el entorno se inicie ***"
+    log_info "*** The environment is currently starting up. Please wait. ***"
     until curl -sk --head --request GET "https://${lan_ipv4}" | grep "302" > /dev/null; do
-        log_info "El entorno aún se está inicializando, esperando 10 segundos..."
+        log_info "The system is in the process of starting up. Please wait ..."
         sleep 10
     done
     log_info "¡Deploy ready!"
 }
 
 reset_admin_password() {
-    log_info "*** Reseteando la contraseña de administrador ***"
+    log_info "*** Password reset ***"
     /usr/local/bin/oml_manage --reset_pass || log_error "Error al resetear la contraseña de administrador."
 }
 
