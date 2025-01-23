@@ -1,5 +1,5 @@
 [Unit]
-Description=Podman wallboard_listener.service
+Description=Podman builk_messages.service
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
 After=network-online.target
@@ -21,9 +21,9 @@ ExecStart=/usr/bin/podman run \
 --log-driver=journald \
 --env-file=/etc/default/django.env \
 -e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
---name=oml-wallboard-server \
+--name=oml-bulk-messages-worker \
 --rm  \
-{{ omnileads_img }} python /opt/omnileads/ominicontacto/manage.py wallboard_events_listener
+{{ omnileads_img }} python /opt/omnileads/ominicontacto/manage.py ejecutar_ordenes_de_envio
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

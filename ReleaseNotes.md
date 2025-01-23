@@ -1,36 +1,42 @@
 # Release Notes - OMniLeads 2.3.0
-[2025-01-02]
+[2025-01-20]
 
 ## Added
 
-* oml-2843 [OMLAPP] - Close Whatsapp conversations command.
-* oml-680 [OMLAPP][OMLACD] - Add Direct Inbound Dial to agents endpoint.
+* oml-2843 Close Whatsapp conversations command.
+* oml-2724 Better notifications in case of External site interaction errors.
+* oml-2765 Show transfer conference members.
+* oml-2732 Consultative transfers to campaigns enabled.
 
 ## Improvements
 
-* oml-2679 [DEPLOY][DOCKER] - Docker deploy refactor (devenv, testenv & prodenv).
-* oml-659 [OMLKAM] - Upgrade to kamailio 5.8 & improve container img size.
-* oml-658 [OMLRTP] - Upgrade to Rtpengine mr13.0.1.5 & improve container img size.
+* oml-2679 Docker deploy refactor (devenv, testenv & prodenv).
+* oml-659 Upgrade to kamailio 5.8 & improve container img size.
+* oml-658 Upgrade to Rtpengine mr13.0.1.5 & improve container img size.
+* oml-2825 Whatsapp Interactive Menu form validations
+* PJSIP parameters optimized for different networking scenarios.
 
 ## Fixes
 
-* oml-697 [OMLACD] - Time groups & Time conditions fix.
-* oml-697 [OMLACD] - Telephony channel audio prompts container volume.
-* oml-2854 [OMLAPP] - Optimizations to allow loading big Blacklists.
-* oml-2831 [OMLAPP] - Identify Whatsapp contact now shows phone field correctly.
-* oml-2856 [OMLAPP] - IVR name change is reflected in IVR as Destination Option.
+* oml-697 Time groups & Time conditions fix.
+* oml-697 Telephony channel audio prompts container volume.
+* oml-2854 Optimizations to allow loading big Blacklists.
+* oml-2831 Identify Whatsapp contact now shows phone field correctly.
+* oml-2856 IVR name change is reflected in IVR as Destination Option.
+* oml-2862 Hide Whatsapp Providers "Password Partner" field.
+* oml-2861 Fix Whatsapp line wizzard initial field data bug.
 
 ## Component changes
 
 ### OMLAPP (Django/VueJS)
 
-- [Container Img]()
-- [Gitlab Repo]()
+- [Container Img](https://hub.docker.com/layers/omnileads/omlapp/250122.01/images/sha256-f998e5edaa18452fed11aa1bde456e42e0c6e4f500589ab7efed8145f00e5de4)
+- [Gitlab Repo](https://gitlab.com/omnileads/ominicontacto/-/tree/250122.01?ref_type=tags)
 
 ### OMLACD (Automatic Call Distribution component)
 
-- [Container Img]()
-- [Gitlab Repo]()
+- [Container Img](https://hub.docker.com/layers/omnileads/asterisk/250117.01/images/sha256-0d20de84b4c4bfefcf8cf7fe7716795bff356a839f420ec594f9fbfba648103d)
+- [Gitlab Repo](https://gitlab.com/omnileads/omlacd/-/tree/250122.01?ref_type=tags)
 
 ### OMLSIPProxy (SIP Proxy component)
 
