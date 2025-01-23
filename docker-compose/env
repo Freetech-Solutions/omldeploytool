@@ -23,8 +23,8 @@ REPO=omnileads
 #           versions of each image to deploy                #
 #############################################################
 
-OMLAPP_IMG=${REPO}/omlapp:241230.01
-OMLACD_IMG=freetechsolutions/asterisk:250107.01
+OMLAPP_IMG=${REPO}/omlapp:250122.01
+OMLACD_IMG=${REPO}/asterisk:250117.01
 OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:240729.01
 OMLFASTAGI_IMG=${REPO}/fastagi:241209.01
 OMLAMI_IMG=${REPO}/astami:241017.01
@@ -237,9 +237,9 @@ HOMER_PORT=9060
 #                                    DIALER                                                             #
 #########################################################################################################
 
-OML_DIALER_ENGINE=omnidialer
-OMNIDIALER_HOST=omnidialer-api:1440
-DIALER_SIP_ADDR=10.22.22.199:5060
+# OML_DIALER_ENGINE=omnidialer
+# OMNIDIALER_HOST=omnidialer-api:1440
+# DIALER_SIP_ADDR=10.22.22.199:5060
 
 WOMBAT_USER=demoadmin
 WOMBAT_PASSWORD=demo

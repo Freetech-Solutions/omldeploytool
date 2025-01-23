@@ -225,7 +225,7 @@ all:
     # ------------------------------------------------------------------------------------------------ #
     
     # --- The Dialer Engine Host (omnileads or wombat)
-    dialer_engine: omnileads
+    # dialer_engine: omnileads
     # ---- localhost or stanalone server host IP
     #dialer_host: localhost
     # --- Text to Speech external "gcp", "aws", "ibm", etc.
@@ -364,8 +364,8 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:241230.01
-    asterisk_img: docker.io/freetechsolutions/asterisk:250101.01
+    omnileads_img: docker.io/omnileads/omlapp:250122.01
+    asterisk_img: docker.io/omnileads/asterisk:250117.01
 
 ##############################################################################################################
 ## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #
