@@ -1,0 +1,18 @@
+[Unit]
+Description=Podman Redis Service
+After=network.target
+Requires=network.target
+
+[Service]
+Restart=always
+ExecStartPre=-/usr/bin/podman rm -f omnidialer-redis
+ExecStart=/usr/bin/podman run --name omnidialer-redis \
+  --network omnidialer-network \
+  -p 6380:6380 \
+  -v redis_omnidialer:/data \
+  --rm -d \
+  docker.io/redis:7.2.5-alpine redis-server --port 6380
+ExecStop=/usr/bin/podman stop omnidialer-redis
+
+[Install]
+WantedBy=multi-user.target

@@ -14,15 +14,15 @@ deploy-aio-cloud-docker:
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
       fi
-    - sed -i "s/\${NIC}/eth1/g" ./first_boot_installer.sh
-    - sed -i "s/\${ENV}/cloud/g" ./first_boot_installer.sh
-    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./first_boot_installer.sh
+    - sed -i "s/\${NIC}/eth1/g" ./deploy.sh
+    - sed -i "s/\${ENV}/docker-compose/g" ./deploy.sh
+    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
       if [ -n "${OMLAPP_IMG}" ]; then
         echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./first_boot_installer.sh
+        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./deploy.sh
       fi    
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./first_boot_installer.sh cicd-docker-compose.${CI_JOB_ID}
+    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
     - sleep 60
     - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
     - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
@@ -47,15 +47,15 @@ deploy-aio-cloud-docker-rocky:
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
       fi
-    - sed -i "s/\${NIC}/eth1/g" ./first_boot_installer.sh
-    - sed -i "s/\${ENV}/cloud/g" ./first_boot_installer.sh
-    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./first_boot_installer.sh
+    - sed -i "s/\${NIC}/eth1/g" ./deploy.sh
+    - sed -i "s/\${ENV}/docker-compose/g" ./deploy.sh
+    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
       if [ -n "${OMLAPP_IMG}" ]; then
         echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./first_boot_installer.sh
+        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./deploy.sh
       fi    
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_ROCKY_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./first_boot_installer.sh cicd-docker-compose.${CI_JOB_ID}
+    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_ROCKY_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
     - sleep 60
     - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
     - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
@@ -301,15 +301,15 @@ deploy-aio-cloud-docker-norm:
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
       fi
-    - sed -i "s/\${NIC}/eth1/g" ./first_boot_installer.sh
-    - sed -i "s/\${ENV}/cloud/g" ./first_boot_installer.sh
-    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./first_boot_installer.sh
+    - sed -i "s/\${NIC}/eth1/g" ./deploy.sh
+    - sed -i "s/\${ENV}/docker-compose/g" ./deploy.sh
+    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
       if [ -n "${OMLAPP_IMG}" ]; then
         echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./first_boot_installer.sh
+        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./deploy.sh
       fi    
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./first_boot_installer.sh cicd-docker-compose.${CI_JOB_ID}
+    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
     - sleep 60
     - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
     - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"

@@ -1,14 +1,14 @@
 [Unit]
-Description=Podman redis2postgres.service
+Description=Podman Omnidialer API
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
-After=network-online.target
+After=network.target job_server.service dialer_redis.service dialer_postgresql.service
+Requires=network.target job_server.service dialer_redis.service dialer_postgresql.service
 RequiresMountsFor=%t/containers
 
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
-Restart=on-failure:5
-RestartSec=60
+Restart=on-failure
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
@@ -17,15 +17,18 @@ ExecStart=/usr/bin/podman run \
   --sdnotify=conmon \
   --replace \
   --detach \
-  --network=host \
-  --env-file=/etc/default/fastagi.env \
-  --name=oml-survey_worker-server \
+  --network=omldialer \
+  --port=1440:1440 \
+  --env-file=/etc/default/dialer.env \
+  -e GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS} \
+  --name=oml-dialer-api \
   --rm  \
-  {{ survey_worker_img }}
+  {{ dialer_api_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
 NotifyAccess=all
-
+StandardOutput=journal
+StandardError=journal
 [Install]
 WantedBy=default.target

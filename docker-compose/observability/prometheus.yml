@@ -1,0 +1,43 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+
+  - job_name: 'omnileads_host'
+    static_configs:
+      - targets: ['nodeexporter:9100']
+        labels:
+          tenant: 'omnileads'
+          arq: 'docker-compose'
+          component: 'aio_os'
+
+  - job_name: 'omnileads_redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          tenant: 'omnileads'
+          arq: 'docker-compose'
+          component: 'redis'
+
+  - job_name: 'omnileads_asterisk'
+    static_configs:
+      - targets: ['acd:7088']
+        labels:
+          tenant: 'omnileads'
+          arq: 'docker-compose'
+          component: 'asterisk'
+
+  - job_name: 'omnileads_postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          tenant: 'omnileads'
+          arq: 'docker-compose'
+          component: 'postgres'
+
+  - job_name: cadvisor
+    scrape_interval: 5s
+    static_configs:
+    - targets:
+      - cadvisor:8080

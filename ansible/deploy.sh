@@ -179,6 +179,7 @@ case ${oml_action} in
     cron_repo_path=$(pwd)/components/cron/ \
     sentinel_repo_path=$(pwd)/components/sentinel/ \
     daphne_repo_path=$(pwd)/components/daphne/ \
+    dialer_repo_path=$(pwd)/components/dialer/ \
     keepalived_repo_path=$(pwd)/components/keepalived/ \
     qa_repo_path=$(pwd)/components/qa/ \
     addons_repo_path=$(pwd)/components/addons/ \

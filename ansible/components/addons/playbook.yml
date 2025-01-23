@@ -16,7 +16,6 @@
 # along with this program. If not, see http://www.gnu.org/licenses/.
 
 ---
-
 - name: ADDONS OMniLeads application installation
   hosts: 
     - omnileads_app
@@ -25,45 +24,31 @@
     - addons
   vars:    
     INSTALL_PREFIX: "/opt/omnileads"
+    services:
+      - { name: 'wallboard_listener', src: '{{ addons_repo_path }}templates/wallboard_listener.service' }
+      - { name: 'wallboard_worker', src: '{{ addons_repo_path }}templates/wallboard_worker.service' }
+      - { name: 'bulk_messages', src: '{{ addons_repo_path }}templates/bulk_messages.service' }
+      - { name: 'survey_worker', src: '{{ addons_repo_path }}templates/survey_worker.service' }
 
   tasks:
+    - name: ADDON Copy systemd services
+      template:
+        src: "{{ item.src }}"
+        dest: "/etc/systemd/system/{{ item.name }}.service"
+      loop: "{{ services }}"
+      tags:
+        - install
+        - upgrade
+        - update
 
-  - name: ADDON WALLBOARD Copy systemd service
-    template:
-      src: "{{ addons_repo_path }}templates/wallboard_listener.service"
-      dest: /etc/systemd/system/wallboard_listener.service
-    tags:
-      - install
-      - upgrade
-      - update
-
-  - name: ADDON WALLBOARD Enable and start systemd service
-    systemd:
-      name: wallboard_listener.service
-      state: restarted
-      enabled: yes
-      daemon_reload: yes
-    tags:
-      - install
-      - upgrade
-      - restart
-  
-  - name: ADDON WALLBOARD-WORKER Copy systemd service
-    template:
-      src: "{{ addons_repo_path }}templates/wallboard_worker.service"
-      dest: /etc/systemd/system/wallboard_worker.service
-    tags:
-      - install
-      - upgrade
-      - update
-
-  - name: ADDON WALLBOARD Enable and start systemd service
-    systemd:
-      name: wallboard_worker.service
-      state: restarted
-      enabled: yes
-      daemon_reload: yes
-    tags:
-      - install
-      - upgrade
-      - restart
+    - name: ADDON Enable and start systemd services
+      systemd:
+        name: "{{ item.name }}.service"
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+      loop: "{{ services }}"
+      tags:
+        - install
+        - upgrade
+        - restart

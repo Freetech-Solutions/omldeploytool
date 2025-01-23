@@ -224,6 +224,10 @@ all:
     # --------------------------------------- Integrations-------------------------------------------- #
     # ------------------------------------------------------------------------------------------------ #
     
+    # --- The Dialer Engine Host (omnileads or wombat)
+    # dialer_engine: omnileads
+    # ---- localhost or stanalone server host IP
+    #dialer_host: localhost
     # --- Text to Speech external "gcp", "aws", "ibm", etc.
     #tts_external_engine: 
     # --- Speech analytics & sentiment analysis
@@ -235,9 +239,7 @@ all:
     google_api_key: jhghjfdaghjkfdgsa43423hg4hg3f4ghjf2j
     google_cloud_projectid: your_project_id
     # --- openai integrations
-    openai_api_key:
-    # --- The Dialer Engine Host
-    #dialer_host: 
+    openai_api_key:    
     # --- set postgres_host if you have your own postgres (standalone host or cloud service)
     # --- otherwise leave commented to deploy PostgreSQL on Application Host instance
     #postgres_host:
@@ -362,8 +364,8 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:241217.01
-    asterisk_img: docker.io/omnileads/asterisk:240920.01
+    omnileads_img: docker.io/omnileads/omlapp:250122.01
+    asterisk_img: docker.io/omnileads/asterisk:250117.01
 
 ##############################################################################################################
 ## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #

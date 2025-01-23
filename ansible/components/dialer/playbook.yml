@@ -1,0 +1,143 @@
+# Copyright (C) 2024 Freetech Solutions
+
+# This file is part of OMniLeads
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see http://www.gnu.org/licenses/.
+#
+---
+
+- name: DIALER installation and configuration
+  hosts: 
+    - omnileads_dialer
+    - omnileads_aio
+  tags:
+    - install
+    - dialer
+  tasks:
+
+#podman pod create --name dialer_web_pod --network omnidialer -p 1440:1440
+
+  - name: DIALER Create a podman network
+    containers.podman.podman_network:
+      name: omnidialer
+    become: true
+
+  - name: DIALER Create pod for API & Workers
+    containers.podman.podman_pod:
+      name: dialer_web_pod
+      state: started
+      network: omnidialer
+      publish:
+        - "1440:1440"
+    tags:
+      - install
+      - dialer
+      
+  - name: DIALER Set environment variables for this installation
+    template:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      mode: "0664"
+      owner: "omnileads"
+      group: "omnileads"
+    loop:
+      - { src: "{{ dialer_repo_path }}templates/dialer.env", dest: "/etc/default/dialer.env" }
+    tags:
+      - install
+      - upgrade
+      - update
+
+  - name: DIALER start worker containers script
+    template: 
+      src: "{{ dialer_repo_path }}templates/dialer_start_workers.sh"
+      dest: /usr/bin/dialer_start_workers.sh
+      mode: 755
+    tags:
+      - upgrade
+      - update
+
+  - name: DIALER Copy systemd services
+    template:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+    loop:
+      - { src: "{{ dialer_repo_path }}templates/job_server.service", dest: "/etc/systemd/system/dialer_job_server.service" }
+      - { src: "{{ dialer_repo_path }}templates/postgresql.service", dest: "/etc/systemd/system/dialer_postgresql.service" }
+      - { src: "{{ dialer_repo_path }}templates/redis.service", dest: "/etc/systemd/system/dialer_redis.service" }
+      - { src: "{{ dialer_repo_path }}templates/ws_ari.service", dest: "/etc/systemd/system/dialer_ws_ari.service" }
+      - { src: "{{ dialer_repo_path }}templates/api.service", dest: "/etc/systemd/system/dialer_api.service" }
+    tags:
+      - install
+      - upgrade
+      - update
+
+  - name: DIALER Pull images
+    command: podman pull --quiet {{ item.image }}
+    register: podman_pull_result
+    until: podman_pull_result is success
+    loop:
+      - { image: "{{ dialer_api_img }}"
+      - { image: "{{ dialer_worker_img }}"
+      - { image: "{{ dialer_ws_img }}"
+    tags:
+      - install
+      - upgrade
+      - update
+
+  # - name: DIALER Enable and start systemd services
+  #   systemd:
+  #     name: "{{ item.name }}"
+  #     state: started
+  #     enabled: yes
+  #     daemon_reload: yes
+  #   loop:
+  #     - { name: 'asterisk_retrieve_conf.service' }
+  #     - { name: 'asterisk.service' }
+  #   when: omnileads_ha is not defined
+  #   tags:
+  #     - install
+  #     - upgrade
+
+  # - name: DIALER Start systemd services on HA scenary
+  #   systemd:
+  #     name: "{{ item.name }}"
+  #     state: started
+  #     enabled: no
+  #     daemon_reload: yes
+  #   loop:
+  #     - { name: 'asterisk_retrieve_conf.service' }
+  #     - { name: 'asterisk.service' }
+  #   when: 
+  #     - omnileads_ha is defined
+  #     - ha_role == 'main'
+  #   tags:
+  #     - install
+  #     - upgrade
+
+  # - name: DIALER Restart systemd services
+  #   systemd:
+  #     name: "{{ item.name }}"
+  #     state: restarted
+  #     enabled: yes
+  #     daemon_reload: yes
+  #   loop:
+  #     - { name: 'asterisk.service' }
+  #     - { name: 'asterisk_retrieve_conf.service' }
+  #   tags:
+  #     - upgrade
+  #     - restart
+  #     - restart_core
+  #     - restart_asterisk
+  #   when: 
+  #     - omnileads_ha is not defined

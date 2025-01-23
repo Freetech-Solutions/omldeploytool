@@ -1,0 +1,12 @@
+[Unit]
+Description=Podman Pod for Gearman Workers
+After=gearman-server.service redis.service postgresql.service
+Requires=gearman-server.service redis.service postgresql.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/podman pod start gearman-workers-pod
+ExecStop=/usr/bin/podman pod stop gearman-workers-pod
+
+[Install]
+WantedBy=multi-user.target
