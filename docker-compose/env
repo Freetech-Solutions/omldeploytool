@@ -6,14 +6,13 @@ COMPOSE_PROJECT_NAME=oml
 #############################
 #   Name of the project     #
 #############################
-# --- "cloud" instance (access through public IP)
-# --- "lan" instance (access through private IP)
-# ---- "nat" instance (access through NAT)
 # --- "devenv" is for run on docker-desktop (access through localhost)
-ENV=devenv
+# --- "docker" is for run on docker-engine production environment (access through Public or Private IP)
+
+ENV=devenv 
 REPO_PATH=./omnileads-repos
 
-# iPV4 address of the host
+# iPV4 address of the docker engine host
 PUBLIC_IP=
 PRIVATE_IP=
 
@@ -125,6 +124,9 @@ FASTAGI_HOSTNAME=fastagi
 SCALE=false
 
 CALLREC_SPLIT_CHANNELS=false
+
+# public_ip or lan_ip
+SIP_NAT_MODE=public_ip
 #####################################################################################################
 #                                       POSTGRESQL                                                  #
 #####################################################################################################

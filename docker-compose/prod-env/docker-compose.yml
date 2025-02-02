@@ -158,7 +158,6 @@ services:
     environment:
       - TZ=${TZ}      
       - ENV=${ENV}
-      - DIALER_HOST=${DIALER_SIP_ADDR}
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
       - FASTAGI=${FASTAGI_HOSTNAME}
       - AMI_USER=${AMI_USER}
@@ -167,7 +166,9 @@ services:
       - HOMERHOST=${HOMERHOST}
       - HOMERPORT=${HOMERPORT}
       - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
-      - ASTERISK_HOSTNAME=${ACD_CONTAINER_IPV4}
+      - SIP_NAT_MODE=${SIP_NAT_MODE}
+      - PUBLIC_IP_DOCKER_ENGINE=${PUBLIC_IP}
+      - PRIVATE_IP_DOCKER_ENGINE=${PRIVATE_IP}
     privileged: true
     restart: on-failure
     stop_grace_period: 30s
@@ -297,7 +298,9 @@ services:
     environment:
       - ENV=${ENV}
       - TZ=${TZ}
+      - SIP_NAT_MODE=${SIP_NAT_MODE}
       - PUBLIC_IP=${PUBLIC_IP}
+      - PRIVATE_IP=${PRIVATE_IP}
       - RTPENGINE_HOSTNAME=${RTPENGINE_CONTAINER_IPV4}
     privileged: true
     restart: on-failure

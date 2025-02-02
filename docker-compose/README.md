@@ -109,10 +109,8 @@ $ curl -o deploy.sh -L "https://gitlab.com/omnileads/omldeploytool/-/raw/main/do
 Upon the availability of the deploy.sh script, we will trigger its execution.
 
 ```
-$ export NIC=eth1 ENV=docker-compose && ./deploy.sh
+$ export PRIVATE_IPV4=X.X.X.X PUBLIC_IPV4=Z.Z.Z.Z && ./deploy.sh
 ```
-
-The NIC and ENV parameters specify the network interface card that will be assigned the IP address, and the BRANCH parameter designates the specific OmniLeads release version to be installed.
 
 #### Manual docker-compose deploy
 
@@ -126,7 +124,7 @@ The following parameters need to be defined in the .env file:
 ```
 PUBLIC_IP=$YOUR_PUBLIC_ADDR
 PRIVATE_IP=$YOUR_LAN_ADDR
-ENV=docker-compose
+ENV=docker
 ```
 
 The following iptables rules are set up to redirect UDP traffic for RTP audio to the ACD and RTPENGINE containers.

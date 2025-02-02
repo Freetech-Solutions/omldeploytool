@@ -7,18 +7,14 @@ set -e
 ######################################################
 
 oml_nic=${NIC}
-lan_addr=${PRIVATE_IP}
-nat_addr=${NAT_IP}
+lan_addr=${PRIVATE_IPV4}
+wan_addr=${PUBLIC_IPV4}
 
 ######################################################
 ###################### STAGE #########################
 ######################################################
 
-# --- "cloud" instance (access through public IP)
-# --- "lan" instance (access through private IP)
-# --- "nat" instance (access through Public NAT IP)    
-# --- or "all" in order to access through all NICs
-env=docker-compose
+env=docker
 
 # --- branch is about specific omnileads release
 branch=${BRANCH:-main}  # Default to "main" if not specified
@@ -55,13 +51,13 @@ log_error() {
 setup_networking() {
     log_info "*** Network settings ***"
     if [[ -z "$lan_addr" ]]; then
-        lan_ipv4=$(ip addr show "$oml_nic" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1) || log_error "No se pudo obtener la dirección privada."
+        lan_addr=$(ip addr show "$oml_nic" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1) || log_error "No se pudo obtener la dirección privada."
     else
-        lan_ipv4="$lan_addr"
+        lan_addr="$lan_addr"
     fi
 
-    if [[ -z "$nat_addr" ]]; then
-        nat_addr=$(curl -s http://ipinfo.io/ip) || log_error "No se pudo obtener la dirección pública."
+    if [[ -z "$wan_addr" ]]; then
+        wan_addr=$(curl -s http://ipinfo.io/ip) || log_error "No se pudo obtener la dirección pública."
     fi
 }
 
@@ -106,7 +102,8 @@ deploy_omnileads() {
 
     cp ../env ./.env
     sed -i "s/ENV=devenv/ENV=${env}/g" .env
-    sed -i "s/PRIVATE_IP=/PRIVATE_IP=${lan_ipv4}/g" .env
+    sed -i "s/PRIVATE_IP=/PRIVATE_IP=${lan_addr}/g" .env
+    sed -i "s/PUBLIC_IP=/PUBLIC_IP=${wan_addr}/g" .env
 
     docker-compose up -d || log_error "Error while executing docker-compose up -d."
 }
