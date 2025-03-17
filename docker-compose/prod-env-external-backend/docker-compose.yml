@@ -152,6 +152,7 @@ services:
       - TZ=${TZ}      
       - ENV=${ENV}
       - DIALER_HOST=${DIALER_SIP_ADDR}
+      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
       - FASTAGI=${FASTAGI_HOSTNAME}
       - AMI_USER=${AMI_USER}
@@ -167,9 +168,9 @@ services:
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
       - asterisk_conf:/etc/asterisk/retrieve_conf
-      - asterisk_sounds:/var/lib/asterisk/sounds/oml
-      #- ./asterisk_custom/google_credential.json:/tmp/google_credential.json
-      #- ./asterisk_custom/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
+      - asterisk_sounds:/var/lib/asterisk/sounds
+      #- ../.custom_conf/google_credential.json:/tmp/google_credential.json
+      #- ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
     working_dir: /etc/asterisk
 
   interaction_processor:
@@ -296,7 +297,7 @@ services:
     stop_grace_period: 10s
     # command: rtpengine --config-file /etc/rtpengine.conf   
     # volumes:
-    #   - ../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
+    #   - .../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
 
   websockets:
     tty: true

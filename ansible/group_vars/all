@@ -2,18 +2,22 @@
 
 #################### containers img tags  ################################
 
-fastagi_img: docker.io/omnileads/fastagi:241209.01
-dialer_api_img: docker.io/freetechsolutions/dialer_api:dev
-dialer_worker_img: docker.io/freetechsolutions/dialer_worker:dev
-dialer_ws_img: docker.io/freetechsolutions/dialer_ws:dev
+fastagi_img: docker.io/omnileads/fastagi:250312.01
 sentiment_analysis_img: docker.io/omnileads/sentiment_analysis:240427.01
 interaction_processor_img: docker.io/omnileads/interaction_processor:240506.01
-asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:240729.01
+asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:250224.01
 astami_img: docker.io/omnileads/astami:241017.01
+dialer_api_img: docker.io/freetechsolutions/dialer_api:250106.01
+dialer_asterisk_img: docker.io/freetechsolutions/dialer_asterisk:250121.01
+dialer_dialplan_img: docker.io/freetechsolutions/dialer_dialplan:250106.01
+dialer_listener_img: docker.io/freetechsolutions/dialer_listener:250106.01
+dialer_scheduler_img: docker.io/freetechsolutions/dialer_scheduler:250106.01
+dialer_worker_img: docker.io/freetechsolutions/dialer_worker:250122.01
+gearman_img: docker.io/artefactual/gearmand:1.1.18-alpine
 nginx_img: docker.io/omnileads/nginx:241009.01
 websockets_img: docker.io/omnileads/websockets:240705.01
 kamailio_img: docker.io/omnileads/kamailio:241109.01
-rtpengine_img: docker.io/omnileads/rtpengine:241128.01
+rtpengine_img: docker.io/omnileads/rtpengine:240625.01
 redis_img: docker.io/omnileads/redis:231125.01
 postgres_img: docker.io/postgres:14.9-bullseye
 postgres_ha_img: docker.io/omnileads/postgres:240902.02
