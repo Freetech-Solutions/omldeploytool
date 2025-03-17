@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                                                                                                    #!/bin/bash
+!#/bin/bash                                                                                                                                                                                                                                                                                                                                                                                                    #!/bin/bash
 
 set -e
 
@@ -104,7 +104,7 @@ deploy_omnileads() {
     sed -i "s/ENV=devenv/ENV=${env}/g" .env
     sed -i "s/PRIVATE_IP=/PRIVATE_IP=${lan_addr}/g" .env
     sed -i "s/PUBLIC_IP=/PUBLIC_IP=${wan_addr}/g" .env
-
+    
     docker-compose up -d || log_error "Error while executing docker-compose up -d."
 }
 
@@ -112,7 +112,7 @@ setup_iptables() {
     log_info "Iptables RTP rules setup"
 
     # Crear reglas de iptables
-    iptables -t nat -A PREROUTING -p udp --dport 5060 -j DNAT --to-destination 10.22.22.99
+    iptables -t nat -A PREROUTING -p udp --dport 5060 -s ! 10.22.22.0/24 -j DNAT --to-destination 10.22.22.99:5060
     iptables -A FORWARD -p udp -d 10.22.22.99 --dport 5060 -j ACCEPT
     iptables -t nat -A PREROUTING -p udp --dport 40000:50000 -j DNAT --to-destination 10.22.22.99
     iptables -A FORWARD -p udp -d 10.22.22.99 --dport 40000:50000 -j ACCEPT
@@ -128,7 +128,7 @@ setup_iptables() {
     # Añadir reglas a rc.local si no existen
     if ! grep -q "iptables -t nat -A PREROUTING -p udp --dport 5060" /etc/rc.local; then
         sed -i '/^exit 0$/i \
-iptables -t nat -A PREROUTING -p udp --dport 5060 -j DNAT --to-destination 10.22.22.99\n\
+iptables -t nat -A PREROUTING -p udp --dport 5060 -s ! 10.22.22.0/24 -j DNAT --to-destination 10.22.22.99:5060\n\
 iptables -A FORWARD -p udp -d 10.22.22.99 --dport 5060 -j ACCEPT\n\
 iptables -t nat -A PREROUTING -p udp --dport 40000:50000 -j DNAT --to-destination 10.22.22.99\n\
 iptables -A FORWARD -p udp -d 10.22.22.99 --dport 40000:50000 -j ACCEPT\n\
@@ -162,5 +162,3 @@ setup_networking
 setup_os_dependencies
 deploy_omnileads
 setup_iptables
-wait_for_env
-reset_admin_password

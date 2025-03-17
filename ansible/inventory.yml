@@ -64,6 +64,19 @@ all:
           ansible_ssh_port: 2235
     # -----------------------------------------
     # -----------------------------------------
+    dialer_instances:
+      hosts:
+        tenant_example_1:
+          tenant_id: tenant_example_1_dialer
+          ansible_host: 190.19.150.22
+          omni_ip_lan: 172.16.101.66
+        tenant_example_2:
+          tenant_id: tenant_example_2_dialer
+          ansible_host: 190.19.11.11
+          omni_ip_lan: 10.10.10.22
+          ansible_ssh_port: 2234          
+    # -----------------------------------------
+    # -----------------------------------------
     cluster_instances:
       children:
         tenant_example_5:
@@ -219,15 +232,20 @@ all:
 
     # --- Web Proxy setting
     # proxy_url: https://X.X.X.X:PPPP
+
+    # ---- Dialer settings
+    # --- If you want to use the dialer, you must to set the dialer_host
+
+    # --- The Dialer Engine Host (omnileads or wombat)
+    dialer_engine: omnileads
+    # ---- localhost or stanalone server host IP
     
+    
+
     # ------------------------------------------------------------------------------------------------ #
     # --------------------------------------- Integrations-------------------------------------------- #
     # ------------------------------------------------------------------------------------------------ #
-    
-    # --- The Dialer Engine Host (omnileads or wombat)
-    # dialer_engine: omnileads
-    # ---- localhost or stanalone server host IP
-    #dialer_host: localhost
+
     # --- Text to Speech external "gcp", "aws", "ibm", etc.
     #tts_external_engine: 
     # --- Speech analytics & sentiment analysis
@@ -364,9 +382,9 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:250122.01
-    asterisk_img: docker.io/omnileads/asterisk:250117.01
-
+    omnileads_img: docker.io/omnileads/omlapp:250221.01
+    asterisk_img: docker.io/omnileads/asterisk:250312.01
+    
 ##############################################################################################################
 ## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #
 ## -- here you can control which host the action deployed by the deploy.sh script will be applied to      -- #
@@ -406,4 +424,8 @@ omnileads_app:
     #tenant_example_5_app:
     #tenant_example_6_app:
 
+omnileads_dialer:
+  hosts:
+    #tenant_example_1_dialer:
+    #tenant_example_2_dialer:
 

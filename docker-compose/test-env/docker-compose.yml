@@ -157,7 +157,7 @@ services:
     environment:
       - TZ=${TZ}      
       - ENV=${ENV}
-      - DIALER_HOST=${DIALER_SIP_ADDR}
+      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
       - FASTAGI=${FASTAGI_HOSTNAME}
       - AMI_USER=${AMI_USER}
@@ -172,7 +172,7 @@ services:
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
       - asterisk_conf:/etc/asterisk/retrieve_conf
-      - asterisk_sounds:/var/lib/asterisk/sounds/oml
+      - asterisk_sounds:/var/lib/asterisk/sounds
       #- ../.custom_conf/google_credential.json:/tmp/google_credential.json
       #- ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
     working_dir: /etc/asterisk

@@ -102,10 +102,10 @@
     - inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_aio']
     
 
-- import_playbook: components/sentiment_analysis/playbook.yml
-  when: 
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
-    - speech_analytics_model is defined
+# - import_playbook: components/dialer/playbook.yml
+#   when: 
+#     - inventory_hostname in groups['omnileads_dialer'] or inventory_hostname in groups['omnileads_aio']
+#     - dialer_engine is defined and dialer_engine == 'omnileads'
     
 
 - import_playbook: components/nginx/playbook.yml

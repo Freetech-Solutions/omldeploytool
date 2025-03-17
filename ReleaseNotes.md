@@ -1,12 +1,32 @@
-# Release Notes - OMniLeads 2.3.1
-[2025-02-06]
+# Release Notes - OMniLeads 2.4.0
+[2025-03-17]
 
 ## Added
 
-## Improvements
+oml-2746 New Disposition form List field with options fetched from CRM.
+oml-2788 Possibility to add Sub-Dispositions.
+oml-2889 Supervisiors can send messages to Agents.
+oml-2924 Massive Users profiles imports.
+oml-2938 New endpoint for multinum calls 
 
-## Fixes
+## Changed
 
-* oml-712 Fix on Kamailio environments variables.
+oml-2750 Whatsapp Line Wizard allows selection of any inbound campaign.
+oml-2892 Enable recordings set by default in Campaign Wizard.
+oml-2891 DB Select input with search capabilities in Campaign Wizard.
+oml-2844 Whatsapp Line Interactive Menu management allows non connected menues.
+oml-2845 Is now not possible to deactivate Whatsapp for Line destination campaigns.
+oml-2934 Inbound Routes language options are now selected from installed asterisk audios.
+oml-2738 Decoupling recording report generation for async processing.
+oml-2887 Change in the way Database Contacts are counted.
+oml-2888 Possibility to select the Agenda telephone.
+oml-2922 Campaign lists views can be ordered by id.
 
-## Component changes
+## Fixed
+
+oml-2859 Fix command for closing conversations.
+oml-2722 Fix External Site Authentication form validation
+Error testing External Site Authentication.
+Error in notification of External Site interaction result.
+Race condition with LlamadaLog log and External Site interaction with 'datetime' parameter.
+One-way audio when a call is placed on hold

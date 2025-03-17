@@ -17,19 +17,19 @@ PUBLIC_IP=
 PRIVATE_IP=
 
 REPO=omnileads
-#############################################################
-#               Components image version                    #
-#           versions of each image to deploy                #
-#############################################################
+#####################################################################################
+#                                  Components image version                         #
+#                              versions of each image to deploy                     #
+#####################################################################################
 
-OMLAPP_IMG=${REPO}/omlapp:250122.01
-OMLACD_IMG=${REPO}/asterisk:250117.01
-OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:240729.01
-OMLFASTAGI_IMG=${REPO}/fastagi:241209.01
+OMLAPP_IMG=${REPO}/omlapp:250221.01
+OMLACD_IMG=${REPO}/asterisk:250312.01
+OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:250224.01
+OMLFASTAGI_IMG=${REPO}/fastagi:250312.01
 OMLAMI_IMG=${REPO}/astami:241017.01
 OMLNGINX_IMG=${REPO}/nginx:241009.01
 OMLKAM_IMG=${REPO}/kamailio:241109.01
-OMLRTPENGINE_IMG=${REPO}/rtpengine:241128.01
+OMLRTPENGINE_IMG=freetechsolutions/rtpengine:250311.01
 OMLWS_IMG=${REPO}/websockets:240705.01
 OMLINTERACTION_PROC_IMG=${REPO}/interaction_processor:240506.01
 OMLCHAN_TEL_LOGGER_IMG=${REPO}/chan_tel_logger:241221.01
@@ -42,6 +42,8 @@ OMLNGINXQA_IMG=${REPO}/nginxqa:latest
 OMLREDIS_IMG=redislabs/redisgears:1.0.9
 OMLPGSQL_IMG=postgres:14.9-bullseye
 OMLMINIO_IMG=quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
+OMLRABBITMQ_IMG=rabbitmq:4.0.5-management
+WOMBAT_IMG=loway/wombatdialer:25.02.2-3
 OMLPROMETHEUS_IMG=prom/prometheus:v3.0.1
 
 ################################
@@ -178,7 +180,6 @@ KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
 SHM_SIZE=64
 PKG_SIZE=8
 
-s
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - RABBITMQ                            #
 #########################################################################################################
@@ -190,7 +191,7 @@ NGINX_EXT_PORT=443
 # --- IP or hostname that each instance will invoke when locating the other    
 REDIS_HOSTNAME=redis
 REDIS_PORT=6379
-
+REDIS_EXT_PORT=6379
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 RTPENGINE_HOSTNAME=rtpengine
@@ -198,7 +199,7 @@ RTPENGINE_CONTAINER_IPV4=10.22.22.98
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 RABBITMQ_HOSTNAME=rabbitmq
-
+RABBITMQ_EXT_PORT=5672
 
 #########################################################################################################
 #                                Object Storage BUCKET config                                           #
@@ -239,9 +240,15 @@ HOMER_PORT=9060
 #                                    DIALER                                                             #
 #########################################################################################################
 
-# OML_DIALER_ENGINE=omnidialer
-# OMNIDIALER_HOST=omnidialer-api:1440
-# DIALER_SIP_ADDR=10.22.22.199:5060
+OML_DIALER_ENGINE=omnidialer
+OMNIDIALER_SIP_ADDR=10.22.22.199:10061
+OMNIDIALER_HOST=omnidialer-api-1:1440
+
+#########################################################################################################
+#                                    WOMBAT DIALER                                                      #
+#########################################################################################################
+
+WOMBAT_HOSTNAME=wombat
 
 WOMBAT_USER=demoadmin
 WOMBAT_PASSWORD=demo
