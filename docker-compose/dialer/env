@@ -37,7 +37,7 @@ OML_HOSTNAME=X.X.X.X
 OMNIDIALER_HOSTNAME=Z.Z.Z.Z
 # SIP_NAT_ADDR=X.X.X.X
 #####################################################################################################
-#                             REDIS, Postgres & RabbitMQ                                            #
+#                             REDIS, Postgres, RabbitMQ & Django channels                           #
 #####################################################################################################
 # --- Redis OML & dialer conn params
 # --- El Dialer necesita conectarse al redis del host OML-App para poder leer
@@ -75,6 +75,9 @@ POSTGRES_DIALER_DB=omnidialer
 # --- es configurado para discar por un trunk aparte del ACD.
 # --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-rabbit-mq" por ${OML_HOSTNAME}
 RABBITMQ_OML_SERVER=oml-rabbit-mq
+# --- Integracion con OML usando django channels.
+# --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-nginx" por ${OML_HOSTNAME}
+WEBSOCKET_SERVER = 'wss://oml-nginx/channels/omnidialer'
 #####################################################################################################
 #                             WEB, Gearman & Python                                                 #
 #####################################################################################################

@@ -13,7 +13,7 @@ services:
       - job_server
       - postgresql
     environment:
-      - GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS}
+      - GEARMAN_JOB_SERVERS=${GEARMAN_JOB_SERVERS}      
   # Gearman Job Server
   job_server:
     image: ${GEARMAN_IMG}
@@ -22,6 +22,20 @@ services:
     networks:
       - omnidialer
     command: gearmand -t 1
+  # Admin htmlx render
+  render-template:
+    image: ${WORKER_IMG}
+    env_file: .env
+    stop_signal: SIGINT
+    tty: true
+    stdin_open: true
+    depends_on:
+      - job_server
+      - postgresql
+    environment:
+      - GEARMAN_JOBS=render-template
+    networks:
+      - omnidialer
   # Worker Dialer Scheduler 
   scheduler_worker:
     image: ${SCHEDULER_IMG}  

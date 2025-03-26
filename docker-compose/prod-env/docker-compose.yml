@@ -14,8 +14,6 @@ services:
     command: /opt/omnileads/bin/init_uwsgi.sh
     networks:
       - omnileads
-    ports:
-      - 8099:8099  
     privileged: true
     restart: on-failure
     stdin_open: true
@@ -143,22 +141,6 @@ services:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
 
-  websockets:
-    tty: true
-    container_name: oml-websockets
-    image: ${OMLWS_IMG}
-    depends_on:
-      - redis
-    environment:
-      - BIND_ADDRESS=0.0.0.0:8000
-      - EVENT_LOOP=uvloop
-      - LOGGERS=${WEBSOCKET_LOGGER}
-      - REDIS_HOST=${WEBSOCKET_REDIS_HOSTNAME}
-      - PYTHONUNBUFFERED=1
-    networks:
-      - omnileads
-    stop_grace_period: 30s  
-
   fastagi:
     depends_on:
       - postgresql
@@ -179,7 +161,7 @@ services:
     networks:
       - omnileads
     ports:
-      - 4573:4573/tcp  
+      - 4573:4573/tcp
 
   ami:
     image: ${OMLAMI_IMG}
@@ -232,11 +214,11 @@ services:
       - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
       - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
       - ENV=${ENV}
-      - FASTAGI=${OML_HOSTNAME}
-      - RABBITMQ_HOST=${OML_HOSTNAME}
+      - FASTAGI=${OML_HOSTNAME}      
       - HOMER_ENABLE=False
       - HOMERHOST=${HOMERHOST}
       - HOMERPORT=${HOMERPORT}
+      - RABBITMQ_HOST=${OML_HOSTNAME}
       - SIP_NAT_IPADDR=${SIP_NAT_IPADDR}
     privileged: true
     restart: on-failure
@@ -337,6 +319,22 @@ services:
     # command: rtpengine --config-file /etc/rtpengine.conf   
     # volumes:
     #   - ../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
+
+  websockets:
+    tty: true
+    container_name: oml-websockets
+    image: ${OMLWS_IMG}
+    depends_on:
+      - redis
+    environment:
+      - BIND_ADDRESS=0.0.0.0:8000
+      - EVENT_LOOP=uvloop
+      - LOGGERS=${WEBSOCKET_LOGGER}
+      - REDIS_HOST=${WEBSOCKET_REDIS_HOSTNAME}
+      - PYTHONUNBUFFERED=1
+    networks:
+      - omnileads
+    stop_grace_period: 30s  
 
   postgresql:
     container_name: oml-postgres

@@ -3,6 +3,7 @@ services:
   django_app:
     container_name: oml-app
     depends_on:
+      - django_commands
       - postgresql
       - redis
       - acd
@@ -13,8 +14,6 @@ services:
     command: /opt/omnileads/bin/init_uwsgi.sh
     networks:
       - omnileads
-    ports:
-      - 8099:8099  
     privileged: true
     restart: on-failure
     stdin_open: true
@@ -106,7 +105,42 @@ services:
     stop_grace_period: 30s
     tty: true
     working_dir: /opt/omnileads/ominicontacto
-    
+
+  nginx:
+    image: ${OMLNGINX_IMG}
+    container_name: oml-nginx
+    depends_on:
+      - django_app
+      - daphne
+      - kamailio
+      - websockets
+    dns: 8.8.8.8
+    environment:
+      - ENV=devenv
+      - TZ=${TZ}
+      - DJANGO_HOSTNAME=${DJANGO_HOSTNAME}
+      - WSGI_PORT=8099
+      - DAPHNE_HOSTNAME=${DJANGO_HOSTNAME}
+      - ASGI_PORT=8099
+      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
+      - KAMAILIO_PORT=14443
+      - WEBSOCKETS_HOSTNAME=${WEBSOCKET_HOSTNAME}
+      - WEBSOCKETS_PORT=8000
+      - CALLREC_DEVICE=${CALLREC_DEVICE}
+      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
+      #- WEBUI_MODE=rproxy
+      #- WALLBOARD_WEBUI_HOST=kamailio
+    networks:
+      - omnileads
+    privileged: true
+    ports:
+      - ${NGINX_EXT_PORT}:443/tcp
+    restart: on-failure
+    stop_grace_period: 15s
+    volumes:
+      - django_static:/opt/omnileads/static
+      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+        
   fastagi:
     depends_on:
       - postgresql
@@ -126,7 +160,9 @@ services:
     restart: on-failure
     networks:
       - omnileads
-
+    ports:
+      - 4573:4573/tcp
+  
   ami:
     image: ${OMLAMI_IMG}
     depends_on:
@@ -170,20 +206,21 @@ services:
     container_name: oml-acd
     depends_on:
       - fastagi
+      - rabbitmq
     networks:
       - omnileads       
     environment:
-      - TZ=${TZ}      
-      - ENV=${ENV}
-      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
-      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
-      - FASTAGI=${FASTAGI_HOSTNAME}
       - AMI_USER=${AMI_USER}
       - AMI_PASSWORD=${AMI_PASSWORD}
+      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
+      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
+      - ENV=${ENV}
+      - FASTAGI=${FASTAGI_HOSTNAME}
       - HOMER_ENABLE=False
       - HOMERHOST=${HOMERHOST}
       - HOMERPORT=${HOMERPORT}
-      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}      
+      - SIP_NAT_IPADDR=${SIP_NAT_IPADDR}
     privileged: true
     restart: on-failure
     stop_grace_period: 30s
@@ -268,54 +305,6 @@ services:
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
-    volumes:
-      - ../certs:/${KAMAILIO_CERTS_LOCATION}
-
-  nginx:
-    image: ${OMLNGINX_IMG}
-    container_name: oml-nginx
-    depends_on:
-      - django_app
-      - daphne
-      - kamailio
-      - websockets
-    dns: 8.8.8.8
-    environment:
-      - ENV=devenv
-      - TZ=${TZ}
-      - DJANGO_HOSTNAME=${DJANGO_HOSTNAME}
-      - WSGI_PORT=8099
-      - DAPHNE_HOSTNAME=${DJANGO_HOSTNAME}
-      - ASGI_PORT=8099
-      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
-      - KAMAILIO_PORT=14443
-      - WEBSOCKETS_HOSTNAME=${WEBSOCKET_HOSTNAME}
-      - WEBSOCKETS_PORT=8000
-      - CALLREC_DEVICE=${CALLREC_DEVICE}
-      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
-      #- WEBUI_MODE=rproxy
-      #- WALLBOARD_WEBUI_HOST=kamailio
-    networks:
-      - omnileads
-    privileged: true
-    ports:
-      - ${NGINX_EXT_PORT}:443/tcp
-    restart: on-failure
-    stop_grace_period: 15s
-    volumes:
-      - django_static:/opt/omnileads/static
-      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
-
-  vue-cli:
-    tty: true
-    container_name: oml-vuejs-cli
-    image: ${OMLVUEJS_IMG}
-    ports:
-      - 8081:8080
-    networks:
-      - omnileads
-    volumes:
-      - ${REPO_PATH}/omlapp/omnileads_ui/:/home/oml_frontend/
       
   rtpengine:
     image: ${OMLRTPENGINE_IMG}
@@ -324,10 +313,10 @@ services:
     environment:
       - ENV=${ENV}
       - TZ=${TZ}
+      - NAT_IPADDR=${RTP_NAT_IPADDR}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
     networks:
-      omnileads:
-        ipv4_address: 10.22.22.98
-  
+      - omnileads
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
@@ -392,7 +381,7 @@ services:
       - omnileads
     ports:
       - "15672:15672"
-      - "5672:5672"
+      - ${RABBITMQ_EXT_PORT}:5672
 
   minio:
     tty: true
