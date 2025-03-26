@@ -10,12 +10,12 @@
 # Index
 
 * [Requirements](#requirements)
-* [Develpment environment](#dev-env)
 * [Quick localhost test environment](#test-env)
 * [Security](#security)
 * [Cloud VPS or Onpremise VM](#vps_vm)
 * [OMniLeads Eneterprise](#oml_enterprise)
 * [OMniLeads interaction tool](#oml_manage)
+* [Develpment environment](#dev-env)
 * [Simulate calls (only for docker-desktop ENV)](#pstn_emulator)
 
 You need docker & docker-compose installed (on Linux, Mac or Windows) and this reposotory cloned <a name="requirements"></a>
@@ -31,32 +31,11 @@ $ cd omldeploytool/docker-compose
 
 In this folder, we will find three Docker Compose environments.
 
+* **test-env**: is used to launch the stack on your local workstation with Docker Desktop.
+* **prod-env**: is used to launch the stack on a VPS or VM for production.
 * **dev-env**: is used to launch the deveelopment stack on sthe workstation with Docker Desktop
-* **test-env**: is used to launch the stack on the workstation with Docker Desktop.
-* **prod-env**: is used to launch the stack on a VPS or VM.
 
-### **Development environment deploy** <a name="dev-env"></a>
-
-In this environment, the Django application runs using the framework's development mode. Additionally, Docker binding is used to mount the code of each component into its respective container.
-
-If you want to set up the development environment on a Linux machine, simply run the docker_install_linux.sh script to install the necessary tools.
-
-```
-$ ./docker_install_linux.sh
-```
-
-
-With the following sequence of commands, you will have an environment ready to start using your development setup:
-
-```
-$ cd dev-env
-$ ./deploy.sh --gitlab_clone=https or ssh
-$ ../oml_manage --reset_pass
-```
-
-Once the environment is up, you can proceed to log in at https://localhost using the username admin and password admin
-
-### **Workstation Docker-Desktop test-env deploy** <a name="test-env"></a>
+## **Workstation Docker-Desktop test-env deploy** <a name="test-env"></a>
 
 This environment is ideal for quickly testing the application locally. It is not recommended for production.
 
@@ -75,15 +54,15 @@ Once the environment is up, you can proceed to log in at https://localhost using
 OMniLeads is an application that combines Web (https), WebRTC (wss & sRTP) and VoIP (SIP & RTP) technologies. This implies a certain complexity and 
 when deploying it in production under an Internet exposure scenario. 
 
-On the Web side of the things the ideal is to implement a Reverse Proxy or Load Balancer ahead of OMnileads, i.e. exposed to the Internet (TCP 443) 
+On the Web side of the things the ideal is to implement a Reverse Proxy or Load Balancer ahead of OMnileads, i.e. exposed to the Internet (TCP 443)
 and that it forwards the requests to the Nginx of the OMniLeads stack. On the VoIP side, when connecting to the PSTN via VoIP it is ideal to 
 operate behind an SBC (Session Border Controller) exposed to the Internet.
 
 However, we can intelligently use the **Cloud Firewall** technology when operating over VPS exposed to the Internet.
 
-<img src="../ansible/png/security.png" alt="Security" width="700">
+<img src="../ansible/png/security_docker.png" alt="Security" width="700">
 
-Below are the Firewall rules to be applied on All In One instance:
+Below are the Firewall rules to be applied:
 
 * 443/tcp Nginx: This is where Web/WebRTC requests to Nginx are processed. Port 443 can be opened to the entire Internet.
 
@@ -95,56 +74,24 @@ Below are the Firewall rules to be applied on All In One instance:
 
 * 9090/tcp Prometheus metrics: This is where the connections coming from the monitoring center. This port can be opened by restricting by origin in the IP of the monitoring center.
 
-### **Onpremise Virtual Machine or Cloud VPS** <a name="vps_vm"></a>
+## **Onpremise Virtual Machine or Cloud VPS deploy for production env** <a name="vps_vm"></a>
 
-This environment is ideal for quickly and simple deploy on production. For instances small por abajo de 50 usuarios. 
-
-
-#### deploy.sh script based deploy
+This environment is ideal for quick and simple production deployments, suitable for small operations (up to 100 users).
 
 ```
-$ curl -o deploy.sh -L "https://gitlab.com/omnileads/omldeploytool/-/raw/main/docker-compose/prod-env/deploy.sh?ref_type=heads" && chmod +x  deploy.sh
-```
-
-Upon the availability of the deploy.sh script, we will trigger its execution.
-
-```
-$ export PRIVATE_IPV4=X.X.X.X PUBLIC_IPV4=Z.Z.Z.Z && ./deploy.sh
-```
-
-#### Manual docker-compose deploy
-
-```
-$ cp env prod-env/.env
-$ cd prod-env
-```
-
-The following parameters need to be defined in the .env file:
-
-```
-PUBLIC_IP=$YOUR_PUBLIC_ADDR
-PRIVATE_IP=$YOUR_LAN_ADDR
-ENV=docker
-```
-
-The following iptables rules are set up to redirect UDP traffic for RTP audio to the ACD and RTPENGINE containers.
-
-```
-$ iptables -t nat -A PREROUTING -p udp --dport 5060 -j DNAT --to-destination 10.22.22.99
-$ iptables -A FORWARD -p udp -d 10.22.22.99 --dport 5060 -j ACCEPT
-$ iptables -t nat -A PREROUTING -p udp --dport 40000:50000 -j DNAT --to-destination 10.22.22.99
-$ iptables -A FORWARD -p udp -d 10.22.22.99 --dport 40000:50000 -j ACCEPT
-$ iptables -t nat -A PREROUTING -p udp --dport 20000:30000 -j DNAT --to-destination 10.22.22.98
-$ iptables -A FORWARD -p udp -d 10.22.22.98 --dport 20000:30000 -j ACCEPT
-```
-
-```
-$ docker-compose up -d
-$ ln -s ../oml_manage ./
-$ ./oml_manage --reset_pass
+$ curl -o deploy.sh -L "https://gitlab.com/omnileads/omldeploytool/-/raw/main/docker-compose/prod-env/deploy.sh?ref_type=heads" && chmod +x deploy.sh
+$ export DOCKER_ENGINE_IPV4=X.X.X.X && ./deploy.sh
 ```
 
 Once the environment is up, you can proceed to log in at https://LINUX_HOST_ADDR using the username admin and password admin
+
+#### OMniLeads Behind NAT
+
+Because VoIP is sensitive to NAT, and OMniLeads is often deployed on a LAN IP address, adjustments are needed for internet connectivity. Specifically, to connect to external PBXs or SBCs via SIP Trunk, and to allow users internet access, run the deploy script with the NAT_IPV4 argument.
+
+```
+$ export DOCKER_ENGINE_IPV4=X.X.X.X NAT_IPV4=Z.Z.Z.Z && ./deploy.sh
+```
 
 ## OMniLeads Enterprise <a name="oml_enterprise"></a>
 
@@ -174,7 +121,7 @@ This is used to launch some administration actions like, read containers logs, d
 $ ./oml_oml_manage --help
 ```
 
-## Create some testing data
+For example: create some testing data:
 
 ```
 $ ./oml_manage --init_env
@@ -191,8 +138,30 @@ gerente
 For all users the pass is:
 
 ```
-usuario0*
+098098ZZZ
 ```
+
+## **Development environment deploy** <a name="dev-env"></a>
+
+In this environment, the Django application runs using the framework's development mode. Additionally, Docker binding is used to mount the code of each component into its respective container.
+
+If you want to set up the development environment on a Linux machine, simply run the docker_install_linux.sh script to install the necessary tools.
+
+```
+$ ./docker_install_linux.sh
+```
+
+
+With the following sequence of commands, you will have an environment ready to start using your development setup:
+
+```
+$ cd dev-env
+$ ./deploy.sh --gitlab_clone=https or ssh
+$ ../oml_manage --reset_pass
+```
+
+Once the environment is up, you can proceed to log in at https://localhost using the username admin and password admin
+
 
 ## Simulate calls from/to PSTN (Only on test-env & dev-env) <a name="pstn_emulator"></a>
 

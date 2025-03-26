@@ -9,12 +9,12 @@ COMPOSE_PROJECT_NAME=oml
 # --- "devenv" is for run on docker-desktop (access through localhost)
 # --- "docker" is for run on docker-engine production environment (access through Public or Private IP)
 
-ENV=devenv 
+ENV=docker
 REPO_PATH=./omnileads-repos
 
 # iPV4 address of the docker engine host
+OML_HOSTNAME=
 PUBLIC_IP=
-PRIVATE_IP=
 
 REPO=omnileads
 #####################################################################################
@@ -23,13 +23,13 @@ REPO=omnileads
 #####################################################################################
 
 OMLAPP_IMG=${REPO}/omlapp:250221.01
-OMLACD_IMG=${REPO}/asterisk:250312.01
+OMLACD_IMG=${REPO}/asterisk:250323.01
 OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:250224.01
 OMLFASTAGI_IMG=${REPO}/fastagi:250312.01
 OMLAMI_IMG=${REPO}/astami:241017.01
 OMLNGINX_IMG=${REPO}/nginx:241009.01
 OMLKAM_IMG=${REPO}/kamailio:241109.01
-OMLRTPENGINE_IMG=freetechsolutions/rtpengine:250311.01
+OMLRTPENGINE_IMG=freetechsolutions/rtpengine:250321.01
 OMLWS_IMG=${REPO}/websockets:240705.01
 OMLINTERACTION_PROC_IMG=${REPO}/interaction_processor:240506.01
 OMLCHAN_TEL_LOGGER_IMG=${REPO}/chan_tel_logger:241221.01
@@ -69,19 +69,6 @@ CALLREC_DEVICE=s3-minio
 DJANGO_HOSTNAME=django_app
 DAPHNE_HOSTNAME=daphne
 
-# Scale UWSGI
-#UWSGI_CUSTOM=True
-#UWSGI_PROCESSES=4
-#UWSGI_THREADS=1
-#UWSGI_LISTEN_QUEUE_SIZE=2048
-#UWSGI_WORKER_RELOAD_MERCY=60
-#UWSGI_MAX_WORKER_LIFETIME=7200
-#UWSGI_MAX_WORKER_LIFETIME_DELTA=300
-#UWSGI_RELOAD_ON_RSS=1024
-#UWSGI_RELOAD_ON_AS=2048
-#UWSGI_EVIL_RELOAD_ON_RSS=3096
-#UWSGI_MAX_REQUESTS=2000
-
 # Session Cookie Age (SCA) is the time in seconds that will last the https session when inactivity
 # is detected in the session (by default is 1 hour)
 SESSION_COOKIE_AGE=3600
@@ -113,22 +100,20 @@ LOGIN_FAILURE_LIMIT=10
 #####################################################################################################
 
 # --- IP or hostname that each instance will invoke when locating the other    
+# ----  ${OML_HOSTNAME} must be value for production deploy
 ASTERISK_HOSTNAME=acd
-ACD_CONTAINER_IPV4=10.22.22.99
 
 AMI_USER=omnileadsami
 AMI_PASSWORD=5_MeO_DMT
 
-SIP_EXT_PORT=5060
-
-FASTAGI_HOSTNAME=fastagi
+FASTAGI_HOSTNAME=fastagi #${OML_HOSTNAME}
 
 SCALE=false
 
 CALLREC_SPLIT_CHANNELS=false
 
 # public_ip or lan_ip
-SIP_NAT_MODE=public_ip
+#SIP_NAT_IPADDR=${PUBLIC_IP}
 #####################################################################################################
 #                                       POSTGRESQL                                                  #
 #####################################################################################################
@@ -145,7 +130,7 @@ PGHOSTRO=
 
 PGSSL=false
 
-PG_EXT_PORT=4444
+PG_EXT_PORT=5432
 #########################################################################################################
 #                                           WEBSOCKETS                                                  #
 #########################################################################################################
@@ -170,7 +155,8 @@ WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 #########################################################################################################
 #                                           KAMAILIO                                                    #
 #########################################################################################################
-# --- IP or hostname that each instance will invoke when locating the other    
+# --- IP or hostname that each instance will invoke when locating the other
+# --- production deploy must be ${OML_HOSTNAME}
 KAMAILIO_HOSTNAME=kamailio
 KAMAILIO_HTTPS_PORT=14443
 KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
@@ -194,8 +180,9 @@ REDIS_PORT=6379
 REDIS_EXT_PORT=6379
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
+# --- production deploy must be ${OML_HOSTNAME}
 RTPENGINE_HOSTNAME=rtpengine
-RTPENGINE_CONTAINER_IPV4=10.22.22.98
+#RTP_NAT_IPADDR=${PUBLIC_IP}
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 RABBITMQ_HOSTNAME=rabbitmq
@@ -218,7 +205,7 @@ AWS_SECRET_ACCESS_KEY=s3omnileads123
 AWS_DEFAULT_REGION=us-east-1
 
 # *** used by storage_service.py & recordings & media_root views
-# your OMniLeads (nginx) ip/hostname
+# your OMniLeads (nginx) ip/hostname ${OML_HOSTNAME}
 S3_ENDPOINT=https://localhost
 # *** used by omni-callrec-move.sh Asterisk AGI
 # https://docs.min.io/docs/how-to-use-aws-sdk-for-python-with-minio-server.html
@@ -241,7 +228,7 @@ HOMER_PORT=9060
 #########################################################################################################
 
 OML_DIALER_ENGINE=omnidialer
-OMNIDIALER_SIP_ADDR=10.22.22.199:10061
+OMNIDIALER_SIP_ADDR=10.22.22.199
 OMNIDIALER_HOST=omnidialer-api-1:1440
 
 #########################################################################################################

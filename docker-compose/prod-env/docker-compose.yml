@@ -7,6 +7,7 @@ services:
       - redis
       - acd
       - minio
+      - django_commands
     dns: 8.8.8.8
     env_file: .env
     image: ${OMLAPP_IMG}
@@ -89,6 +90,24 @@ services:
     tty: true
     working_dir: /opt/omnileads
 
+  background_tasks:
+    image: ${OMLAPP_IMG}
+    container_name: oml-background-tasks
+    depends_on:
+      - postgresql
+      - redis
+    dns: 8.8.8.8
+    env_file: .env
+    command: python manage.py runworker background-tasks
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+
   nginx:
     image: ${OMLNGINX_IMG}
     container_name: oml-nginx
@@ -102,9 +121,9 @@ services:
       - ENV=devenv
       - TZ=${TZ}
       - DJANGO_HOSTNAME=${DJANGO_HOSTNAME}
-      - WSGI_PORT=8099
-      - DAPHNE_HOSTNAME=${DJANGO_HOSTNAME}
-      - ASGI_PORT=8099
+      - WSGI_PORT=${UWSGI_PORT}
+      - DAPHNE_HOSTNAME=${DAPHNE_HOSTNAME}
+      - ASGI_PORT=${DAPHNE_PORT}
       - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
       - KAMAILIO_PORT=14443
       - WEBSOCKETS_HOSTNAME=${WEBSOCKET_HOSTNAME}
@@ -149,16 +168,18 @@ services:
     command: python /app/fastagi.py
     environment:
       - TZ=${TZ}
-      - PGHOST=${PGHOST}
-      - PGPORT=${PGPORT}
+      - PGHOST=${OML_HOSTNAME}
+      - PGPORT=${PG_EXT_PORT}
       - PGUSER=${PGUSER}
       - PGDATABASE=${PGDATABASE}
       - PGPASSWORD=${PGPASSWORD}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
-      - REDIS_PORT=${REDIS_PORT}    
+      - REDIS_HOSTNAME=${OML_HOSTNAME}
+      - REDIS_PORT=${REDIS_EXT_PORT}
     restart: on-failure
     networks:
       - omnileads
+    ports:
+      - 4573:4573/tcp  
 
   ami:
     image: ${OMLAMI_IMG}
@@ -203,22 +224,20 @@ services:
     container_name: oml-acd
     depends_on:
       - fastagi
-    networks:
-      omnileads:
-        ipv4_address: ${ACD_CONTAINER_IPV4}
+      - rabbitmq
+    network_mode: host
     environment:
       - AMI_USER=${AMI_USER}
       - AMI_PASSWORD=${AMI_PASSWORD}
       - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
       - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
       - ENV=${ENV}
-      - FASTAGI=${FASTAGI_HOSTNAME}      
+      - FASTAGI=${OML_HOSTNAME}
+      - RABBITMQ_HOST=${OML_HOSTNAME}
       - HOMER_ENABLE=False
       - HOMERHOST=${HOMERHOST}
       - HOMERPORT=${HOMERPORT}
-      - SIP_NAT_MODE=${SIP_NAT_MODE}
-      - PUBLIC_IP_DOCKER_ENGINE=${PUBLIC_IP}
-      - PRIVATE_IP_DOCKER_ENGINE=${PRIVATE_IP}
+      - SIP_NAT_IPADDR=${SIP_NAT_IPADDR}
     privileged: true
     restart: on-failure
     stop_grace_period: 30s
@@ -293,13 +312,12 @@ services:
       - AUTHEPH_SK=${AUTHEPH_SK}
       - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
       - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_HOSTNAME=${OML_HOSTNAME}
       - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
       - SHM_SIZE=${SHM_SIZE}
       - PKG_SIZE=${PKG_SIZE}
       - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
-    networks:
-      - omnileads
+    network_mode: host
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
@@ -307,22 +325,18 @@ services:
   rtpengine:
     image: ${OMLRTPENGINE_IMG}
     container_name: oml-rtpengine
-    networks:
-      omnileads:
-        ipv4_address: ${RTPENGINE_CONTAINER_IPV4}
+    network_mode: host
     environment:
-      - ENV=${ENV}
+      - ENV=docker
       - TZ=${TZ}
-      - SIP_NAT_MODE=${SIP_NAT_MODE}
-      - PUBLIC_IP=${PUBLIC_IP}
-      - PRIVATE_IP=${PRIVATE_IP}
-      - RTPENGINE_HOSTNAME=${RTPENGINE_CONTAINER_IPV4}
+      - NAT_IPADDR=${RTP_NAT_IPADDR}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
     # command: rtpengine --config-file /etc/rtpengine.conf   
     # volumes:
-    #   - .../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
+    #   - ../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
 
   postgresql:
     container_name: oml-postgres

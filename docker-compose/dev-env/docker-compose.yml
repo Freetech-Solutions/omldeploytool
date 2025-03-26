@@ -28,12 +28,30 @@ services:
     volumes:
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
       - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
+      
+  background_tasks:
+    image: omlapp:dev
+    container_name: oml-background-tasks
+    depends_on:
+      - postgresql
+      - redis
+    dns: 8.8.8.8
+    env_file: .env
+    environment:
+      - DJANGO_ALLOW_ASYNC_UNSAFE=true
+      - DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
+    command: python manage.py runworker background-tasks
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+    volumes:
+      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
       - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
-      - ${REPO_PATH}/survey_app/:/opt/omnileads/ominicontacto/survey_app
-      - ${REPO_PATH}/wallboard_app/:/opt/omnileads/ominicontacto/wallboard_app
-      - ${REPO_PATH}/premium_reports_app/:/opt/omnileads/ominicontacto/premium_reports_app
-      - ${REPO_PATH}/webphone_client_app/:/opt/omnileads/ominicontacto/webphone_client_app
-      - ${REPO_PATH}/bulk_messages_app/:/opt/omnileads/ominicontacto/bulk_messages_app
 
   omlcron:
     container_name: oml-cron
@@ -60,12 +78,6 @@ services:
     working_dir: /opt/omnileads
     volumes:
       - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
-      - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
-      - ${REPO_PATH}/survey_app/:/opt/omnileads/ominicontacto/survey_app
-      - ${REPO_PATH}/wallboard_app/:/opt/omnileads/ominicontacto/wallboard_app
-      - ${REPO_PATH}/premium_reports_app/:/opt/omnileads/ominicontacto/premium_reports_app
-      - ${REPO_PATH}/webphone_client_app/:/opt/omnileads/ominicontacto/webphone_client_app
-      - ${REPO_PATH}/bulk_messages_app/:/opt/omnileads/ominicontacto/bulk_messages_app
 
   fastagi:
     build:
