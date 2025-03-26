@@ -43,15 +43,18 @@
       - upgrade
       - update
 
-  - name: DJANGO Copy systemd service
+  - name: DJANGO Copy systemd services
     template:
-      src: "{{ django_repo_path }}templates/django.service"
-      dest: /etc/systemd/system/omnileads.service
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+    loop:
+      - { src: "{{ django_repo_path }}templates/django.service", dest: "/etc/systemd/system/omnileads.service" }
+      - { src: "{{ django_repo_path }}templates/background_tasks_worker.service", dest: "/etc/systemd/system/background_tasks.service" }
     tags:
       - install
       - upgrade
       - update
-    
+
   - name: DJANGO Pull image
     command: podman pull --quiet {{ omnileads_img }}
     register: podman_pull
@@ -92,12 +95,15 @@
     when:
       - omnileads_ha is not defined  
 
-  - name: DJANGO Enable and start systemd UWSGI service
+  - name: DJANGO Enable and start systemd services
     systemd:
-      name: omnileads.service
+      name: "{{ item }}"
       state: started
       enabled: yes
       daemon_reload: yes
+    loop:
+      - omnileads.service
+      - background_tasks.service
     tags:
       - install
     when:       
@@ -111,17 +117,21 @@
       - upgrade_from_oml_1 is not defined
       - omnileads_ha is not defined
     
-  - name: DJANGO Restart systemd UWSGI service
+  - name: DJANGO Restart systemd services
     systemd:
-      name: omnileads.service
+      name: "{{ item }}"
       state: restarted
       enabled: yes
       daemon_reload: yes
+    loop:
+      - omnileads.service
+      - background_tasks.service
     tags:
       - upgrade
       - restart
       - restart_django
       - restart_core
+      - restart_background_tasks
     when:       
       - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']    
       - omnileads_ha is not defined

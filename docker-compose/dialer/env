@@ -18,26 +18,36 @@ COMPOSE_PROJECT_NAME=omnidialer
 #                                 Components image version                                          #
 #                              versions of each image to deploy                                     #
 #####################################################################################################
-API_IMG=docker.io/freetechsolutions/dialer_api:250106.01
-LISTENER_IMG=docker.io/freetechsolutions/dialer_listener:250127.01
-WORKER_IMG=docker.io/freetechsolutions/dialer_worker:250130.01
-SCHEDULER_IMG=docker.io/freetechsolutions/dialer_scheduler:250127.01
-DIALPLAN_IMG=docker.io/freetechsolutions/dialer_dialplan:250130.01
-ASTERISK_IMG=docker.io/freetechsolutions/dialer_asterisk:250203.01
+API_IMG=docker.io/omnileads/dialer_api:250127.01
+LISTENER_IMG=docker.io/omnileads/dialer_listener:250127.01
+WORKER_IMG=docker.io/omnileads/dialer_worker:250314.01
+SCHEDULER_IMG=docker.io/omnileads/dialer_scheduler:250127.01
+DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:250130.01
+ASTERISK_IMG=docker.io/omnileads/dialer_asterisk:250121.01
 # --- 3rd party container images
 POSTGRES_IMG=docker.io/library/postgres:14.9-bullseye
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.18-alpine
 REDIS_IMG=docker.io/redis:7.2.5-alpine
 #####################################################################################################
+#                             NETWORK PARAMS                                                        #
+#####################################################################################################
+# En caso de correr OML y OMniDialer en hosts separados, se debe configurar la IP de OML (X.X.X.X)
+# Para OMNIDIALER_HOSTNAME se debe configurar la IP del Docker Engine Host (Z.Z.Z.Z)
+OML_HOSTNAME=X.X.X.X
+OMNIDIALER_HOSTNAME=Z.Z.Z.Z
+# SIP_NAT_ADDR=X.X.X.X
+#####################################################################################################
 #                             REDIS, Postgres & RabbitMQ                                            #
 #####################################################################################################
 # --- Redis OML & dialer conn params
 # --- El Dialer necesita conectarse al redis del host OML-App para poder leer
-REDIS_OML_SERVER=oml-redis
+# --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-redis" por ${OML_HOSTNAME}
+REDIS_OML_SERVER=oml-redis 
 REDIS_OML_PORT=6379
 # --- Opcionalmente la Dialer-App puede trabajar sobre una instancia de redis exclusiva
 # --- Escenario recomendado si debe escalar por encima de los 150 usuarios concurrentes 
 # --- en campañas dialer.
+# --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-redis" por ${OML_HOSTNAME}
 REDIS_DIALER_SERVER=oml-redis
 REDIS_DIALER_PORT=6379
 # --- Se utiliza la db 3 
@@ -45,6 +55,7 @@ REDIS_DB=3
 
 # --- Postgres OML & dialer conn params
 # --- El Dialer necesita conectarse al postgres del host OML-App para poder leer las campañas y otras tablas.
+# --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-postgres" por ${OML_HOSTNAME}
 POSTGRES_OML_USER=omnileads
 POSTGRES_OML_PASSWORD=admin123
 POSTGRES_OML_SERVER=oml-postgres
@@ -62,6 +73,7 @@ POSTGRES_DIALER_DB=omnidialer
 # --- RabbitMQ OML conn params
 # --- El dialplan utiliza rabbitmq para enviar eventos de logs, cuando el dialer
 # --- es configurado para discar por un trunk aparte del ACD.
+# --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-rabbit-mq" por ${OML_HOSTNAME}
 RABBITMQ_OML_SERVER=oml-rabbit-mq
 #####################################################################################################
 #                             WEB, Gearman & Python                                                 #
@@ -85,31 +97,18 @@ PROCESS_EVENT_REPLICAS=3
 #####################################################################################################
 #                             VoIP, Asterisk & Calls                                                #
 #####################################################################################################
-# --- Este Dialer, desde ahora OMniDialer utiliza un PJSIP trunk con el ACD de OML-App para poder enviar llamadas
-# --- Se utiliza "SIP" en lugar de "AMI-ORIGINATE" a la hora de generar los canales de la llamada (hacia la PSTN y hacia un agente).
-
-# --- Estos parametros es importante a la hora de plantear el escenario de VoIP NAT que se va a desplegar
-# --- Si el stack de OML-app se encuentra un host en internet o en una red privada. 
-# --- Para el caso internet, entonces se debe setear SIP_NAT_MODE=public, mientras que para un ambient
-# --- de red privada, se debe setear SIP_NAT_MODE=private.
-PRIVATE_IP_DOCKER_ENGINE=
-PUBLIC_IP_DOCKER_ENGINE=
-SIP_NAT_MODE=
-
 # --- Asterisk dialer container params
 # --- Se utilizan para que listener_worker y dialplan_worker puedan conectarse a Asterisk (ari.onf)
 ASTERISK_USER=omnileadsami
 ASTERISK_PASS=amipassword
-ASTERISK_HOST=asterisk
+ASTERISK_HOST=${OMNIDIALER_HOSTNAME}
 ASTERISK_PORT=8888
 ASTERISK_APP_DIALER=call_manager_dialer
 ASTERISK_APP=call_manager
-# --- Asterisk dialer IPV4 container or NAT ADDR
-# --- Tratar de no modificar porque se utiliza para la configuracion del NAT entre el host y el contenedor de Asterisk
-ASTERISK_CONTAINER_ADDR=10.22.22.199
 
 # --- OMniLeads ACD SIP Peer when dialer send calls
 # --- Tener en cuenta si debe abrir el 5060 UDP en el firewall de OML-App
+# --- En caso de correr en Servers separados OML y OMniDialer se debe reemplazar "oml-acd" por ${OML_HOSTNAME}
 OMLACD_SIP_SERVER=oml-acd:5260
 
 # --- Call attempts per second

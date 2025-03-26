@@ -89,6 +89,24 @@ services:
     tty: true
     working_dir: /opt/omnileads
 
+  background_tasks:
+    image: omlapp:dev
+    container_name: oml-background-tasks
+    depends_on:
+      - postgresql
+      - redis
+    dns: 8.8.8.8
+    env_file: .env
+    command: python manage.py runworker background-tasks
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+    
   fastagi:
     depends_on:
       - postgresql

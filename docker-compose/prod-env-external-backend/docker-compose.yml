@@ -4,7 +4,8 @@ services:
     container_name: oml-app
     depends_on:
       - redis
-      - acd    
+      - acd
+      - django_commands
     dns: 8.8.8.8
     env_file: .env
     image: ${OMLAPP_IMG}
@@ -83,6 +84,74 @@ services:
     tty: true
     working_dir: /opt/omnileads
 
+  background_tasks:
+    image: ${OMLAPP_IMG}
+    container_name: oml-background-tasks
+    depends_on:
+      - redis
+    dns: 8.8.8.8
+    env_file: .env
+    command: python manage.py runworker background-tasks
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+
+  nginx:
+    image: ${OMLNGINX_IMG}
+    container_name: oml-nginx
+    depends_on:
+      - django_app
+      - daphne
+      - kamailio
+      - websockets
+    dns: 8.8.8.8
+    environment:
+      - ENV=devenv
+      - TZ=${TZ}
+      - DJANGO_HOSTNAME=${DJANGO_HOSTNAME}
+      - WSGI_PORT=8099
+      - DAPHNE_HOSTNAME=${DAPHNE_HOSTNAME}
+      - ASGI_PORT=8099
+      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
+      - KAMAILIO_PORT=14443
+      - WEBSOCKETS_HOSTNAME=${WEBSOCKET_HOSTNAME}
+      - WEBSOCKETS_PORT=8000
+      - CALLREC_DEVICE=${CALLREC_DEVICE}
+      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
+      #- WEBUI_MODE=rproxy
+      #- WALLBOARD_WEBUI_HOST=kamailio
+    networks:
+      - omnileads
+    privileged: true
+    ports:
+      - ${NGINX_EXT_PORT}:443/tcp
+    restart: on-failure
+    stop_grace_period: 15s
+    volumes:
+      - django_static:/opt/omnileads/static
+      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+
+  websockets:
+    tty: true
+    container_name: oml-websockets
+    image: ${OMLWS_IMG}
+    depends_on:
+      - redis
+    environment:
+      - BIND_ADDRESS=0.0.0.0:8000
+      - EVENT_LOOP=uvloop
+      - LOGGERS=${WEBSOCKET_LOGGER}
+      - REDIS_HOST=${WEBSOCKET_REDIS_HOSTNAME}
+      - PYTHONUNBUFFERED=1
+    networks:
+      - omnileads
+    stop_grace_period: 30s  
+
   fastagi:
     depends_on:
       - redis      
@@ -91,16 +160,18 @@ services:
     command: python /app/fastagi.py
     environment:
       - TZ=${TZ}
-      - PGHOST=${PGHOST}
+      - PGHOST=${OML_HOSTNAME}
       - PGPORT=${PGPORT}
       - PGUSER=${PGUSER}
       - PGDATABASE=${PGDATABASE}
       - PGPASSWORD=${PGPASSWORD}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_HOSTNAME=${OML_HOSTNAME}
       - REDIS_PORT=${REDIS_PORT}    
     restart: on-failure
     networks:
       - omnileads
+    ports:
+      - 4573:4573/tcp  
 
   ami:
     image: ${OMLAMI_IMG}
@@ -145,23 +216,20 @@ services:
     container_name: oml-acd
     depends_on:
       - fastagi
-    networks:
-      omnileads:
-        ipv4_address: ${ACD_CONTAINER_IPV4}
+      - rabbitmq
+    network_mode: host
     environment:
-      - TZ=${TZ}      
-      - ENV=${ENV}
-      - DIALER_HOST=${DIALER_SIP_ADDR}
-      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
-      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
-      - FASTAGI=${FASTAGI_HOSTNAME}
       - AMI_USER=${AMI_USER}
       - AMI_PASSWORD=${AMI_PASSWORD}
+      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
+      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
+      - ENV=${ENV}
+      - FASTAGI=${OML_HOSTNAME}
+      - RABBITMQ_HOST=${OML_HOSTNAME}
       - HOMER_ENABLE=False
       - HOMERHOST=${HOMERHOST}
       - HOMERPORT=${HOMERPORT}
-      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
-      - ASTERISK_HOSTNAME=${PRIVATE_IP}
+      - SIP_NAT_IPADDR=${SIP_NAT_IPADDR}      
     privileged: true
     restart: on-failure
     stop_grace_period: 30s
@@ -177,6 +245,7 @@ services:
     image: ${OMLINTERACTION_PROC_IMG}
     container_name: oml-post-interactions
     depends_on:
+      - minio
       - rabbitmq
       - acd
     dns: 8.8.8.8
@@ -197,13 +266,12 @@ services:
     command: python /app/app.py
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
-
+  
   chan_tel_logger:
-    image: omnileads/chan_tel_logger:${OMLCHAN_TEL_LOGGER_IMG}
+    image: ${OMLCHAN_TEL_LOGGER_IMG}
     container_name: oml-chan-tel-logger
     depends_on:
       - rabbitmq
-      - postgresql
     dns: 8.8.8.8
     environment:
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
@@ -221,7 +289,7 @@ services:
     restart: on-failure
     stop_grace_period: 10s
     command: python /app/app.py
-        
+
   kamailio:
     image: ${OMLKAM_IMG}
     container_name: oml-kamailio
@@ -235,85 +303,31 @@ services:
       - AUTHEPH_SK=${AUTHEPH_SK}
       - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
       - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_HOSTNAME=${OML_HOSTNAME}
       - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
       - SHM_SIZE=${SHM_SIZE}
       - PKG_SIZE=${PKG_SIZE}
       - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
-    networks:
-      - omnileads
+    network_mode: host
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
 
-  nginx:
-    image: ${OMLNGINX_IMG}
-    container_name: oml-nginx
-    depends_on:
-      - django_app
-      - daphne
-      - kamailio
-      - websockets
-    dns: 8.8.8.8
-    environment:
-      - ENV=devenv
-      - TZ=${TZ}
-      - DJANGO_HOSTNAME=${DJANGO_HOSTNAME}
-      - WSGI_PORT=8099
-      - DAPHNE_HOSTNAME=${DJANGO_HOSTNAME}
-      - ASGI_PORT=8099
-      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
-      - KAMAILIO_PORT=14443
-      - WEBSOCKETS_HOSTNAME=${WEBSOCKET_HOSTNAME}
-      - WEBSOCKETS_PORT=8000
-      - CALLREC_DEVICE=${CALLREC_DEVICE}
-      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
-      #- WEBUI_MODE=rproxy
-      #- WALLBOARD_WEBUI_HOST=kamailio
-    networks:
-      - omnileads
-    privileged: true
-    ports:
-      - ${NGINX_EXT_PORT}:443/tcp
-    restart: on-failure
-    stop_grace_period: 15s
-    volumes:
-      - django_static:/opt/omnileads/static
-      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
-
   rtpengine:
     image: ${OMLRTPENGINE_IMG}
     container_name: oml-rtpengine
-    networks:
-      omnileads:
-        ipv4_address: ${RTPENGINE_CONTAINER_IPV4}
+    network_mode: host
     environment:
-      - ENV=nat
+      - ENV=docker
       - TZ=${TZ}
-      - PUBLIC_IP=${PUBLIC_IP}
-      - RTPENGINE_HOSTNAME=${RTPENGINE_CONTAINER_IPV4}
+      - NAT_IPADDR=${RTP_NAT_IPADDR}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
     # command: rtpengine --config-file /etc/rtpengine.conf   
     # volumes:
     #   - .../.custom_conf/rtpengine.conf:/etc/rtpengine.conf:ro
-
-  websockets:
-    tty: true
-    container_name: oml-websockets
-    image: ${OMLWS_IMG}
-    depends_on:
-      - redis
-    environment:
-      - BIND_ADDRESS=0.0.0.0:8000
-      - EVENT_LOOP=uvloop
-      - LOGGERS=${WEBSOCKET_LOGGER}
-      - REDIS_HOST=${WEBSOCKET_REDIS_HOSTNAME}
-      - PYTHONUNBUFFERED=1
-    networks:
-      - omnileads
-    stop_grace_period: 30s  
 
   redis:
     container_name: oml-redis
@@ -323,7 +337,9 @@ services:
       - TZ=${TZ}
       - BIND_IP=0.0.0.0
     networks:
-      - omnileads    
+      - omnileads
+    ports:
+      - ${REDIS_EXT_PORT}:6379/tcp  
     privileged: true
     restart: on-failure
     stop_grace_period: 1m30s
@@ -332,12 +348,29 @@ services:
       
   rabbitmq:
     container_name: oml-rabbit-mq
-    image: rabbitmq:management
+    image: ${OMLRABBITMQ_IMG}
     networks:
       - omnileads
     ports:
       - "15672:15672"
-      - "5672:5672"
+      - ${RABBITMQ_EXT_PORT}:5672
+
+  redisinsight:
+    container_name: redisinsight
+    image: redis/redisinsight:latest
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - BIND_IP=0.0.0.0
+    networks:
+      - omnileads
+    ports:
+      - '7963:5540'    
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 1m30s
+    volumes:
+      - redis_redisinsight:/data
 
 networks:
   omnileads:
@@ -348,6 +381,7 @@ networks:
 
 volumes:
   redis:
+  redis_redisinsight:
   django_static:
   django_callrec_zip:
   asterisk_callrec:

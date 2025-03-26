@@ -76,6 +76,7 @@ function deploy {
     warning_msg "Could not find '../env' file. Ensure it exists in the parent directory."
   else
     cp ../env .env
+    sed -i "s/ENV=docker/ENV=devenv/g" .env
   fi
 
   prepare_dir
