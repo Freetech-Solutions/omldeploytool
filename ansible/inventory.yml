@@ -61,7 +61,7 @@ all:
           omni_ip_lan: 172.16.101.110
           infra_env: lan
           qa_env: true
-          ansible_ssh_port: 2235
+          ansible_ssh_port: 2235        
     # -----------------------------------------
     # -----------------------------------------
     cluster_instances:
@@ -189,9 +189,6 @@ all:
     # --- Asterisk Manager Interface (AMI) user & password
     ami_user: omnileads
     ami_password: C12H17N2O4P_o98o98
-    # --- Wombat Dialer API user & pass
-    dialer_user: demoadmin
-    dialer_password: demo
     # --- Session Cookie Age, is the time in seconds that will last 
     # --- the https session when inactivity
     SCA: 3600
@@ -203,6 +200,18 @@ all:
     ECCTL: 28800
     # --- is the attempts a user has to enter an incorrect password in login
     LOGIN_FAILURE_LIMIT: 10
+    
+    # --- Dialer Settings
+    # --- The Dialer Engine: omnidialer or wombat.
+    dialer_engine: wombat
+    # --- The Dialer host address (FQDN or IP)
+    dialer_host: dialer.example.com
+    # --- Dialer API user & password
+    dialer_user: demoadmin
+    dialer_password: demo
+    # --- Dialer API port
+    dialer_port: 8080
+
     # --- SMTP server params, if you want to use your own SMTP, put true and
     # --- uncomment all necesary
     email_smtp_relay: false
@@ -219,15 +228,11 @@ all:
 
     # --- Web Proxy setting
     # proxy_url: https://X.X.X.X:PPPP
-    
+        
     # ------------------------------------------------------------------------------------------------ #
     # --------------------------------------- Integrations-------------------------------------------- #
     # ------------------------------------------------------------------------------------------------ #
-    
-    # --- The Dialer Engine Host (omnileads or wombat)
-    # dialer_engine: omnileads
-    # ---- localhost or stanalone server host IP
-    #dialer_host: localhost
+
     # --- Text to Speech external "gcp", "aws", "ibm", etc.
     #tts_external_engine: 
     # --- Speech analytics & sentiment analysis
@@ -312,7 +317,8 @@ all:
     # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
     #scale_postgres: True
     #postgres_max_connections: 20 # max(4 * number of CPU cores, 100)
-    #postgres_shared_buffers: 1GB #  Min 128kB Max 25% of total MEM RAM 
+    #postgres_shared_buffers: 1GB #  Min 128kB Max 25% of total MEM RAM
+    #postgres_idle_in_transaction_session_timeout: 60000 # max time in milliseconds that a session can remain idle, 0 is disabled
     #postgres_statement_timeout: 60000 # query timeout in milliseconds, 0 is disabled
     #postgres_effective_cache_size: 4GB # between 50% and 75% of total MEM RAM
     #postgres_wal_buffers: 32MB # between 64KB & 16MB
@@ -364,9 +370,9 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:250122.01
-    asterisk_img: docker.io/omnileads/asterisk:250117.01
-
+    omnileads_img: docker.io/omnileads/omlapp:250424.01
+    asterisk_img: docker.io/omnileads/asterisk:250422.01
+    
 ##############################################################################################################
 ## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #
 ## -- here you can control which host the action deployed by the deploy.sh script will be applied to      -- #
@@ -405,5 +411,4 @@ omnileads_app:
   hosts:
     #tenant_example_5_app:
     #tenant_example_6_app:
-
 

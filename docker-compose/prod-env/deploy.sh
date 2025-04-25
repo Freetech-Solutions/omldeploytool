@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                                                                                                    #!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -6,9 +6,15 @@ set -e
 ####################  NETWORKING #####################
 ######################################################
 
+# Check if either NIC or DOCKER_ENGINE_IPV4 is provided
+if [[ -z "$NIC" && -z "$DOCKER_ENGINE_IPV4" ]]; then
+    echo "Error: You must to pass NIC or DOCKER_ENGINE_IPV4 as argument." >&2
+    exit 1
+fi
+
 oml_nic=${NIC}
-lan_addr=${PRIVATE_IPV4}
-wan_addr=${PUBLIC_IPV4}
+docker_engine_ip=${DOCKER_ENGINE_IPV4}
+wan_addr=${NAT_IPV4}
 
 ######################################################
 ###################### STAGE #########################
@@ -48,12 +54,41 @@ log_error() {
     exit 1
 }
 
+disable_firewalls() {
+    log_info "*** Checking and disabling firewall services ***"
+    
+    # Check for UFW (Debian/Ubuntu)
+    if command -v ufw &> /dev/null; then
+        if systemctl is-active --quiet ufw; then
+            log_info "UFW is active. Disabling..."
+            systemctl stop ufw
+            systemctl disable ufw
+            ufw disable
+            log_info "UFW has been disabled"
+        else
+            log_info "UFW is installed but not active"
+        fi
+    fi
+    
+    # Check for FirewallD (RHEL/CentOS/Fedora)
+    if command -v firewall-cmd &> /dev/null; then
+        if systemctl is-active --quiet firewalld; then
+            log_info "FirewallD is active. Disabling..."
+            systemctl stop firewalld
+            systemctl disable firewalld
+            log_info "FirewallD has been disabled"
+        else
+            log_info "FirewallD is installed but not active"
+        fi
+    fi
+}
+
 setup_networking() {
     log_info "*** Network settings ***"
-    if [[ -z "$lan_addr" ]]; then
-        lan_addr=$(ip addr show "$oml_nic" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1) || log_error "No se pudo obtener la dirección privada."
+    if [[ -z "$docker_engine_ip" ]]; then
+        docker_engine_ip=$(ip addr show "$oml_nic" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1) || log_error "No se pudo obtener la dirección privada."
     else
-        lan_addr="$lan_addr"
+        docker_engine_ip="$docker_engine_ip"
     fi
 
     if [[ -z "$wan_addr" ]]; then
@@ -93,8 +128,10 @@ deploy_omnileads() {
 
     cd omldeploytool || log_error "Canot access the 'omldeploytool' directory."
     
-    if [[ "$branch" != "main" ]]; then
+    if [[ -n "$branch" ]]; then
         git checkout "$branch" || log_error "Error al cambiar a la rama '$branch'."
+    else    
+        git checkout "main" || log_error "Error al cambiar a la rama '$branch'."
     fi
     
     cp docker-compose/oml_manage /usr/local/bin/oml_manage
@@ -102,47 +139,25 @@ deploy_omnileads() {
 
     cp ../env ./.env
     sed -i "s/ENV=devenv/ENV=${env}/g" .env
-    sed -i "s/PRIVATE_IP=/PRIVATE_IP=${lan_addr}/g" .env
+    sed -i "s/OML_HOSTNAME=/OML_HOSTNAME=${docker_engine_ip}/g" .env
     sed -i "s/PUBLIC_IP=/PUBLIC_IP=${wan_addr}/g" .env
+    sed -i "s/ASTERISK_HOSTNAME=acd/ASTERISK_HOSTNAME=${docker_engine_ip}/g" .env
+    sed -i "s/FASTAGI_HOSTNAME=fastagi/FASTAGI_HOSTNAME=${docker_engine_ip}/g" .env
+    sed -i "s/RTPENGINE_HOSTNAME=rtpengine/RTPENGINE_HOSTNAME=${docker_engine_ip}/g" .env
+    sed -i "s/KAMAILIO_HOSTNAME=kamailio/KAMAILIO_HOSTNAME=${docker_engine_ip}/g" .env
+    sed -i "s/https:\/\/localhost/https:\/\/${docker_engine_ip}/g" .env
+
+    if [[ -n "$NAT_IPV4" ]]; then
+        sed -i "s/#SIP_NAT_IPADDR/SIP_NAT_IPADDR/g" .env
+        sed -i "s/#RTP_NAT_IPADDR/RTP_NAT_IPADDR/g" .env
+    fi
 
     docker-compose up -d || log_error "Error while executing docker-compose up -d."
 }
 
-setup_iptables() {
-    log_info "Iptables RTP rules setup"
-
-    # Crear reglas de iptables
-    iptables -t nat -A PREROUTING -p udp --dport 5060 -j DNAT --to-destination 10.22.22.99
-    iptables -A FORWARD -p udp -d 10.22.22.99 --dport 5060 -j ACCEPT
-    iptables -t nat -A PREROUTING -p udp --dport 40000:50000 -j DNAT --to-destination 10.22.22.99
-    iptables -A FORWARD -p udp -d 10.22.22.99 --dport 40000:50000 -j ACCEPT
-    iptables -t nat -A PREROUTING -p udp --dport 20000:30000 -j DNAT --to-destination 10.22.22.98
-    iptables -A FORWARD -p udp -d 10.22.22.98 --dport 20000:30000 -j ACCEPT
-
-    # Crear o modificar rc.local
-    if [[ ! -f /etc/rc.local ]]; then
-        echo -e "#!/bin/bash\nexit 0" > /etc/rc.local
-        chmod +x /etc/rc.local
-    fi
-
-    # Añadir reglas a rc.local si no existen
-    if ! grep -q "iptables -t nat -A PREROUTING -p udp --dport 5060" /etc/rc.local; then
-        sed -i '/^exit 0$/i \
-iptables -t nat -A PREROUTING -p udp --dport 5060 -j DNAT --to-destination 10.22.22.99\n\
-iptables -A FORWARD -p udp -d 10.22.22.99 --dport 5060 -j ACCEPT\n\
-iptables -t nat -A PREROUTING -p udp --dport 40000:50000 -j DNAT --to-destination 10.22.22.99\n\
-iptables -A FORWARD -p udp -d 10.22.22.99 --dport 40000:50000 -j ACCEPT\n\
-iptables -t nat -A PREROUTING -p udp --dport 20000:30000 -j DNAT --to-destination 10.22.22.98\n\
-iptables -A FORWARD -p udp -d 10.22.22.98 --dport 20000:30000 -j ACCEPT' /etc/rc.local
-        log_info "Reglas de iptables añadidas a rc.local."
-    else
-        log_info "The iptables rules already exist in rc.local."
-    fi
-}
-
 wait_for_env() {
     log_info "*** The environment is currently starting up. Please wait. ***"
-    until curl -sk --head --request GET "https://${lan_ipv4}" | grep "302" > /dev/null; do
+    until curl -sk --head --request GET "https://${docker_engine_ip}" | grep "302" > /dev/null; do
         log_info "The system is in the process of starting up. Please wait ..."
         sleep 10
     done
@@ -159,8 +174,9 @@ reset_admin_password() {
 ######################################################
 
 setup_networking
+# Agregamos la función de deshabilitación de firewalls antes de la instalación
+disable_firewalls
 setup_os_dependencies
 deploy_omnileads
-setup_iptables
 wait_for_env
 reset_admin_password

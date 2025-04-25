@@ -61,6 +61,33 @@
       when:
         - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']  
 
+    - name: RESTORE wait for PostgreSQL to be available AIO
+      wait_for:
+        host: localhost
+        port: {{ postgres_port}}
+        state: started
+        timeout: 120
+      when:
+        - inventory_hostname in groups['omnileads_aio']
+
+    - name: RESTORE wait for PostgreSQL to be available AIT
+      wait_for:
+        host: {{ data_host }}
+        port: {{ postgres_port}}
+        state: started
+        timeout: 120
+      when:
+        - inventory_hostname in groups['omnileads_app']
+
+    - name: RESTORE wait for PostgreSQL to be available External Postgres
+      wait_for:
+        host: {{ postgres_host }}
+        port: {{ postgres_port}}
+        state: started
+        timeout: 120
+      when:
+        - inventory_hostname in groups['omnileads_app']
+
     - name: RESTORE postgres DB pg_restore
       shell: "podman run --name pgsql_bk_{{ restore_file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ restore_file_timestamp }}.sql --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_restore.sh"
       when:

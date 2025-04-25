@@ -3,18 +3,27 @@ services:
   django_app:
     container_name: oml-app
     depends_on:
-      - postgresql
-      - redis
-      - acd
-      - minio
+      django_commands:
+        condition: service_completed_successfully
+        required: true
+      postgresql:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true      
+      minio:
+        condition: service_started
+        required: true
+      acd:
+        condition: service_started
+        required: true  
     dns: 8.8.8.8
     env_file: .env
     image: ${OMLAPP_IMG}
     command: /opt/omnileads/bin/init_uwsgi.sh
     networks:
       - omnileads
-    ports:
-      - 8099:8099  
     privileged: true
     restart: on-failure
     stdin_open: true
@@ -27,9 +36,15 @@ services:
 
   django_commands:
     depends_on:
-      - postgresql
-      - redis
-      - minio
+      postgresql:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true      
+      minio:
+        condition: service_started
+        required: true
     dns: 8.8.8.8
     env_file: .env    
     image: ${OMLAPP_IMG}
@@ -49,7 +64,9 @@ services:
   daphne:
     container_name: oml-daphne
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
     env_file: .env
     environment:
@@ -69,14 +86,22 @@ services:
   omlcron:
     container_name: oml-cron
     depends_on:
-      - postgresql
-      - acd
-      - minio
-      - redis
+      postgresql:
+        condition: service_started
+        required: true    
+      acd:
+        condition: service_started
+        required: true    
+      minio:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
     env_file: .env
     environment:
-      - UWSGI_PORT=8097
+      - UWSGI_PORT=${UWSGI_PORT}
       - DJANGO_HOSTNAME=omlcron
     image: ${OMLAPP_IMG}
     command: /opt/omnileads/bin/docker-entrypoint.sh
@@ -89,178 +114,44 @@ services:
     tty: true
     working_dir: /opt/omnileads
 
-  fastagi:
+  background_tasks:
+    image: omlapp:dev
+    container_name: oml-background-tasks
     depends_on:
-      - postgresql
-      - redis      
-    image: ${OMLFASTAGI_IMG}
-    container_name: oml-fastagi
-    command: python /app/fastagi.py
-    environment:
-      - TZ=${TZ}
-      - PGHOST=${PGHOST}
-      - PGPORT=${PGPORT}
-      - PGUSER=${PGUSER}
-      - PGDATABASE=${PGDATABASE}
-      - PGPASSWORD=${PGPASSWORD}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
-      - REDIS_PORT=${REDIS_PORT}    
-    restart: on-failure
-    networks:
-      - omnileads
-
-  ami:
-    image: ${OMLAMI_IMG}
-    depends_on:
-      - acd
-      - redis
-    container_name: oml-astami
-    environment:
-      - TZ=${TZ}
-      - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
-      - AMI_USER=${AMI_USER}
-      - AMI_PASSWORD=${AMI_PASSWORD}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
-    restart: on-failure    
-    networks:
-      - omnileads
-
-  acd_config_generator:
-    image: ${OMLACD_RETRIEVE_CONF_IMG}
-    container_name: oml-acd-conf
-    depends_on:
-      - websockets
+      postgresql:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
-    environment:
-      - TZ=${TZ}
-      - ASTERISK_LOCATION=
-      - ARI_HOST=${ASTERISK_HOSTNAME}
-      - ARI_USER=${AMI_USER}
-      - ARI_PASS=${AMI_PASSWORD}
-      - OMNILEADS_HOSTNAME=${OMNILEADS_HOSTNAME}
+    env_file: .env
+    command: python manage.py runworker background-tasks
     networks:
       - omnileads
     privileged: true
     restart: on-failure
-    stop_grace_period: 10s
-    volumes:      
-      - asterisk_conf:/home/omnileads/astconf
-      - asterisk_sounds:/home/omnileads/sounds
-
-  acd:
-    image: ${OMLACD_IMG}
-    container_name: oml-acd
-    depends_on:
-      - fastagi
-    networks:
-      - omnileads       
-    environment:
-      - TZ=${TZ}      
-      - ENV=${ENV}
-      - DIALER_HOST=${DIALER_SIP_ADDR}
-      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
-      - FASTAGI=${FASTAGI_HOSTNAME}
-      - AMI_USER=${AMI_USER}
-      - AMI_PASSWORD=${AMI_PASSWORD}
-      - HOMER_ENABLE=False
-      - HOMERHOST=${HOMERHOST}
-      - HOMERPORT=${HOMERPORT}
-      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
-    privileged: true
-    restart: on-failure
+    stdin_open: true
     stop_grace_period: 30s
-    volumes:
-      - asterisk_callrec:/var/spool/asterisk/monitor/
-      - asterisk_conf:/etc/asterisk/retrieve_conf
-      - asterisk_sounds:/var/lib/asterisk/sounds/oml
-      #- ../.custom_conf/google_credential.json:/tmp/google_credential.json
-      #- ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
-    working_dir: /etc/asterisk
-
-  interaction_processor:
-    image: ${OMLINTERACTION_PROC_IMG}
-    container_name: oml-post-interactions
-    depends_on:
-      - minio
-      - rabbitmq
-      - acd
-    dns: 8.8.8.8
-    environment:
-      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
-      - TZ=${TZ}
-      - CALLREC_DEVICE=${CALLREC_DEVICE}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-    networks:
-      - omnileads
-    privileged: true
-    restart: on-failure
-    stop_grace_period: 10s
-    command: python /app/app.py
-    volumes:
-      - asterisk_callrec:/var/spool/asterisk/monitor/
-  
-  chan_tel_logger:
-    image: ${OMLCHAN_TEL_LOGGER_IMG}
-    container_name: oml-chan-tel-logger
-    depends_on:
-      - rabbitmq
-      - postgresql
-    dns: 8.8.8.8
-    environment:
-      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
-      - PGHOST=${PGHOST}
-      - PGPORT=${PGPORT}
-      - PGUSER=${PGUSER}
-      - PGDATABASE=${PGDATABASE}
-      - PGPASSWORD=${PGPASSWORD}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
-      - REDIS_PORT=${REDIS_PORT}  
-      - TZ=${TZ}
-    networks:
-      - omnileads
-    privileged: true
-    restart: on-failure
-    stop_grace_period: 10s
-    command: python /app/app.py
-
-  kamailio:
-    image: ${OMLKAM_IMG}
-    container_name: oml-kamailio
-    depends_on:
-      - redis
-      - acd
-      - rtpengine
-    dns: 8.8.8.8
-    environment:
-      - TZ=${TZ}
-      - AUTHEPH_SK=${AUTHEPH_SK}
-      - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
-      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
-      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
-      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
-      - SHM_SIZE=${SHM_SIZE}
-      - PKG_SIZE=${PKG_SIZE}
-      - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
-    networks:
-      - omnileads
-    privileged: true
-    restart: on-failure
-    stop_grace_period: 10s
-    volumes:
-      - ../certs:/${KAMAILIO_CERTS_LOCATION}
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
 
   nginx:
     image: ${OMLNGINX_IMG}
     container_name: oml-nginx
     depends_on:
-      - django_app
-      - daphne
-      - kamailio
-      - websockets
+      django_app:
+        condition: service_started
+        required: true    
+      daphne:
+        condition: service_started
+        required: true    
+      kamailio:
+        condition: service_started
+        required: true    
+      websockets:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
     environment:
       - ENV=devenv
@@ -287,17 +178,201 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
-
-  vue-cli:
-    tty: true
-    container_name: oml-vuejs-cli
-    image: ${OMLVUEJS_IMG}
-    ports:
-      - 8081:8080
+        
+  fastagi:
+    depends_on:
+      postgresql:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true      
+    image: ${OMLFASTAGI_IMG}
+    container_name: oml-fastagi
+    command: python /app/fastagi.py
+    environment:
+      - TZ=${TZ}
+      - PGHOST=${PGHOST}
+      - PGPORT=${PGPORT}
+      - PGUSER=${PGUSER}
+      - PGDATABASE=${PGDATABASE}
+      - PGPASSWORD=${PGPASSWORD}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_PORT=${REDIS_PORT}    
+    restart: on-failure
     networks:
       - omnileads
+    ports:
+      - 4573:4573/tcp
+  
+  ami:
+    image: ${OMLAMI_IMG}
+    depends_on:
+      acd:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true    
+    container_name: oml-astami
+    environment:
+      - TZ=${TZ}
+      - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
+      - AMI_USER=${AMI_USER}
+      - AMI_PASSWORD=${AMI_PASSWORD}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+    restart: on-failure    
+    networks:
+      - omnileads
+
+  acd_config_generator:
+    image: ${OMLACD_RETRIEVE_CONF_IMG}
+    container_name: oml-acd-conf
+    depends_on:
+      websockets:
+        condition: service_started
+        required: true    
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - ASTERISK_LOCATION=
+      - ARI_HOST=${ASTERISK_HOSTNAME}
+      - ARI_USER=${AMI_USER}
+      - ARI_PASS=${AMI_PASSWORD}
+      - OMNILEADS_HOSTNAME=${OMNILEADS_HOSTNAME}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    volumes:      
+      - asterisk_conf:/home/omnileads/astconf
+      - asterisk_sounds:/home/omnileads/sounds
+
+  acd:
+    image: ${OMLACD_IMG}
+    container_name: oml-acd
+    depends_on:
+      fastagi:
+        condition: service_started
+        required: true    
+      rabbitmq:
+        condition: service_started
+        required: true    
+    networks:
+      - omnileads       
+    environment:
+      - AMI_USER=${AMI_USER}
+      - AMI_PASSWORD=${AMI_PASSWORD}
+      - CALLREC_SPLIT_CHANNELS=${CALLREC_SPLIT_CHANNELS}
+      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
+      - ENV=${ENV}
+      - FASTAGI=${FASTAGI_HOSTNAME}
+      - HOMER_ENABLE=False
+      - HOMERHOST=${HOMERHOST}
+      - HOMERPORT=${HOMERPORT}
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}      
+      - SIP_NAT_IPADDR=${SIP_NAT_IPADDR}
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 30s
     volumes:
-      - ${REPO_PATH}/omlapp/omnileads_ui/:/home/oml_frontend/
+      - asterisk_callrec:/var/spool/asterisk/monitor/
+      - asterisk_conf:/etc/asterisk/retrieve_conf
+      - asterisk_sounds:/var/lib/asterisk/sounds
+      #- ../.custom_conf/google_credential.json:/tmp/google_credential.json
+      #- ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
+    working_dir: /etc/asterisk
+
+  interaction_processor:
+    image: ${OMLINTERACTION_PROC_IMG}
+    container_name: oml-post-interactions
+    depends_on:
+      minio:
+        condition: service_started
+        required: true    
+      rabbitmq:
+        condition: service_started
+        required: true    
+      acd:
+        condition: service_started
+        required: true    
+    dns: 8.8.8.8
+    environment:
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
+      - TZ=${TZ}
+      - CALLREC_DEVICE=${CALLREC_DEVICE}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    command: python /app/app.py
+    volumes:
+      - asterisk_callrec:/var/spool/asterisk/monitor/
+  
+  chan_tel_logger:
+    image: ${OMLCHAN_TEL_LOGGER_IMG}
+    container_name: oml-chan-tel-logger
+    depends_on:
+      rabbitmq:
+        condition: service_started
+        required: true    
+      postgresql:
+        condition: service_started
+        required: true    
+    dns: 8.8.8.8
+    environment:
+      - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
+      - PGHOST=${PGHOST}
+      - PGPORT=${PGPORT}
+      - PGUSER=${PGUSER}
+      - PGDATABASE=${PGDATABASE}
+      - PGPASSWORD=${PGPASSWORD}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - REDIS_PORT=${REDIS_PORT}  
+      - TZ=${TZ}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
+    command: python /app/app.py
+
+  kamailio:
+    image: ${OMLKAM_IMG}
+    container_name: oml-kamailio
+    depends_on:
+      redis:
+        condition: service_started
+        required: true    
+      acd:
+        condition: service_started
+        required: true    
+      rtpengine:
+        condition: service_started
+        required: true    
+    dns: 8.8.8.8
+    environment:
+      - TZ=${TZ}
+      - AUTHEPH_SK=${AUTHEPH_SK}
+      - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
+      - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
+      - REDIS_HOSTNAME=${REDIS_HOSTNAME}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
+      - SHM_SIZE=${SHM_SIZE}
+      - PKG_SIZE=${PKG_SIZE}
+      - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 10s
       
   rtpengine:
     image: ${OMLRTPENGINE_IMG}
@@ -306,10 +381,10 @@ services:
     environment:
       - ENV=${ENV}
       - TZ=${TZ}
+      - NAT_IPADDR=${RTP_NAT_IPADDR}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
     networks:
-      omnileads:
-        ipv4_address: 10.22.22.98
-  
+      - omnileads
     privileged: true
     restart: on-failure
     stop_grace_period: 10s
@@ -322,7 +397,9 @@ services:
     container_name: oml-websockets
     image: ${OMLWS_IMG}
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+        required: true    
     environment:
       - BIND_ADDRESS=0.0.0.0:8000
       - EVENT_LOOP=uvloop
@@ -374,7 +451,7 @@ services:
       - omnileads
     ports:
       - "15672:15672"
-      - "5672:5672"
+      - ${RABBITMQ_EXT_PORT}:5672
 
   minio:
     tty: true
@@ -399,7 +476,9 @@ services:
     image: minio/mc
     container_name: oml-initminio
     depends_on:
-      - minio
+      minio:
+        condition: service_started
+        required: true    
     networks:
       - omnileads
     entrypoint: >

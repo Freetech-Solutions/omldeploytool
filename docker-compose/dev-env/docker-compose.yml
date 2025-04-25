@@ -29,26 +29,29 @@ services:
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
       - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
       
-  daphne:
-    container_name: oml-daphne
+  background_tasks:
+    image: omlapp:dev
+    container_name: oml-background-tasks
     depends_on:
+      - postgresql
       - redis
-      - django_app
     dns: 8.8.8.8
     env_file: .env
     environment:
-      - DAPHNE_ENABLE=True
-      - DJANGO_HOSTNAME=daphne
-    image: omlapp:dev
-    command: /opt/omnileads/bin/init_daphne.sh
+      - DJANGO_ALLOW_ASYNC_UNSAFE=true
+      - DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
+    command: python manage.py runworker background-tasks
     networks:
       - omnileads
     privileged: true
     restart: on-failure
     stdin_open: true
-    stop_grace_period: 1m30s
+    stop_grace_period: 30s
     tty: true
     working_dir: /opt/omnileads/ominicontacto
+    volumes:
+      - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+      - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
 
   omlcron:
     container_name: oml-cron
@@ -73,6 +76,8 @@ services:
     stop_grace_period: 1m30s
     tty: true
     working_dir: /opt/omnileads
+    volumes:
+      - ${REPO_PATH}/omlapp/:/opt/omnileads/ominicontacto/
 
   fastagi:
     build:
@@ -89,7 +94,8 @@ services:
       - PGDATABASE=${PGDATABASE}
       - PGPASSWORD=${PGPASSWORD}
       - REDIS_HOSTNAME=${REDIS_HOSTNAME}
-      - REDIS_PORT=${REDIS_PORT}    
+      - REDIS_PORT=${REDIS_PORT}
+      - OMNILEADS_HOSTNAME=${OMNILEADS_HOSTNAME}
     restart: on-failure
     networks:
       - omnileads
@@ -141,14 +147,14 @@ services:
       target: run
       context: ${REPO_PATH}/omlacd
     image: asterisk:dev
-    container_name: oml-acd
     depends_on:
       - fastagi
+    container_name: oml-acd
     dns: 8.8.8.8
     environment:
       - TZ=${TZ}      
       - ENV=${ENV}
-      - DIALER_HOST=${DIALER_SIP_ADDR}
+      - DIALER_HOST=${OMNIDIALER_SIP_ADDR}
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
       - FASTAGI=${FASTAGI_HOSTNAME}
       - AMI_USER=${AMI_USER}
@@ -168,8 +174,8 @@ services:
       - ${REPO_PATH}/omlacd/source/agi-bin/:/var/lib/asterisk/agi-bin/
       - asterisk_callrec:/var/spool/asterisk/monitor/
       - asterisk_conf:/etc/asterisk/retrieve_conf
-      - asterisk_sounds:/var/lib/asterisk/sounds/oml
-      # - ./asterisk_custom/google_credential.json:/tmp/google_credential.json
+      - asterisk_sounds:/var/lib/asterisk/sounds
+      # - ../.custom_conf/google_credential.json:/tmp/google_credential.json
       # - ../.custom_conf/oml_extensions_custom.conf:/etc/asterisk/oml_extensions_custom.conf
     working_dir: /etc/asterisk
 
@@ -231,6 +237,33 @@ services:
     volumes:
       - ${REPO_PATH}/tel_call_logger/src:/app
 
+  # tel_pstn_proxy:
+  #   build:
+  #     target: run
+  #     context: ${REPO_PATH}/tel_pstn_proxy
+  #   image: tel_pstn_proxy:dev
+  #   container_name: oml-tel-pstn-proxy
+  #   depends_on:
+  #     - mariadb
+  #     - rtpengine
+  #   dns: 8.8.8.8
+  #   environment:
+  #     - TZ=${TZ}
+  #     - AUTHEPH_SK=${AUTHEPH_SK}
+  #     - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
+  #     - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
+  #     - MARIADB_DATABASE=${MARIADB_DATABASE}
+  #     - MARIADB_USER=${MARIADB_USER}
+  #     - MARIADB_PASSWORD=${MARIADB_PASSWORD}
+  #     - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
+  #     - SHM_SIZE=${SHM_SIZE}
+  #     - PKG_SIZE=${PKG_SIZE}
+  #     - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
+  #   networks:
+  #     - omnileads
+  #   privileged: true
+  #   restart: on-failure
+  #   stop_grace_period: 10s
   kamailio:
     build:
       target: run
@@ -244,11 +277,13 @@ services:
     dns: 8.8.8.8
     environment:
       - TZ=${TZ}
+      - ENV=docker
       - AUTHEPH_SK=${AUTHEPH_SK}
       - ASTERISK_HOSTNAME=${ASTERISK_HOSTNAME}
       - KAMAILIO_HOSTNAME=${KAMAILIO_HOSTNAME}
       - REDIS_HOSTNAME=${REDIS_HOSTNAME}
       - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
+      - RTPENGINE_PUBLIC_IP=${RTPENGINE_HOSTNAME}
       - SHM_SIZE=${SHM_SIZE}
       - PKG_SIZE=${PKG_SIZE}
       - KAMAILIO_CERTS_LOCATION=${KAMAILIO_CERTS_LOCATION}
@@ -305,8 +340,12 @@ services:
     container_name: oml-rtpengine
     dns: 8.8.8.8
     environment:
-      - ENV=devenv
+      - ENV=docker
+      - SIP_NAT_MODE=lan_ip
       - TZ=${TZ}
+      - PUBLIC_IP=${RTPENGINE_HOSTNAME}
+      - PRIVATE_IP=${RTPENGINE_HOSTNAME}
+      - RTPENGINE_HOSTNAME=${RTPENGINE_HOSTNAME}
     networks:
       - omnileads    
     privileged: true
@@ -337,6 +376,45 @@ services:
     volumes:
       - ${REPO_PATH}/omnileads-websockets/source/:/opt/services/webapp/src/
 
+  # sentiment_analysis:
+  #   build:
+  #     context: ${REPO_PATH}/oml_sentiment_analysis
+  #     target: run
+  #   image: sentiment_analysis:dev
+  #   container_name: oml-sentiment_analysis
+  #   depends_on:
+  #     - postgresql
+  #     - minio
+  #     - rabbitmq
+  #   dns: 8.8.8.8
+  #   environment:
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/tmp/google_credential.json
+  #     - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
+  #     - TZ=${TZ}
+  #     - PGHOST=${PGHOST}
+  #     - PGPORT=${PGPORT}
+  #     - PGUSER=${PGUSER}
+  #     - PGDATABASE=${PGDATABASE}
+  #     - PGPASSWORD=${PGPASSWORD}
+  #     - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+  #     - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+  #     - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+  #     - S3_ENDPOINT=${S3_ENDPOINT_MINIO}
+  #     - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+  #     - LANG=es
+  #     - GCP_PROJECT_ID=${GOOGLE_CLOUD_PROJECTID}
+  #   networks:
+  #     - omnileads
+  #   privileged: true
+  #   command: python /app/app_openai.py
+  #   restart: on-failure
+  #   stop_grace_period: 1m30s
+  #   volumes:
+  #   #  - ../.custom_conf/google_credential.json:/tmp/google_credential.json
+  #     - ${REPO_PATH}/oml_sentiment_analysis/:/app/
+
   postgresql:
     container_name: oml-postgres
     image: ${OMLPGSQL_IMG}
@@ -348,8 +426,6 @@ services:
       - POSTGRES_DB=${PGDATABASE}
     networks:
       - omnileads
-    ports:
-      - ${PG_EXT_PORT}:5432/tcp
     privileged: true
     restart: on-failure
     stop_grace_period: 1m30s
@@ -370,6 +446,25 @@ services:
     stop_grace_period: 1m30s
     volumes:
       - redis:/data
+
+  # mariadb:
+  #   container_name: oml-mariadb
+  #   dns: 8.8.8.8
+  #   environment:
+  #     - ALLOW_EMPTY_PASSWORD=yes
+  #     - TZ=${TZ}
+  #     - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASS}
+  #     - MARIADB_DATABASE=${WOMBAT_DB}
+  #     - MARIADB_USER=${WOMBAT_DB_USER}
+  #     - MARIADB_PASSWORD=${WOMBAT_DB_PASS}
+  #   image: ${MARIADB_IMG}
+  #   networks:
+  #     - omnileads
+  #   privileged: true
+  #   restart: on-failure
+  #   stop_grace_period: 1m30s
+  #   volumes:
+  #     - mariadb:/bitnami
 
   vue-cli:
     tty: true
@@ -428,7 +523,6 @@ services:
       /usr/bin/mc admin policy attach local readwrite --user omlminio;
       exit 0;
       "
-
   pbxemulator:
     build:
       context: ${REPO_PATH}/omlqa/pstn_emulator
@@ -451,8 +545,7 @@ services:
     # volumes:
       # - ${REPO_PATH}/omlqa/pstn_emulator/conf:/etc/asterisk/
       # - ./.conf/pstn_emulator_extensions.conf:/etc/asterisk/extensions.conf:ro
-    
-    
+
   nginx_qa:
     build:
       context: ${REPO_PATH}/omlqa/nginx
@@ -490,6 +583,22 @@ services:
     stdin_open: true
     stop_grace_period: 1m30s
     tty: true
+
+  wombat:
+    container_name: oml-wombat
+    dns: 8.8.8.8
+    image: ${WOMBAT_IMG}
+    networks:
+      - omnileads
+    ports:
+      - 8082:8080/tcp
+    # ulimits:
+    #   nofile:
+    #     soft: 65536
+    #     hard: 65536
+    privileged: true
+    restart: on-failure
+    stop_grace_period: 1m30s
 
   pgadmin:
     container_name: pgadmin

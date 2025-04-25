@@ -112,3 +112,10 @@
       - restart_asterisk
     when: 
       - omnileads_ha is not defined
+
+  - name: ASTERISK Restore Asterisk and OML audio packages
+    shell: "podman run --network=host --env-file /etc/default/asterisk.env --rm -v asterisk_sounds:/mnt/sounds --entrypoint /bin/bash {{ asterisk_img }} -c 'cp -rfp /var/lib/asterisk/sounds/oml/ /mnt/sounds/;cp -rfp /var/lib/asterisk/sounds/en/ /mnt/sounds/;cp -rfp /var/lib/asterisk/sounds/es/ /mnt/sounds/'"
+    tags:
+      - upgrade
+    when:       
+      - omnileads_ha is not defined

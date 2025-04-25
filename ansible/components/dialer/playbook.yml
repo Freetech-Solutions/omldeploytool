@@ -26,24 +26,6 @@
     - dialer
   tasks:
 
-#podman pod create --name dialer_web_pod --network omnidialer -p 1440:1440
-
-  - name: DIALER Create a podman network
-    containers.podman.podman_network:
-      name: omnidialer
-    become: true
-
-  - name: DIALER Create pod for API & Workers
-    containers.podman.podman_pod:
-      name: dialer_web_pod
-      state: started
-      network: omnidialer
-      publish:
-        - "1440:1440"
-    tags:
-      - install
-      - dialer
-      
   - name: DIALER Set environment variables for this installation
     template:
       src: "{{ item.src }}"
@@ -58,24 +40,62 @@
       - upgrade
       - update
 
-  - name: DIALER start worker containers script
+  - name: DIALER template stop worker containers script
     template: 
-      src: "{{ dialer_repo_path }}templates/dialer_start_workers.sh"
-      dest: /usr/bin/dialer_start_workers.sh
+      src: "{{ dialer_repo_path }}templates/stop_workers.sh"
+      dest: /usr/local/bin/dialer_stop_workers.sh
       mode: 755
     tags:
       - upgrade
       - update
+
+  - name: DIALER postgres DB Ensure PostgreSQL database exists
+    postgresql_db:
+      name: omnidialer
+      owner: "{{ postgres_user }}"
+      login_host: "{{ postgres_host }}"
+      login_password: "{{ postgres_password }}"
+      login_user: "{{ postgres_user }}"
+      port: "{{ postgres_port }}"
+      maintenance_db: "{{ postgres_maintenance_db }}"
+      state: present
+    tags:
+      - install  
+
+  - name: DIALER postgres DB template omnidialer tables
+    template: 
+      src: "{{ dialer_repo_path }}templates/omnidialer.sql"
+      dest: /var/tmp/omnidialer.sql
+      mode: 755
+    tags:
+      - upgrade
+      - update
+
+  - name: DIALER postgres DB generate file_timestamp for container DB creator
+    set_fact:
+      file_timestamp: "{{ ansible_date_time.epoch }}"
+    tags:
+      - install  
+
+  - name: DIALER postgres DB create omnidialer
+    shell: "podman run --name omnidialer_createdb_{{ file_timestamp }} --network=host --env-file /etc/default/django.env --volume=/var/tmp/omnidialer.sql:/var/tmp/omnidialer.sql --rm {{ omnileads_img }} psql -U {{ postgres_user }} -d omnidialer -f /var/tmp/omnidialer.sql"
+    tags:
+      - install  
 
   - name: DIALER Copy systemd services
     template:
       src: "{{ item.src }}"
       dest: "{{ item.dest }}"
     loop:
-      - { src: "{{ dialer_repo_path }}templates/job_server.service", dest: "/etc/systemd/system/dialer_job_server.service" }
-      - { src: "{{ dialer_repo_path }}templates/postgresql.service", dest: "/etc/systemd/system/dialer_postgresql.service" }
-      - { src: "{{ dialer_repo_path }}templates/redis.service", dest: "/etc/systemd/system/dialer_redis.service" }
-      - { src: "{{ dialer_repo_path }}templates/ws_ari.service", dest: "/etc/systemd/system/dialer_ws_ari.service" }
+      # - { src: "{{ dialer_repo_path }}templates/postgresql.service", dest: "/etc/systemd/system/dialer_postgresql.service" }
+      # - { src: "{{ dialer_repo_path }}templates/redis.service", dest: "/etc/systemd/system/dialer_redis.service" }
+      - { src: "{{ dialer_repo_path }}templates/gearman.service", dest: "/etc/systemd/system/dialer_gearman.service" }
+      - { src: "{{ dialer_repo_path }}templates/listener.service", dest: "/etc/systemd/system/dialer_listener.service" }
+      - { src: "{{ dialer_repo_path }}templates/asterisk.service", dest: "/etc/systemd/system/dialer_asterisk.service" }
+      - { src: "{{ dialer_repo_path }}templates/dialplan.service", dest: "/etc/systemd/system/dialer_dialplan.service" }
+      - { src: "{{ dialer_repo_path }}templates/scheduler.service", dest: "/etc/systemd/system/dialer_scheduler.service" }
+      - { src: "{{ dialer_repo_path }}templates/listener.service", dest: "/etc/systemd/system/dialer_listener.service" }
+      - { src: "{{ dialer_repo_path }}templates/worker.service", dest: "/etc/systemd/system/dialer_workers.service" }
       - { src: "{{ dialer_repo_path }}templates/api.service", dest: "/etc/systemd/system/dialer_api.service" }
     tags:
       - install
@@ -87,57 +107,33 @@
     register: podman_pull_result
     until: podman_pull_result is success
     loop:
-      - { image: "{{ dialer_api_img }}"
-      - { image: "{{ dialer_worker_img }}"
-      - { image: "{{ dialer_ws_img }}"
+      - { image: "{{ gearman_img }}"}
+      - { image: "{{ dialer_api_img }}"}
+      - { image: "{{ dialer_worker_img }}"}
+      - { image: "{{ dialer_listener_img }}"}
+      - { image: "{{ dialer_scheduler_img }}"}
+      - { image: "{{ dialer_asterisk_img }}"}
+      - { image: "{{ dialer_dialplan_img }}"}
     tags:
       - install
       - upgrade
       - update
 
-  # - name: DIALER Enable and start systemd services
-  #   systemd:
-  #     name: "{{ item.name }}"
-  #     state: started
-  #     enabled: yes
-  #     daemon_reload: yes
-  #   loop:
-  #     - { name: 'asterisk_retrieve_conf.service' }
-  #     - { name: 'asterisk.service' }
-  #   when: omnileads_ha is not defined
-  #   tags:
-  #     - install
-  #     - upgrade
-
-  # - name: DIALER Start systemd services on HA scenary
-  #   systemd:
-  #     name: "{{ item.name }}"
-  #     state: started
-  #     enabled: no
-  #     daemon_reload: yes
-  #   loop:
-  #     - { name: 'asterisk_retrieve_conf.service' }
-  #     - { name: 'asterisk.service' }
-  #   when: 
-  #     - omnileads_ha is defined
-  #     - ha_role == 'main'
-  #   tags:
-  #     - install
-  #     - upgrade
-
-  # - name: DIALER Restart systemd services
-  #   systemd:
-  #     name: "{{ item.name }}"
-  #     state: restarted
-  #     enabled: yes
-  #     daemon_reload: yes
-  #   loop:
-  #     - { name: 'asterisk.service' }
-  #     - { name: 'asterisk_retrieve_conf.service' }
-  #   tags:
-  #     - upgrade
-  #     - restart
-  #     - restart_core
-  #     - restart_asterisk
-  #   when: 
-  #     - omnileads_ha is not defined
+  - name: DIALER Enable and start systemd services
+    systemd:
+      name: "{{ item.name }}"
+      state: started
+      enabled: yes
+      daemon_reload: yes
+    loop:
+      - { name: 'dialer_gearman.service' }
+      - { name: 'dialer_asterisk.service' }
+      - { name: 'dialer_dialplan.service' }    
+      - { name: 'dialer_workers.service' }    
+      - { name: 'dialer_scheduler.service' }    
+      - { name: 'dialer_listener.service' }    
+      - { name: 'dialer_api.service' }    
+    when: omnileads_ha is not defined
+    tags:
+      - install
+      - upgrade
