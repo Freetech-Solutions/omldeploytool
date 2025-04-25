@@ -29,7 +29,7 @@ ExecStart=/usr/bin/podman run \
   --rm  \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
   --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
-  --volume=asterisk_sounds:/var/lib/asterisk/sounds/oml \
+  --volume=asterisk_sounds:/var/lib/asterisk/sounds \
   --volume=/etc/omnileads/google_credential.json:/tmp/google_credential.json \
   {{ asterisk_img }}  
 {% else %}
@@ -46,7 +46,7 @@ ExecStart=/usr/bin/podman run \
   --rm  \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
   --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
-  --volume=asterisk_sounds:/var/lib/asterisk/sounds/oml \
+  --volume=asterisk_sounds:/var/lib/asterisk/sounds \
   {{ asterisk_img }}
 {% endif %}
 

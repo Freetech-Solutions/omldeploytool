@@ -31,6 +31,10 @@
     echo "generate an ibound call through PSTN-Emulator container to DID: $2"
     docker exec -it oml-pstn-emulator sipp -sn uac 127.0.0.1:5070 -s $2 -m 1 -r 1 -d 60000 -l 1
     ;;  
+  --call_generate_dialer)
+    echo "generate dialer call through PSTN-Emulator container to CAMP $2"
+    docker exec -it dialer-dialplan python call_sender.py 123456784 $2 1 20 30 2
+    ;;
   --backup)
     file_date=$(date +'%y%m%d.%H%M')
     docker run --network=host --env-file .env -e POSTGRES_BACKUP=True -e BACKUP_FILENAME=pgsql-backup-$file_date.sql omnileads/omlapp:231005.01 /opt/omnileads/bin/init_pgsql_backup.sh
