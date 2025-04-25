@@ -22,14 +22,14 @@ REPO=omnileads
 #                              versions of each image to deploy                     #
 #####################################################################################
 
-OMLAPP_IMG=${REPO}/omlapp:250221.01
-OMLACD_IMG=${REPO}/asterisk:250323.01
+OMLAPP_IMG=${REPO}/omlapp:250424.01
+OMLACD_IMG=${REPO}/asterisk:250422.01
 OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:250224.01
 OMLFASTAGI_IMG=${REPO}/fastagi:250312.01
 OMLAMI_IMG=${REPO}/astami:241017.01
 OMLNGINX_IMG=${REPO}/nginx:241009.01
 OMLKAM_IMG=${REPO}/kamailio:241109.01
-OMLRTPENGINE_IMG=freetechsolutions/rtpengine:250321.01
+OMLRTPENGINE_IMG=freetechsolutions/rtpengine:250403.01
 OMLWS_IMG=${REPO}/websockets:240705.01
 OMLINTERACTION_PROC_IMG=${REPO}/interaction_processor:240506.01
 OMLCHAN_TEL_LOGGER_IMG=${REPO}/chan_tel_logger:241221.01

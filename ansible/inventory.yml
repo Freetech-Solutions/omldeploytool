@@ -370,8 +370,8 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:250221.01
-    asterisk_img: docker.io/omnileads/asterisk:250323.01
+    omnileads_img: docker.io/omnileads/omlapp:250424.01
+    asterisk_img: docker.io/omnileads/asterisk:250422.01
     
 ##############################################################################################################
 ## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #

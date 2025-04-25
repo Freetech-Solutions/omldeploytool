@@ -8,15 +8,15 @@ deploy-aio-cloud-docker:
     - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
     - rm -rf ~/omldeploytool
     - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cd ~/omldeploytool/docker-compose
+    - cp ~/omldeploytool/docker-compose/env ~/omldeploytool/docker-compose/prod-env/.env
+    - cd ~/omldeploytool/docker-compose/prod-env
     - |
       if [ -n "${OMLOSS_BRANCH}" ]; then
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
       fi
-    - sed -i "s/\${NIC}/eth1/g" ./deploy.sh
-    - sed -i "s/\${ENV}/docker-compose/g" ./deploy.sh
-    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./deploy.sh
+    - sed -i "s/\${NIC}/eth0/g" ./deploy.sh
+    - sed -i "s/\BRANCH/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
       if [ -n "${OMLAPP_IMG}" ]; then
         echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
@@ -41,15 +41,15 @@ deploy-aio-cloud-docker-rocky:
     - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
     - rm -rf ~/omldeploytool
     - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cd ~/omldeploytool/docker-compose
+    - cp ~/omldeploytool/docker-compose/env ~/omldeploytool/docker-compose/prod-env/.env
+    - cd ~/omldeploytool/docker-compose/prod-env
     - |
       if [ -n "${OMLOSS_BRANCH}" ]; then
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
       fi
-    - sed -i "s/\${NIC}/eth1/g" ./deploy.sh
-    - sed -i "s/\${ENV}/docker-compose/g" ./deploy.sh
-    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./deploy.sh
+    - sed -i "s/\${NIC}/eth0/g" ./deploy.sh
+    - sed -i "s/\BRANCH/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
       if [ -n "${OMLAPP_IMG}" ]; then
         echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
@@ -295,15 +295,15 @@ deploy-aio-cloud-docker-norm:
     - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
     - rm -rf ~/omldeploytool
     - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cd ~/omldeploytool/docker-compose
+    - cp ~/omldeploytool/docker-compose/env ~/omldeploytool/docker-compose/prod-env/.env
+    - cd ~/omldeploytool/docker-compose/prod-env
     - |
       if [ -n "${OMLOSS_BRANCH}" ]; then
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
       fi
-    - sed -i "s/\${NIC}/eth1/g" ./deploy.sh
-    - sed -i "s/\${ENV}/docker-compose/g" ./deploy.sh
-    - sed -i "s/\${BRANCH}/$CI_COMMIT_REF_NAME/g" ./deploy.sh
+    - sed -i "s/\${NIC}/eth0/g" ./deploy.sh
+    - sed -i "s/\BRANCH/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
       if [ -n "${OMLAPP_IMG}" ]; then
         echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
