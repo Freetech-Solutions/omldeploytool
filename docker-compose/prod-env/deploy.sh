@@ -81,13 +81,6 @@ disable_firewalls() {
             log_info "FirewallD is installed but not active"
         fi
     fi
-    
-    # Check iptables as fallback
-    if command -v iptables &> /dev/null; then
-        log_info "Clearing any iptables rules..."
-        iptables -F
-        log_info "iptables rules cleared"
-    fi
 }
 
 setup_networking() {
@@ -135,8 +128,10 @@ deploy_omnileads() {
 
     cd omldeploytool || log_error "Canot access the 'omldeploytool' directory."
     
-    if [[ "$branch" != "main" ]]; then
+    if [[ -n "$branch" ]]; then
         git checkout "$branch" || log_error "Error al cambiar a la rama '$branch'."
+    else    
+        git checkout "main" || log_error "Error al cambiar a la rama '$branch'."
     fi
     
     cp docker-compose/oml_manage /usr/local/bin/oml_manage

@@ -3,11 +3,21 @@ services:
   django_app:
     container_name: oml-app
     depends_on:
-      - postgresql
-      - redis
-      - acd
-      - minio
-      - django_commands
+      django_commands:
+        condition: service_completed_successfully
+        required: true
+      postgresql:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+      minio:
+        condition: service_started
+        required: true
+      acd:
+        condition: service_started
+        required: true 
     dns: 8.8.8.8
     env_file: .env
     image: ${OMLAPP_IMG}
@@ -26,9 +36,15 @@ services:
 
   django_commands:
     depends_on:
-      - postgresql
-      - redis
-      - minio
+      postgresql:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true      
+      minio:
+        condition: service_started
+        required: true
     dns: 8.8.8.8
     env_file: .env    
     image: ${OMLAPP_IMG}
@@ -48,7 +64,9 @@ services:
   daphne:
     container_name: oml-daphne
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
     env_file: .env
     environment:
@@ -68,10 +86,18 @@ services:
   omlcron:
     container_name: oml-cron
     depends_on:
-      - postgresql
-      - acd
-      - minio
-      - redis
+      postgresql:
+        condition: service_started
+        required: true    
+      acd:
+        condition: service_started
+        required: true    
+      minio:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
     env_file: .env
     environment:
@@ -92,8 +118,12 @@ services:
     image: ${OMLAPP_IMG}
     container_name: oml-background-tasks
     depends_on:
-      - postgresql
-      - redis
+      postgresql:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true  
     dns: 8.8.8.8
     env_file: .env
     command: python manage.py runworker background-tasks
@@ -110,10 +140,18 @@ services:
     image: ${OMLNGINX_IMG}
     container_name: oml-nginx
     depends_on:
-      - django_app
-      - daphne
-      - kamailio
-      - websockets
+      django_app:
+        condition: service_started
+        required: true    
+      daphne:
+        condition: service_started
+        required: true    
+      kamailio:
+        condition: service_started
+        required: true    
+      websockets:
+        condition: service_started
+        required: true   
     dns: 8.8.8.8
     environment:
       - ENV=devenv
@@ -143,8 +181,12 @@ services:
 
   fastagi:
     depends_on:
-      - postgresql
-      - redis      
+      postgresql:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true      
     image: ${OMLFASTAGI_IMG}
     container_name: oml-fastagi
     command: python /app/fastagi.py
@@ -166,8 +208,12 @@ services:
   ami:
     image: ${OMLAMI_IMG}
     depends_on:
-      - acd
-      - redis
+      acd:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true    
     container_name: oml-astami
     environment:
       - TZ=${TZ}
@@ -183,7 +229,9 @@ services:
     image: ${OMLACD_RETRIEVE_CONF_IMG}
     container_name: oml-acd-conf
     depends_on:
-      - websockets
+      websockets:
+        condition: service_started
+        required: true
     dns: 8.8.8.8
     environment:
       - TZ=${TZ}
@@ -205,8 +253,12 @@ services:
     image: ${OMLACD_IMG}
     container_name: oml-acd
     depends_on:
-      - fastagi
-      - rabbitmq
+      fastagi:
+        condition: service_started
+        required: true
+      rabbitmq:
+        condition: service_started
+        required: true
     network_mode: host
     environment:
       - AMI_USER=${AMI_USER}
@@ -235,9 +287,15 @@ services:
     image: ${OMLINTERACTION_PROC_IMG}
     container_name: oml-post-interactions
     depends_on:
-      - minio
-      - rabbitmq
-      - acd
+      minio:
+        condition: service_started
+        required: true    
+      rabbitmq:
+        condition: service_started
+        required: true    
+      acd:
+        condition: service_started
+        required: true   
     dns: 8.8.8.8
     environment:
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
@@ -261,8 +319,12 @@ services:
     image: ${OMLCHAN_TEL_LOGGER_IMG}
     container_name: oml-chan-tel-logger
     depends_on:
-      - rabbitmq
-      - postgresql
+      rabbitmq:
+        condition: service_started
+        required: true    
+      postgresql:
+        condition: service_started
+        required: true  
     dns: 8.8.8.8
     environment:
       - RABBITMQ_HOST=${RABBITMQ_HOSTNAME}
@@ -285,9 +347,15 @@ services:
     image: ${OMLKAM_IMG}
     container_name: oml-kamailio
     depends_on:
-      - redis
-      - acd
-      - rtpengine
+      redis:
+        condition: service_started
+        required: true    
+      acd:
+        condition: service_started
+        required: true    
+      rtpengine:
+        condition: service_started
+        required: true    
     dns: 8.8.8.8
     environment:
       - TZ=${TZ}
@@ -404,7 +472,9 @@ services:
     image: minio/mc
     container_name: oml-initminio
     depends_on:
-      - minio
+      minio:
+        condition: service_started
+        required: true
     networks:
       - omnileads
     entrypoint: >
