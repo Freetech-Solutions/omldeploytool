@@ -23,7 +23,7 @@ ExecStart=/usr/bin/podman run \
 -e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
 --name=oml-tasks-worker \
 --rm  \
-{{ omnileads_img }} python /opt/omnileads/ominicontacto/manage.py runworker background-tasks
+{{ omnileads_img }} /opt/omnileads/bin/init_worker_bgtasks.sh
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
