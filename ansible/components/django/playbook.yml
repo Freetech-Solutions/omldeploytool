@@ -106,6 +106,7 @@
       - background_tasks.service
     tags:
       - install
+      - upgrade
     when:       
       - omnileads_ha is not defined  
       
