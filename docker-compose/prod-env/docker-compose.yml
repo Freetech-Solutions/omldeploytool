@@ -126,7 +126,7 @@ services:
         required: true  
     dns: 8.8.8.8
     env_file: .env
-    command: python manage.py runworker background-tasks
+    command: /opt/omnileads/bin/init_worker_bgtasks.sh
     networks:
       - omnileads
     privileged: true
