@@ -64,7 +64,7 @@
     - name: RESTORE wait for PostgreSQL to be available AIO
       wait_for:
         host: localhost
-        port: {{ postgres_port}}
+        port: "{{ postgres_port}}"
         state: started
         timeout: 120
       when:
@@ -72,8 +72,8 @@
 
     - name: RESTORE wait for PostgreSQL to be available AIT
       wait_for:
-        host: {{ data_host }}
-        port: {{ postgres_port}}
+        host: "{{ data_host }}"
+        port: "{{ postgres_port }}"
         state: started
         timeout: 120
       when:
@@ -81,8 +81,8 @@
 
     - name: RESTORE wait for PostgreSQL to be available External Postgres
       wait_for:
-        host: {{ postgres_host }}
-        port: {{ postgres_port}}
+        host: "{{ postgres_host }}"
+        port: "{{ postgres_port }}"
         state: started
         timeout: 120
       when:
