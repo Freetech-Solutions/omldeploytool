@@ -1,18 +1,23 @@
-# Release Notes - OMniLeads 2.4.1
-[2025-05-14]
+# Release Notes - OMniLeads 2.4.2
+[2025-05-27]
 
 ## Added
 
 ## Changed
 
+* oml-3027 Optimized whatsapp reports
+* oml-713 For systemd/ansible deployments, the /dev/shm partition for the PostgreSQL container has been enlarged.
+* oml-760 Now allows uploading secret_key and key_id for authentication with AWS Buckets.
+
 ## Fixed
 
-* oml-3030: call recording view translations was fixed
-* oml-3003: inbound inbound call direct agent was fixed
+* oml-3026 Fix Whatsapp general report dates filter.
+* oml-3031 Fix whatsapp messages style.
+* oml-766 Resolved an issue with the restore action in All-in-Three deployments using Ansible/Systemd.
 
 ## Component changes
 
 ### OMLAPP (Django/VueJS)
 
-* Container Img: https://hub.docker.com/layers/omnileads/omlapp/250424.01/images/sha256-1acfa76506b460842db47501a74c4d6b198fbff4a898dc3be48568a4597fe0af
-* Gitlab Repo: https://gitlab.com/omnileads/ominicontacto/-/blob/250424.01/ReleaseNotes.md?ref_type=tags
+* Container Img: https://hub.docker.com/layers/omnileads/omlapp/250516.01/images/sha256-9c8c06582777647ab2ff457242fdc3fc9a58afb6f75d824f4465a9a66b9e1c1f
+* Gitlab Repo: https://gitlab.com/omnileads/ominicontacto/-/tree/250516.01?ref_type=tags
