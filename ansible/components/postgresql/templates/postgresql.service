@@ -20,6 +20,7 @@ ExecStart=/usr/bin/podman run \
   --detach \
   --rm \
   --network=host \
+  --shm-size=1g \
   --log-driver=journald \
   --env-file=/etc/default/postgres.env \
   --name=oml-postgresql-server \
