@@ -50,6 +50,7 @@
     loop:
       - { src: "{{ django_repo_path }}templates/django.service", dest: "/etc/systemd/system/omnileads.service" }
       - { src: "{{ django_repo_path }}templates/background_tasks_worker.service", dest: "/etc/systemd/system/background_tasks.service" }
+      - { src: "{{ django_repo_path }}templates/whatsapp.service", dest: "/etc/systemd/system/whatsapp.service" }
     tags:
       - install
       - upgrade
@@ -104,6 +105,7 @@
     loop:
       - omnileads.service
       - background_tasks.service
+      - whatsapp.service
     tags:
       - install
       - upgrade
@@ -127,12 +129,14 @@
     loop:
       - omnileads.service
       - background_tasks.service
+      - whatsapp.service
     tags:
       - upgrade
       - restart
       - restart_django
       - restart_core
       - restart_background_tasks
+      - restart_whatsapp
     when:       
       - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']    
       - omnileads_ha is not defined
