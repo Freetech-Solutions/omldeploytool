@@ -114,6 +114,28 @@ services:
     tty: true
     working_dir: /opt/omnileads
 
+  whatsapp:
+    image: ${OMLAPP_IMG}
+    container_name: oml-whatsapp
+    depends_on:
+      postgresql:
+        condition: service_started
+        required: true    
+      redis:
+        condition: service_started
+        required: true  
+    dns: 8.8.8.8
+    env_file: .env
+    command: /opt/omnileads/bin/init_whatsapp.sh
+    networks:
+      - omnileads
+    privileged: true
+    restart: on-failure
+    stdin_open: true
+    stop_grace_period: 30s
+    tty: true
+    working_dir: /opt/omnileads/ominicontacto
+
   background_tasks:
     image: ${OMLAPP_IMG}
     container_name: oml-background-tasks
