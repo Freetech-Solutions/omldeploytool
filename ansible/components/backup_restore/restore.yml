@@ -94,6 +94,15 @@
         - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is not defined      
     
+    - name: DJANGO run migrations 
+      shell: "podman run --network=host --env-file /etc/default/django.env --rm {{ omnileads_img }} /opt/omnileads/bin/django_migrations.sh"
+      tags:  
+        - install
+        - upgrade
+        - update
+      when:
+        - omnileads_ha is not defined  
+
     - name: RESTORE DJANGO Restart systemd service
       systemd:
         name: omnileads.service
