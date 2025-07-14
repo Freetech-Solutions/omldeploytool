@@ -59,6 +59,7 @@
       systemd:
         name: prometheus_postgres.service
         state: started
+        enabled: yes
         daemon_reload: yes
       tags:
         - install
