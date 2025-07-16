@@ -1,5 +1,5 @@
 [Unit]
-Description=Podman wallboard_listener.service
+Description=Podman dialer-update_incidence_rule.service
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
 After=network-online.target
@@ -7,7 +7,7 @@ RequiresMountsFor=%t/containers
 
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
-Restart=on-failure:5
+Restart=on-failure
 RestartSec=60
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
@@ -17,13 +17,13 @@ ExecStart=/usr/bin/podman run \
 --sdnotify=conmon \
 --replace \
 --detach \
---network=host \
+--network=omnidialer \
 --log-driver=journald \
---env-file=/etc/default/django.env \
--e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
---name=oml-tasks-worker \
+-e GEARMAN_JOBS=update-incidence-rule \
+--env-file=/etc/default/dialer.env \
+--name=dialer-update-incidence-rule \
 --rm  \
-{{ omnileads_img }} /opt/omnileads/bin/init_worker_bgtasks.sh
+{{ dialer_worker_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

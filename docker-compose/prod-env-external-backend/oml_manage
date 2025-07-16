@@ -1,0 +1,144 @@
+#!/bin/bash
+
+  case $1 in
+  --reset_pass)
+    echo "reset django admin password"
+    docker-compose exec -it django-app python3 manage.py cambiar_admin_password
+    ;;
+  --init_env)
+    echo "initialize django environment"
+    docker-compose exec -it django-app python3 manage.py inicializar_entorno
+    ;;
+  --build_js)
+    echo "Build VueJS frontend"
+    docker-compose exec -it vue-cli npm install
+    docker-compose exec -it vue-cli npm run build
+    ;;
+  --call_generate)
+    echo "generate an ibound call through PSTN-Emulator container"
+    docker-compose exec -it pbxemulator sipp -sn uac pbxemulator:5070 -s test -m 1 -r 1 -d 60000 -l 1
+    ;;
+  --call_generate_did)
+    echo "generate an ibound call through PSTN-Emulator container to DID: $2"
+    docker-compose exec -it pbxemulator sipp -sn uac 127.0.0.1:5070 -s $2 -m 1 -r 1 -d 60000 -l 1
+    ;;  
+  --call_generate_dialer)
+    echo "generate dialer call through PSTN-Emulator container to CAMP $2"
+    docker-compose exec -it dialer-dialplan python call_sender.py 123456784 $2 1 20 30 2
+    ;;
+  --backup)
+    file_date=$(date +'%y%m%d.%H%M')
+    docker run --network=host --env-file .env -e POSTGRES_BACKUP=True -e BACKUP_FILENAME=pgsql-backup-$file_date.sql omnileads/omlapp:231005.01 /opt/omnileads/bin/init_pgsql_backup.sh
+    docker exec -it oml-acd /opt/asterisk/scripts/asterisk_backup.py $file_date
+    ;;
+  --restore)
+    file_date=$2
+    echo "¿Are you sure you want to delete the database & restore backup DB? yes or no"
+    read confirmacion
+    if [[ $confirmacion == "yes" ]]; then
+      echo "echo drop all on PostgreSQL"
+      docker stop oml-postgres
+      docker rm oml-postgres
+      docker volume rm oml_postgresql_data
+      docker-compose -f docker-compose_prod_external_bucket.yml up -d
+      until curl -sk --head  --request GET https://localhost |grep "302" > /dev/null; do echo "Environment still initializing , sleeping 10 seconds"; sleep 10; done; echo "Environment is up"
+      docker run --network=host -e POSTGRES_RESTORE=True -e BACKUP_FILENAME=pgsql-backup-$file_date.sql --env-file .env omnileads/omlapp:1.30.0
+      docker exec -it oml-acd python /opt/asterisk/scripts/asterisk_restore.py $file_date
+      docker exec -it oml-acd asterisk -rx 'dialplan reload'
+    else
+      echo "Operación cancelada."
+    fi  
+    ;;
+  --postgres_clean_tables)
+    echo "¿Are you sure you want to delete the database? yes or no"
+    read confirmacion
+    if [[ $confirmacion == "yes" ]]; then
+      echo "drop calls and agent count tables PostgreSQL"
+      docker-compose exec -it django-app psql -c 'DELETE FROM queue_log'
+      docker-compose exec -it django-app psql -c 'DELETE FROM reportes_app_llamadalog'
+      docker-compose exec -it django-app psql -c 'DELETE FROM reportes_app_actividadagentelog'
+      docker-compose exec -it django-app psql -c 'DELETE FROM ominicontacto_app_respuestaformulariogestion'
+      docker-compose exec -it django-app psql -c 'DELETE FROM ominicontacto_app_auditoriacalificacion'
+      docker-compose exec -it django-app psql -c 'DELETE FROM ominicontacto_app_calificacioncliente'
+    else
+      echo "Operación cancelada."
+    fi
+    ;;
+  --postgres_psql)
+    docker-compose exec -it django-app psql -U omnileads
+    ;;      
+  --redis_clean)
+    echo "¿Are you sure you want to delete all redis cache? yes or no"
+    read confirmacion
+    if [[ $confirmacion == "yes" ]]; then
+      docker-compose exec -it redis redis-cli flushall
+    else
+      echo "Cancel action"
+    fi
+    ;;  
+   --redis_sync)
+    docker-compose exec -it django-app python3 manage.py regenerar_asterisk
+    ;;
+  --redis_cli)
+    docker-compose exec -it redis redis-cli
+    ;;  
+  --dialer_sync)
+    docker-compose exec -it django-app python3 manage.py regenerar_asterisk
+    ;; 
+  --bucket_show)
+    mc alias set MINIO http://localhost:9000 minio s3minio123
+    mc ls --recursive MINIO/omnileads
+    ;;
+  --asterisk_cli)
+    docker-compose exec -it acd asterisk -rvvvv
+    ;;
+  --asterisk_bash)
+    docker-compose exec -it acd bash
+    ;;
+  --django_bash)
+    docker-compose exec -it django-app bash
+    ;;  
+  --django_shell)
+    docker-compose exec -it django-app python3 manage.py shell
+    ;;    
+  --django_commands)
+    REPO=$(cat .env | grep REPO= | awk -F'=' '{print $2}')
+    docker-compose exec -it django-app /opt/omnileads/bin/django_commands.sh
+    ;;      
+  --rtpengine_conf)
+    docker-compose exec -it rtpengine cat /etc/rtpengine.conf
+    ;;
+  --nginx_t)
+    docker-compose exec -it nginx nginx -T
+    ;;
+  
+  --help)
+    echo "
+NAME:
+OMniLeads docker-compose cmd tool
+
+USAGE:
+./manage.sh COMMAND
+
+--reset_pass: reset admin password to admin admin
+--init_env: init some basic configs in order to test it
+--call_generate: generate an ibound call through PSTN-Emulator container. Arg1: calls  Arg2: caps [optional] Arg3 tel num.
+--backup: take a postgres & asterisk backup and send to external bucket
+--postgres_clean_logs: drop calls and agent count tables PostgreSQL 
+--redis_clean: clean App redis cache
+--redis_sync: sync django & redis
+--redis_cli: launch redis cli
+--asterisk_cli: launch asterisk CLI
+--asterisk_bash: launch asterisk container bash shell
+--django_shell: launch django shell 
+--django_commands: run migrations and others django_commands
+--nginx_t: print nginx container run config
+"
+    shift
+    exit 1
+    ;;
+  *)
+    echo "ERROR oml_action var is unset";
+    exit 1
+    ;;
+esac

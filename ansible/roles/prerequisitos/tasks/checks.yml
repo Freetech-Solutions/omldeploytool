@@ -73,7 +73,7 @@
     postgres_out: true
   when:
     - postgres_host is defined
-    - inventory_hostname in groups['omnileads_aio'] or inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_data']
+    - inventory_hostname in groups['omnileads_aio'] or inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_dialer']
   tags: 
     - install
     - upgrade
@@ -85,7 +85,7 @@
     postgres_out: false
   when:
     - postgres_host is not defined
-    - inventory_hostname in groups['omnileads_aio'] or inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_data']
+    - inventory_hostname in groups['omnileads_aio'] or inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_data']  or inventory_hostname in groups['omnileads_dialer']
   tags: 
     - install
     - upgrade
@@ -99,22 +99,38 @@
   changed_when: false
   when:
     - postgres_host is not defined
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_data']
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_dialer']
     - omnileads_ha is not defined
   tags: 
     - install
     - upgrade
     - update
 
-# Set postgres_host as localhost on AIO instance when postgres_host is not explicitly defined
+# Set postgres_host as 127.0.0.1 on AIO instance when postgres_host is not explicitly defined
 - name: CHECKS Setting postgres_host AIO
   set_fact:
-    postgres_host: localhost
+    postgres_host: 127.0.0.1
   changed_when: false
   when:
     - postgres_host is not defined
     - inventory_hostname in groups['omnileads_aio']
     - omnileads_ha is not defined
+    - dialer_engine == "wombat"
+  tags: 
+    - install
+    - upgrade
+    - update
+
+# Set postgres_host as 127.0.0.1 on AIO instance when postgres_host is not explicitly defined and dialer_engine is omnidialer
+- name: CHECKS Setting postgres_host AIO and OMniDialer
+  set_fact:
+    postgres_host: "{{ omni_ip_lan }}"
+  changed_when: false
+  when:
+    - postgres_host is not defined
+    - inventory_hostname in groups['omnileads_aio']
+    - omnileads_ha is not defined
+    - dialer_engine == "omnidialer"
   tags: 
     - install
     - upgrade
@@ -148,10 +164,10 @@
     - upgrade
     - update
     
-# Set minio_host as localhost on App instance when minios_host is not explicitly defined
+# Set minio_host as 127.0.0.1 on App instance when minios_host is not explicitly defined
 - name: CHECKS Setting minio_host AIO
   set_fact:
-    minio_host: http://localhost:9000
+    minio_host: http://127.0.0.1:9000
   changed_when: false
   when:
     - bucket_url is not defined
@@ -176,10 +192,10 @@
     - upgrade
     - update
 
-# Set websockets_host as localhost on App or AIO instance when websockets_host is not explicitly defined
-- name: CHECKS Setting websockets_host as localhost
+# Set websockets_host as 127.0.0.1 on App or AIO instance when websockets_host is not explicitly defined
+- name: CHECKS Setting websockets_host as 127.0.0.1
   set_fact:
-    websockets_host: localhost
+    websockets_host: 127.0.0.1
   changed_when: false
   when:
     - websockets_host is not defined
@@ -201,10 +217,10 @@
     - upgrade
     - update
 
-# Set kamailio_host as localhost on AIO instance when kamailio_host is not explicitly defined
-- name: CHECKS Setting kamailio_host as localhost
+# Set kamailio_host as 127.0.0.1 on AIO instance when kamailio_host is not explicitly defined
+- name: CHECKS Setting kamailio_host as 127.0.0.1
   set_fact:
-    kamailio_host: localhost
+    kamailio_host: 127.0.0.1
   changed_when: false
   when:
     - kamailio_host is not defined
@@ -222,7 +238,7 @@
   changed_when: false
   when:
     - redis_host is not defined
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_data']
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_dialer']
   tags: 
     - install
     - upgrade
@@ -230,27 +246,68 @@
     - app
     - asterisk
 
-# Set redis_host as localhost on AIO instance when redis_host is not explicitly defined
-- name: CHECKS Setting redis_host as localhost
+# Set redis_host as 127.0.0.1 on AIO instance when redis_host is not explicitly defined
+- name: CHECKS Setting redis_host as 127.0.0.1
   set_fact:
-    redis_host: localhost
+    redis_host: 127.0.0.1
   changed_when: false
   when:
     - redis_host is not defined
     - inventory_hostname in groups['omnileads_aio']
+    - dialer_engine == "wombat"
   tags: 
     - install
     - upgrade
     - update
 
-# Set dialer_host as localhost on App instance when dialer_host is not explicitly defined
-- name: CHECKS Set dialer_host as localhost on App instance when dialer_host is not explicitly defined
+# Set redis_host as omni_ip_lan on AIO instance when redis_host is not explicitly defined and dialer_engine is omnidialer
+- name: CHECKS Setting redis_host as 127.0.0.1
   set_fact:
-    dialer_host: localhost    
+    redis_host: "{{ omni_ip_lan }}"
+  changed_when: false
+  when:
+    - redis_host is not defined
+    - inventory_hostname in groups['omnileads_aio']
+    - dialer_engine == "omnidialer"
+  tags: 
+    - install
+    - upgrade
+    - update
+
+# Set dialer_host as 127.0.0.1 on App instance when dialer_host is not explicitly defined
+- name: CHECKS Set dialer_host as 127.0.0.1 on App instance when dialer_host is not explicitly defined
+  set_fact:
+    dialer_host: 127.0.0.1    
   changed_when: false
   when:
     - dialer_host is not defined
     - inventory_hostname in groups['omnileads_aio'] or inventory_hostname in groups['omnileads_app']
+  tags: 
+    - install
+    - upgrade
+    - update
+    - dialer
+
+# Set dialer_sip_host as 127.0.0.1 on App instance when dialer_host is not explicitly defined
+- name: CHECKS Set  as 127.0.0.1 on AIO or omni_ip_lan on dialer 
+  set_fact:
+    omlacd_dialer_host: 127.0.0.1
+  changed_when: false
+  when:
+    - inventory_hostname in groups['omnileads_aio']
+  tags: 
+    - install
+    - upgrade
+    - update
+    - dialer
+
+# Set dialer_sip_host as 127.0.0.1 on App instance when dialer_host is not explicitly defined
+- name: CHECKS Set dialer_sip_host as AIO_IP on AIO or omni_ip_lan on dialer 
+  set_fact:
+    omlacd_dialer_host: "{{ voice_host }}"
+  changed_when: false
+  when:
+    - inventory_hostname in groups['omnileads_dialer']
   tags: 
     - install
     - upgrade
@@ -270,10 +327,10 @@
     - upgrade
     - update
 
-# Set prometheus_host as localhost on AIO-Homer instance
-- name: CHECKS Setting prometheus_host as localhost
+# Set prometheus_host as 127.0.0.1 on AIO-Homer instance
+- name: CHECKS Setting prometheus_host as 127.0.0.1
   set_fact:
-    prometheus_host: localhost
+    prometheus_host: 127.0.0.1
   changed_when: false
   when:
     - inventory_hostname in groups['omnileads_aio']
@@ -297,7 +354,7 @@
     - app
 
 # Set asterisk_host as omni_ip_lan on AIO instance when asterisk_host is not explicitly defined
-- name: CHECKS Setting asterisk_host as voice_host
+- name: CHECKS Setting asterisk_host as omni_ip_lan
   set_fact:
     asterisk_host: "{{ omni_ip_lan }}"
   changed_when: false
@@ -309,8 +366,38 @@
     - upgrade
     - update
     - app
+    
+# Set dialer_host as {{ omni_ip_lan }} on App instance when dialer_host is not explicitly defined
+- name: CHECKS Setting asterisk_dialer_host as voice_host
+  set_fact:
+    dialer_host: 127.0.0.1
+  changed_when: false
+  when:
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+    - dialer_engine == "omnidialer"
+    - dialer_host is not defined
+  tags: 
+    - install
+    - upgrade
+    - update
+    - app
 
-# Set rtpengine_out as true when postgres_host is defined on inventory
+# Set dialer_host as {{ omni_ip_lan }} on App instance when dialer_host is not explicitly defined
+- name: CHECKS Setting asterisk_dialer_host as voice_host
+  set_fact:
+    dialer_host: "{{ dialer_host }}"
+  changed_when: false
+  when:
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+    - dialer_engine == "omnidialer"
+    - dialer_host is defined
+  tags: 
+    - install
+    - upgrade
+    - update
+    - app
+
+# Set rtpengine_out as true when rtpengine_host is defined on inventory
 - name: CHECKS Setting rtpengine_host & set rtpengine_out true
   set_fact:
     rtpengine_out: true
@@ -322,7 +409,7 @@
     - upgrade
     - update
 
-# Set rtpengine_out as true when postgres_host is defined on inventory
+# Set rtpengine_out as true when rtpengine_host is defined on inventory
 - name: CHECKS Setting rtpengine_host & set rtpengine_out true
   set_fact:
     rtpengine_out: false
@@ -388,7 +475,7 @@
     - update
     - restart
 
-# Set fastagi_host as localhost on AIO instance when fastagi_host is not explicitly defined
+# Set fastagi_host as 127.0.0.1 on AIO instance when fastagi_host is not explicitly defined
 - name: CHECKS Setting fastagi_host as private_ipv4_addr
   set_fact:
     fastagi_host: "{{ omni_ip_lan }}"
@@ -429,14 +516,14 @@
     - upgrade
     - update
 
-# Set rabbitmq_host as {{ rabbitmq_host }} on App instance when rabbitmq_host is not explicitly defined
-- name: CHECKS Setting rabbitmq_host as data_host
+# Set gearman_host as {{ gearman_host }} on App instance when gearman_host is not explicitly defined
+- name: CHECKS Setting gearman_host as data_host
   set_fact:
-    rabbitmq_host: "{{ data_host }}"
+    gearman_host: "{{ data_host }}"
   changed_when: false
   when:
-    - rabbitmq_host is not defined
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_data']
+    - gearman_host is not defined
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_dialer']
   tags: 
     - install
     - upgrade
@@ -444,13 +531,13 @@
     - app
     - asterisk
 
-# Set rabbitmq_host as localhost on AIO instance when rabbitmq_host is not explicitly defined
-- name: CHECKS Setting rabbitmq_host as localhost
+# Set gearman_host as 127.0.0.1 on AIO instance when gearman_host is not explicitly defined
+- name: CHECKS Setting gearman_host as 127.0.0.1
   set_fact:
-    rabbitmq_host: 127.0.0.1
+    gearman_host: "{{ omni_ip_lan }}"
   changed_when: false
   when:
-    - rabbitmq_host is not defined
+    - gearman_host is not defined
     - inventory_hostname in groups['omnileads_aio']
   tags: 
     - install
@@ -471,6 +558,34 @@
 #     msg: application_host variable undefined, edit voice_host variable in inventory file
 #   when: application_host is not defined and assert_application_host.rc == 1
 #   tags: always
+
+# Set dialer_caps as 1 when dialer_engine is omnidialer and dialer_caps is not defined
+- name: CHECKS Setting dialer_caps default value for omnidialer
+  set_fact:
+    dialer_caps: 1
+  changed_when: false
+  when:
+    - dialer_engine is defined
+    - dialer_engine == "omnidialer"
+    - dialer_caps is not defined
+  tags: 
+    - install
+    - upgrade
+    - update
+
+# Set dialer_worker_replicas as 5 when dialer_engine is omnidialer and dialer_worker_replicas is not defined
+- name: CHECKS Setting dialer_worker_replicas default value for omnidialer
+  set_fact:
+    dialer_worker_replicas: 5
+  changed_when: false
+  when:
+    - dialer_engine is defined
+    - dialer_engine == "omnidialer"
+    - dialer_worker_replicas is not defined
+  tags: 
+    - install
+    - upgrade
+    - update
 
 - name: CHECKS Check if omnileads_img variable is defined
   fail:
@@ -620,24 +735,24 @@
     - voice
     - asterisk
 
-- name: CHECKS Check if WD user variable is defined
-  fail:
-    msg: WD user undefined, edit dialer_user in inventory file
-  when: dialer_user is not defined and assert_dialeruser.rc == 1
-  tags: 
-    - install
-    - upgrade
-    - update
+# - name: CHECKS Check if WD user variable is defined
+#   fail:
+#     msg: WD user undefined, edit dialer_user in inventory file
+#   when: dialer_user is not defined and assert_dialeruser.rc == 1
+#   tags: 
+#     - install
+#     - upgrade
+#     - update
 
 
-- name: CHECKS Check if WD pass variable is defined
-  fail:
-    msg: WD pass undefined, edit dialer_password in inventory file
-  when: dialer_password is not defined and assert_dialerpass.rc == 1
-  tags: 
-    - install
-    - upgrade
-    - update
+# - name: CHECKS Check if WD pass variable is defined
+#   fail:
+#     msg: WD pass undefined, edit dialer_password in inventory file
+#   when: dialer_password is not defined and assert_dialerpass.rc == 1
+#   tags: 
+#     - install
+#     - upgrade
+#     - update
 
 
 - name: CHECKS Check if bucket_access_key variable is defined

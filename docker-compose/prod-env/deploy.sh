@@ -39,7 +39,7 @@ postgres_host=${PGSQL_HOST}
 postgres_port=${PGSQL_PORT}
 postgres_user=${PGSQL_USER}
 postgres_password=${PGSQL_PASSWORD}
-postgres_db=${PGDATABASE}
+postgres_db=${POSTGRES_DB}
 
 ######################################################
 ###################### FUNC ##########################
@@ -138,15 +138,9 @@ deploy_omnileads() {
     cd docker-compose/prod-env || log_error "Canot access the 'prod-env' directory."
 
     cp ../env ./.env
-    sed -i "s/ENV=devenv/ENV=${env}/g" .env
     sed -i "s/OML_HOSTNAME=/OML_HOSTNAME=${docker_engine_ip}/g" .env
-    sed -i "s/PUBLIC_IP=/PUBLIC_IP=${wan_addr}/g" .env
-    sed -i "s/ASTERISK_HOSTNAME=acd/ASTERISK_HOSTNAME=${docker_engine_ip}/g" .env
-    sed -i "s/FASTAGI_HOSTNAME=fastagi/FASTAGI_HOSTNAME=${docker_engine_ip}/g" .env
-    sed -i "s/RTPENGINE_HOSTNAME=rtpengine/RTPENGINE_HOSTNAME=${docker_engine_ip}/g" .env
-    sed -i "s/KAMAILIO_HOSTNAME=kamailio/KAMAILIO_HOSTNAME=${docker_engine_ip}/g" .env
-    sed -i "s/https:\/\/localhost/https:\/\/${docker_engine_ip}/g" .env
-
+    sed -i "s/PUBLIC_IP=\${OML_HOSTNAME}/OML_HOSTNAME=${wan_addr}/g" .env
+ 
     if [[ -n "$NAT_IPV4" ]]; then
         sed -i "s/#SIP_NAT_IPADDR/SIP_NAT_IPADDR/g" .env
         sed -i "s/#RTP_NAT_IPADDR/RTP_NAT_IPADDR/g" .env

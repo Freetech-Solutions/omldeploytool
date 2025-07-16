@@ -1,0 +1,39 @@
+[submodule "components-git-repo/call_logger"]
+	path = components-git-repo/call_logger
+	url = https://gitlab.com/omnileads/tel_call_logger.git
+[submodule "components-git-repo/acd"]
+	path = components-git-repo/acd
+	url = https://gitlab.com/omnileads/omlacd.git
+[submodule "components-git-repo/acd_configurator"]
+	path = components-git-repo/acd_configurator
+	url = https://gitlab.com/omnileads/acd_retrieve_conf.git
+[submodule "components-git-repo/fastagi"]
+	path = components-git-repo/fastagi
+	url = https://gitlab.com/omnileads/omlfastagi.git
+[submodule "components-git-repo/ami"]
+	path = components-git-repo/ami
+	url = https://gitlab.com/omnileads/omlami.git
+[submodule "components-git-repo/kamailio-webrtc"]
+	path = components-git-repo/kamailio-webrtc
+	url = https://gitlab.com/omnileads/omlkamailio.git
+[submodule "components-git-repo/rtpengine"]
+	path = components-git-repo/rtpengine
+	url = https://gitlab.com/omnileads/omlrtpengine.git
+[submodule "components-git-repo/django"]
+	path = components-git-repo/django
+	url = https://gitlab.com/omnileads/ominicontacto.git
+[submodule "components-git-repo/dialer"]
+	path = components-git-repo/dialer
+	url = https://gitlab.com/omnileads/omnidialer.git
+[submodule "components-git-repo/nginx"]
+	path = components-git-repo/nginx
+	url = https://gitlab.com/omnileads/omlnginx.git
+[submodule "components-git-repo/websocket-server"]
+	path = components-git-repo/websocket-server
+	url = https://gitlab.com/omnileads/omnileads-websockets.git
+[submodule "components-git-repo/postcall_actions"]
+	path = components-git-repo/postcall_actions
+	url = https://gitlab.com/omnileads/oml_interactions_processor.git
+[submodule "omlqa"]
+	path = components-git-repo/omlqa
+	url = https://gitlab.com/omnileads/omlqa.git

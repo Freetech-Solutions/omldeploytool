@@ -1,71 +1,345 @@
-# Copyright (C) 2024 Freetech Solutions
+  # Copyright (C) 2025 Freetech Solutions
 
-# This file is part of OMniLeads
+  # This file is part of OMniLeads
 
-# This program is free software: you can nginxtribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+  # This program is free software: you can redistribute it and/or modify
+  # it under the terms of the GNU General Public License as published by
+  # the Free Software Foundation, either version 3 of the License, or
+  # (at your option) any later version.
 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+  # This program is distributed in the hope that it will be useful,
+  # but WITHOUT ANY WARRANTY; without even the implied warranty of
+  # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  # GNU General Public License for more details.
 
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see http://www.gnu.org/licenses/.
-#
+  # You should have received a copy of the GNU General Public License
+  # along with this program.  If not, see http://www.gnu.org/licenses/.
+  #
 
-- name: OBSERVABILITY Promtail installation and configuration
-  hosts: 
-    - omnileads_data
-    - omnileads_voice
-    - omnileads_app
-    - omnileads_aio
-  tags:
-    - all_components
-    - observability
+  - name: OBSERVABILITY Promtail installation and configuration
+    hosts: 
+      - omnileads_data
+      - omnileads_voice
+      - omnileads_app
+      - omnileads_aio
+      - omnileads_dialer
+    tags:
+      - all_components
+      - observability
     
-  tasks:
+    tasks:
 
-  - name: OBSERVABILITY Promtail setting config & variables
-    template:
-      src: "{{ observability_repo_path }}templates/{{ item }}"
-      dest: /etc/default/{{ item }}
-    with_items:
-      - promtail.yml
-    tags:
-      - install
-      - upgrade
+    - name: OBSERVABILITY Promtail Validate required variables
+      assert:
+        that:
+          - tenant_id is defined
+          - omni_ip_lan is defined
+          - observability_repo_path is defined
+        fail_msg: |
+          Required variables missing:
+          - tenant_id: {{ tenant_id | default('NOT_DEFINED') }}
+          - omni_ip_lan: {{ omni_ip_lan | default('NOT_DEFINED') }}
+          - observability_repo_path: {{ observability_repo_path | default('NOT_DEFINED') }}
+          - loki_host: {{ loki_host | default('OPTIONAL - only for non-dialer nodes') }}
+        success_msg: "All required variables are properly defined for {{ inventory_hostname }}"
+      tags:
+        - install
+        - upgrade
+        - validate
 
-  - name: OBSERVABILITY Promtail Copy service Systemd files
-    template:
-      src: "{{ observability_repo_path }}templates/{{ item }}"
-      dest: /etc/systemd/system/{{ item }}
-    with_items:
-      - promtail.service
-    tags:
-      - install
-      - upgrade
+    - name: OBSERVABILITY Promtail Create config directory
+      file:
+        path: /etc/default
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      tags:
+        - install
+        - upgrade
 
-  - name: OBSERVABILITY Promtail Pull image
-    command: podman pull --quiet '{{ promtail_img }}'
-    register: podman_pull
-    until: podman_pull is success
-    with_items:
-      - grafana/promtail
-    tags:
-      - install
-      - upgrade
+    - name: OBSERVABILITY Promtail Generate configuration
+      template:
+        src: "{{ observability_repo_path }}templates/promtail.yml"
+        dest: /etc/default/promtail.yml
+        mode: '0644'
+        owner: root
+        group: root
+        backup: yes
+      notify: restart promtail
+      tags:
+        - install
+        - upgrade
+        - config
 
-  - name: OBSERVABILITY Promtail Enable and start service
-    systemd:
-      name: '{{ item }}.service'
-      state: restarted
-      enabled: yes
-      daemon_reload: yes
-    with_items:
-      - promtail
+    - name: OBSERVABILITY Promtail Deploy systemd service
+      template:
+        src: "{{ observability_repo_path }}templates/promtail.service"
+        dest: /etc/systemd/system/promtail.service
+        mode: '0644'
+        owner: root
+        group: root
+        backup: yes
+      notify: reload systemd
+      tags:
+        - install
+        - upgrade
+
+    - name: OBSERVABILITY Promtail Pull image (using command for compatibility)
+      command: podman pull --quiet {{ promtail_img | default('grafana/promtail:latest') }}
+      register: promtail_pull_result
+      until: promtail_pull_result.rc == 0
+      retries: 3
+      delay: 10
+      changed_when: "'Storing signatures' in promtail_pull_result.stderr or 'Downloaded newer image' in promtail_pull_result.stdout"
+      tags:
+        - install
+        - upgrade
+        - images
+
+    # - name: OBSERVABILITY Promtail Validate configuration syntax
+    #   command: >
+    #     podman run --rm 
+    #     -v /etc/default/promtail.yml:/etc/promtail/config.yml:ro 
+    #     {{ promtail_img | default('grafana/promtail:latest') }}
+    #     -config.file=/etc/promtail/config.yml 
+    #     -dry-run
+    #   register: promtail_config_check
+    #   changed_when: false
+    #   failed_when: promtail_config_check.rc != 0
+    #   tags:
+    #     - install
+    #     - upgrade
+    #     - validate
+
+    - name: OBSERVABILITY Promtail Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+      tags:
+        - install
+        - upgrade
+
+    - name: OBSERVABILITY Promtail Enable and start service
+      systemd:
+        name: promtail.service
+        state: started
+        enabled: yes
+      tags:
+        - install
+        - upgrade
+        - service
+
+    # Task específica para verificar conectividad con Loki
+    - name: OBSERVABILITY Promtail Test Loki connectivity
+      uri:
+        url: "http://{{ loki_host }}:3100/ready"
+        method: GET
+        timeout: 10
+      register: loki_health_check
+      failed_when: false
+      changed_when: false
+      when: 
+        - loki_host is defined 
+        - loki_host != "127.0.0.1"
+        - loki_host != ""
+      tags:
+        - install
+        - upgrade
+        - validate
+
+    - name: OBSERVABILITY Promtail Display Loki connectivity status
+      debug:
+        msg: |
+          Loki connectivity status: {{ 'SUCCESS' if (loki_health_check.status | default(0)) == 200 else 'FAILED' }}
+          Loki URL: http://{{ loki_host | default('not_configured') }}:3100
+          Status Code: {{ loki_health_check.status | default('No response') }}
+      when: loki_host is defined and loki_host != ""
+      tags:
+        - install
+        - upgrade
+        - validate
+
+    # Task para mostrar información del deployment
+    - name: OBSERVABILITY Promtail Show deployment summary
+      debug:
+        msg: |
+          Promtail Deployment Summary:
+          - Host: {{ inventory_hostname }}
+          - Node Type: {% if inventory_hostname in groups.get('omnileads_aio', []) %}AIO{% elif inventory_hostname in groups.get('omnileads_app', []) %}APP{% elif inventory_hostname in groups.get('omnileads_voice', []) %}VOICE{% elif inventory_hostname in groups.get('omnileads_data', []) %}DATA{% elif inventory_hostname in groups.get('omnileads_dialer', []) %}DIALER{% else %}UNKNOWN{% endif %}
+          
+          - Tenant ID: {{ tenant_id }}
+          - Loki Host: {{ loki_host | default('Not configured') }}
+          - Promtail Listen: {{ omni_ip_lan }}:9080
+          - Config: /etc/default/promtail.yml
+          - Service: promtail.service
+          - Image: {{ promtail_img | default('grafana/promtail:latest') }}
+      tags:
+        - install
+        - upgrade
+        - info
+
+    handlers:
+      - name: reload systemd
+        systemd:
+          daemon_reload: yes
+
+      - name: restart promtail
+        systemd:
+          name: promtail.service
+          state: restarted
+
+  # Tasks adicionales para troubleshooting (ejecutar con --tags debug)
+  - name: OBSERVABILITY Promtail Debug and troubleshooting
+    hosts: 
+      - omnileads_data
+      - omnileads_voice
+      - omnileads_app
+      - omnileads_aio
+      - omnileads_dialer
     tags:
-      - install
-      - upgrade
+      - never
+      - debug
+    gather_facts: yes
+    
+    tasks:
+
+    - name: DEBUG Show active systemd services
+      command: systemctl list-units --type=service --state=active --no-pager
+      register: active_services
+      changed_when: false
+      tags:
+        - debug
+
+    - name: DEBUG Show dialer worker services status
+      shell: systemctl status "dialer_process_*@*.service" --no-pager || echo "No dialer workers found"
+      register: dialer_workers_status
+      changed_when: false
+      when: 
+        - inventory_hostname in groups.get('omnileads_dialer', []) or 
+          inventory_hostname in groups.get('omnileads_aio', []) or
+          inventory_hostname in groups.get('omnileads_app', [])
+      tags:
+        - debug
+
+    - name: DEBUG Show promtail service status
+      command: systemctl status promtail.service --no-pager
+      register: promtail_service_status
+      changed_when: false
+      failed_when: false
+      tags:
+        - debug
+
+    - name: DEBUG Show promtail logs
+      command: journalctl -u promtail.service --lines=20 --no-pager
+      register: promtail_logs
+      changed_when: false
+      tags:
+        - debug
+
+    - name: DEBUG Show promtail configuration snippet
+      shell: head -30 /etc/default/promtail.yml
+      register: promtail_config_snippet
+      changed_when: false
+      tags:
+        - debug
+
+    - name: DEBUG Check if promtail is listening
+      shell: ss -tulnp | grep :9080 || echo "Promtail not listening on port 9080"
+      register: promtail_listening
+      changed_when: false
+      tags:
+        - debug
+
+    - name: DEBUG Display troubleshooting information
+      debug:
+        msg: |
+          ============= PROMTAIL DEBUG INFO =============
+          Host: {{ inventory_hostname }}
+          Node Type: {% if inventory_hostname in groups.get('omnileads_aio', []) %}AIO{% elif inventory_hostname in groups.get('omnileads_app', []) %}APP{% elif inventory_hostname in groups.get('omnileads_voice', []) %}VOICE{% elif inventory_hostname in groups.get('omnileads_data', []) %}DATA{% elif inventory_hostname in groups.get('omnileads_dialer', []) %}DIALER{% else %}UNKNOWN{% endif %}
+          
+          Promtail Service Status: {{ 'Active' if 'active (running)' in promtail_service_status.stdout else 'Inactive/Failed' }}
+          
+          Active Services Count: {{ active_services.stdout_lines | length }}
+          
+          Promtail Listening: {{ 'YES' if ':9080' in promtail_listening.stdout else 'NO' }}
+          
+          {% if dialer_workers_status is defined and dialer_workers_status.stdout is defined %}
+          Dialer Workers Status: {{ 'Running' if 'active (running)' in dialer_workers_status.stdout else 'Issues detected' }}
+          {% endif %}
+          
+          Recent Promtail Logs (last 5 lines):
+          {{ (promtail_logs.stdout_lines | default(['No logs']))[-5:] | join('\n        ') }}
+          
+          Config Preview:
+          {{ (promtail_config_snippet.stdout_lines | default(['Config not readable']))[:10] | join('\n        ') }}
+      tags:
+        - debug
+
+  # Tasks para verificar conectividad con Loki desde el host
+  - name: OBSERVABILITY Loki connectivity test
+    hosts: 
+      - omnileads_data
+      - omnileads_voice
+      - omnileads_app
+      - omnileads_aio
+      - omnileads_dialer
+    tags:
+      - never
+      - loki_test
+    
+    tasks:
+
+    - name: TEST Check Loki connectivity
+      uri:
+        url: "http://{{ loki_host }}:3100/ready"
+        method: GET
+        timeout: 10
+      register: loki_test_result
+      failed_when: false
+      when: loki_host is defined and loki_host != ""
+      tags:
+        - loki_test
+
+    - name: TEST Show Loki test results
+      debug:
+        msg: |
+          Loki Test Results for {{ inventory_hostname }}:
+          - Loki Host: {{ loki_host | default('Not configured') }}
+          - Status: {{ 'REACHABLE' if (loki_test_result.status | default(0)) == 200 else 'UNREACHABLE' }}
+          - Response Code: {{ loki_test_result.status | default('No response') }}
+          - Response Time: {{ loki_test_result.elapsed | default('N/A') }}s
+      when: loki_host is defined and loki_host != ""
+      tags:
+        - loki_test
+
+    - name: TEST Query Loki for recent logs
+      uri:
+        url: "http://{{ loki_host }}:3100/loki/api/v1/query"
+        method: GET
+        body_format: form-urlencoded
+        body:
+          query: '{tenant="{{ tenant_id }}"}'
+          limit: "5"
+        timeout: 10
+      register: loki_query_result
+      failed_when: false
+      when: 
+        - loki_host is defined 
+        - loki_host != ""
+        - (loki_test_result.status | default(0)) == 200
+      tags:
+        - loki_test
+
+    - name: TEST Show Loki query results
+      debug:
+        msg: |
+          Loki Query Results:
+          - Query: {tenant="{{ tenant_id }}"}
+          - Status: {{ 'SUCCESS' if (loki_query_result.status | default(0)) == 200 else 'FAILED' }}
+          - Results Count: {{ (loki_query_result.json.data.result | length) if loki_query_result.json is defined and loki_query_result.json.data is defined else 0 }}
+      when: 
+        - loki_host is defined 
+        - loki_host != ""
+        - loki_query_result is defined
+      tags:
+        - loki_test

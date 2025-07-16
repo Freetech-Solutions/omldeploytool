@@ -24,6 +24,7 @@ ExecStart=/usr/bin/podman run \
   --log-driver=journald \
   --env-file=/etc/default/postgres.env \
   --name=oml-postgresql-server \
+  --shm-size=1g \
   --volume=oml_postgres:/var/lib/postgresql/data \
 {% if omnileads_ha is defined and omnileads_ha %}
   --volume=/etc/omnileads/repmgr.conf:/etc/postgresql/repmgr.conf \

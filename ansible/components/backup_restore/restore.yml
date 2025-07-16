@@ -63,7 +63,7 @@
 
     - name: RESTORE wait for PostgreSQL to be available AIO
       wait_for:
-        host: localhost
+        host: 127.0.0.1
         port: "{{ postgres_port}}"
         state: started
         timeout: 120

@@ -367,6 +367,7 @@
   loop:
     - omnileads.service
     - nginx.service
+    - postgresql.service
   tags:
     - upgrade
   when:

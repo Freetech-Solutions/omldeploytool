@@ -1,72 +1,80 @@
-#############################
-#   Name of the project     #
-#############################
-COMPOSE_PROJECT_NAME=oml
-
-#############################
-#   Name of the project     #
-#############################
-# --- "devenv" is for run on docker-desktop (access through localhost)
-# --- "docker" is for run on docker-engine production environment (access through Public or Private IP)
-
-ENV=docker
-REPO_PATH=./omnileads-repos
-
-# iPV4 address of the docker engine host
+###################################################################################################
+#                                   Environment                                                   #   
+###################################################################################################
+# --- Path to the repositories where the OML git submodules are cloned
+REPO_PATH=../../components-git-repo
+# --- Environment type, can be "prod" or "dev"
+# For "test" environment, set ENV=dev
+ENV=prod
+# IPV4 address of the docker engine host
 OML_HOSTNAME=
-PUBLIC_IP=
-
-REPO=omnileads
-#####################################################################################
-#                                  Components image version                         #
-#                              versions of each image to deploy                     #
-#####################################################################################
-
-OMLAPP_IMG=${REPO}/omlapp:250623.01
-OMLACD_IMG=${REPO}/asterisk:250422.01
-OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:250224.01
-OMLFASTAGI_IMG=${REPO}/fastagi:250312.01
-OMLAMI_IMG=${REPO}/astami:241017.01
-OMLNGINX_IMG=${REPO}/nginx:241009.01
-OMLKAM_IMG=${REPO}/kamailio:241109.01
-OMLRTPENGINE_IMG=freetechsolutions/rtpengine:250403.01
-OMLWS_IMG=${REPO}/websockets:240705.01
-OMLINTERACTION_PROC_IMG=${REPO}/interaction_processor:240506.01
-OMLCHAN_TEL_LOGGER_IMG=${REPO}/chan_tel_logger:241221.01
-
-OMLPSTNEMULATOR_IMG=${REPO}/pstn_emulator:241209.01
-OMLVIDEOCALLS_WIDGET_IMG=${REPO}/videocalls_widget:230905.01
-OMLVUEJS_IMG=freetechsolutions/vue-cli:develop
-OMLNGINXQA_IMG=${REPO}/nginxqa:latest
-
-OMLREDIS_IMG=redislabs/redisgears:1.0.9
-OMLPGSQL_IMG=postgres:14.9-bullseye
-OMLMINIO_IMG=quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
-OMLRABBITMQ_IMG=rabbitmq:4.0.5-management
-WOMBAT_IMG=loway/wombatdialer:25.02.2-3
-OMLPROMETHEUS_IMG=prom/prometheus:v3.0.1
-
-################################
-# Timezone for the environment #
-################################
+# If you want to use a public IP, set it here
+PUBLIC_IP=${OML_HOSTNAME}
+# If you want to advertise the public IP in the SIP & RTP headers, set this variable true.
+VOIP_NAT=false
+# If you want to use a FQDN, set it here
+FQDN=
+# --- Timezone for the environment
 TZ=America/Argentina/Cordoba
+# --- If you want to use the docker-compose scale option, set this variable to true
+SCALE=false
+# --- If you want to use a custom docker network bridge params:
+SUBNET=10.22.22.0/24
+GATEWAY=10.22.22.254
 
+###################################################################################################
+#                                  Components image version                                       #
+#                              versions of each image to deploy                                   #
+###################################################################################################
 
-#####################################################################################
-# s3-minio is the default option and use the stack bucket                           #
-# s3 in order to use an external bucket service                                     #
-# if you object storage service use selfsigned TLS/SSL certs,                       #
-# you mus to put *callrec_device=s3-no-check-cert* in order to don't verify CA.     #
-#####################################################################################
+# --- OMniLeads core application images
+OMLAPP_IMG=docker.io/omnileads/omlapp:20250711-d8c2556a
+OMLNGINX_IMG=docker.io/freetechsolutions/nginx:20250710-3d642158
+OMLWS_IMG=docker.io/freetechsolutions/websockets:20250627-ebd513a5
+
+OMLACD_IMG=docker.io/freetechsolutions/asterisk:20250716-fccd69db
+OMLACD_RETRIEVE_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250605-47b3aa78
+OMLFASTAGI_IMG=docker.io/freetechsolutions/fastagi:20250616-6782cc3c
+OMLAMI_IMG=docker.io/omnileads/astami:20250605-5d38d2e1
+OMLKAM_IMG=docker.io/freetechsolutions/kamailio:20250605-0c87ff3d
+OMLRTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20250716-0601b0df
+OMLINTERACTION_PROC_IMG=docker.io/freetechsolutions/interaction_processor:20250605-972f1468
+OMLCHAN_TEL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250605-0cd256e4
+
+# --- OMniDialer images
+API_IMG=docker.io/omnileads/dialer_api:20250711-5e7a2efa
+LISTENER_IMG=docker.io/omnileads/dialer_listener:20250711-5e7a2efa
+WORKER_IMG=docker.io/omnileads/dialer_worker:20250711-5e7a2efa
+SCHEDULER_IMG=docker.io/omnileads/dialer_scheduler:20250711-5e7a2efa
+DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20250711-5e7a2efa
+ASTERISK_IMG=docker.io/omnileads/dialer_asterisk:20250711-5e7a2efa
+
+# --- Backend services images
+REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
+POSTGRES_IMG=docker.io/library/postgres:14.9-bullseye
+MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
+GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
+PROMETHEUS_IMG=docker.io/prom/prometheus:v3.4.0
+
+# --- Images for testing and development
+OMLPSTNEMULATOR_IMG=docker.io/omnileads/pstn_emulator:241209.01
+OMLVIDEOCALLS_WIDGET_IMG=docker.io/omnileads/videocalls_widget:230905.01
+OMLVUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
+OMLNGINXQA_IMG=docker.io/omnileads/nginxqa:latest
+
+###################################################################################################
+#               s3-minio is the default option and use the stack bucket                           #
+#               s3 in order to use an external bucket service                                     #
+#               if you object storage service use selfsigned TLS/SSL certs,                       #
+#               you mus to put *callrec_device=s3-no-check-cert* in order to don't verify CA.     #
+###################################################################################################
 CALLREC_DEVICE=s3-minio
-
 
 ###################################################################################################
 #                                       DJANGO APP                                                #
 ###################################################################################################
-
-# --- IP or hostname that each instance will invoke when locating the other    
-DJANGO_HOSTNAME=django_app
+# --- IP or hostname that each instance will invoke when locating the other
+DJANGO_HOSTNAME=django-app
 DAPHNE_HOSTNAME=daphne
 
 # Session Cookie Age (SCA) is the time in seconds that will last the https session when inactivity
@@ -84,53 +92,68 @@ AUTHEPH_SK=SUp3rS3cr3tK3y
 DJANGO_LOG_LEVEL=INFO
 
 UWSGI_PORT=8099
+UWSGI_EXT_BIND_IP=${OML_HOSTNAME}
 DAPHNE_PORT=8098
-##################################
-# Name of the agenda disposition #
-##################################
+
+# Name of the agenda disposition
 CALIFICACION_REAGENDA=AGENDA
 
 # Login failure limit (LFM) is the attempts a user has to enter an incorrect password in login
 # Decrease it if paranoic reasons
 LOGIN_FAILURE_LIMIT=10
 
+OMLAPP_VERSION=250626.01
+DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
+PYTHONPATH=/opt/omnileads/ominicontacto
+INSTALL_PREFIX=/opt/omnileads/
+OML_COMMIT=XCOMIT
+OML_BRANCH=docker-compose
+OML_BUILD_DATE="250626.01"
+MONITORFORMAT=mp3
+S3_STORAGE_ENABLED=true
 
 #####################################################################################################
-#                                       ASTERISK                                                    #
+#                                       ACD                                                        #
 #####################################################################################################
+# --- On test-env or dev-env you must set the ACD_HOSTNAME variable with "acd-dev" string
+ACD_HOSTNAME=${OML_HOSTNAME}
 
-# --- IP or hostname that each instance will invoke when locating the other    
-# ----  ${OML_HOSTNAME} must be value for production deploy
-ASTERISK_HOSTNAME=acd
+ACD_RTP_PORT_MIN=30001
+ACD_RTP_PORT_MAX=40000
+ACD_AMI_USER=omnileadsami
+ACD_AMI_PASSWORD=5_MeO_DMT
+ACD_CALLREC_SPLIT=false
 
-AMI_USER=omnileadsami
-AMI_PASSWORD=5_MeO_DMT
+# --- OMniLeads ACD SIP Peer when dialer send calls
+# --- On test-env or dev-env you must set the ACD_DIALER_PJSIP_TRANSPORT variable with "acd-dev:5260" string
+ACD_DIALER_PJSIP_TRANSPORT=127.0.0.1:5260
 
-FASTAGI_HOSTNAME=fastagi #${OML_HOSTNAME}
+#####################################################################################################
+#                                       FASTAGI                                                     #
+#####################################################################################################
+# --- On test-env or dev-env you must set the OMLACD_HOST variable with "fastagi" string
+FASTAGI_HOSTNAME=${OML_HOSTNAME}
+FASTAGI_PORT=4573
+FASTAGI_EXT_BIND_IP=${OML_HOSTNAME}
+FASTAGI_EXT_PORT=4573
 
-SCALE=false
-
-CALLREC_SPLIT_CHANNELS=false
-
-# public_ip or lan_ip
-#SIP_NAT_IPADDR=${PUBLIC_IP}
 #####################################################################################################
 #                                       POSTGRESQL                                                  #
 #####################################################################################################
 # --- IP or hostname that each instance will invoke when locating the other    
-PGHOST=postgresql
+POSTGRES_HOSTNAME=postgresql
+POSTGRES_DB=omnileads
+POSTGRES_PORT=5432
+POSTGRES_USER=omnileads
+POSTGRES_PASSWORD=admin123
 
-PGDATABASE=omnileads
-PGPORT=5432
-PGUSER=omnileads
-PGPASSWORD=admin123
+POSTGRES_HA=false
+POSTGRES_NODE_RO=
 
-PGHOSTHA=false
-PGHOSTRO=
+POSTGRES_SSL=false
+POSTGRES_EXT_BIND_IP=${OML_HOSTNAME}
+POSTGRES_EXT_PORT=5432
 
-PGSSL=false
-
-PG_EXT_PORT=5432
 #########################################################################################################
 #                                           WEBSOCKETS                                                  #
 #########################################################################################################
@@ -138,10 +161,11 @@ PG_EXT_PORT=5432
 WEBSOCKET_HOSTNAME=websockets
 
 WEBSOCKET_PORT=8000
+WEBSOCKET_EXT_BIND_IP=${OML_HOSTNAME}
 WEBSOCKET_EXT_PORT=8000
 
 # *** Activete verbose ---> DEBUG:fts.oml.services.websockets,websockets.server
-WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets;INFO:websockets.server
+WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets ;INFO:websockets.server
 
 # ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
 # ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
@@ -155,9 +179,10 @@ WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 #########################################################################################################
 #                                           KAMAILIO                                                    #
 #########################################################################################################
-# --- IP or hostname that each instance will invoke when locating the other
-# --- production deploy must be ${OML_HOSTNAME}
-KAMAILIO_HOSTNAME=kamailio
+# --- On test-env or dev-env you must set the KAMAILIO_WEBRTC_HOSTNAME variable with "kamailio-webrtc-dev"
+# string for prod-env "127.0.0.1" is the default value
+KAMAILIO_WEBRTC_HOSTNAME=127.0.0.1
+KAMAILIO_WEBRTC_SIP_PORT=10060
 KAMAILIO_HTTPS_PORT=14443
 KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
 
@@ -169,76 +194,149 @@ PKG_SIZE=8
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - RABBITMQ                            #
 #########################################################################################################
-# --- IP or hostname that each instance will invoke when locating the other    
-OMNILEADS_HOSTNAME=nginx
+# --- IP or hostname that each instance will invoke when locating the other
+# "${OML_HOSTNAME}" is the prod profile or "nginx-dev" is the dev profile
+NGINX_HOSTNAME=${OML_HOSTNAME}
+NGINX_EXT_BIND_IP=${OML_HOSTNAME}
 NGINX_EXT_PORT=443
 
 # -----------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
-REDIS_HOSTNAME=redis
+# "${OML_HOSTNAME}" is the prod profile or "redis" is the dev profile
+REDIS_HOSTNAME=${OML_HOSTNAME}
 REDIS_PORT=6379
+REDIS_EXT_BIND_IP=${OML_HOSTNAME}
 REDIS_EXT_PORT=6379
+
 # ------------------------------------------------------------------------------
-# --- IP or hostname that each instance will invoke when locating the other    
-# --- production deploy must be ${OML_HOSTNAME}
-RTPENGINE_HOSTNAME=rtpengine
-#RTP_NAT_IPADDR=${PUBLIC_IP}
+# --- On test-env or dev-env you must set the RTPENGINE_HOSTNAME variable with "rtpengine" string
+RTPENGINE_HOSTNAME=${OML_HOSTNAME}
+RTPENGINE_BIND_UDP_PORT=22222
+RTPENGINE_RTP_PORT_MIN=20001
+RTPENGINE_RTP_PORT_MAX=30000
+# NAT_IPADDR
 # ------------------------------------------------------------------------------
-# --- IP or hostname that each instance will invoke when locating the other    
-RABBITMQ_HOSTNAME=rabbitmq
-RABBITMQ_EXT_PORT=5672
+# --- IP or hostname that each instance will invoke when locating the other
+# "${OML_HOSTNAME}" is the prod profile or "gearman" is the dev profile   
+GEARMAN_HOSTNAME=${OML_HOSTNAME}
+GEARMAN_PORT=4730
+GEARMAN_EXT_BIND_IP=${OML_HOSTNAME}
+GEARMAN_EXT_PORT=4730
+GEARMAN_JOB_SERVERS=${GEARMAN_HOSTNAME}:${GEARMAN_PORT}
 
 #########################################################################################################
 #                                Object Storage BUCKET config                                           #
 #########################################################################################################
 
 # --- name for invoke bucket actions
-S3_BUCKET_NAME=omnileads
-
-# --- MinIO web and console credentials
-S3_HTTP_ADMIN_USER=minio
-S3_HTTP_ADMIN_PASS=s3minio123
+BUCKET_NAME=omnileads
 
 # --- Bucket credentials 
-AWS_ACCESS_KEY_ID=omlminio
-AWS_SECRET_ACCESS_KEY=s3omnileads123
-AWS_DEFAULT_REGION=us-east-1
+BUCKET_ACCESS_KEY_ID=omlminio
+BUCKET_SECRET_ACCESS_KEY=s3omnileads123
+BUCKET_DEFAULT_REGION=us-east-1
 
-# *** used by storage_service.py & recordings & media_root views
-# your OMniLeads (nginx) ip/hostname ${OML_HOSTNAME}
-S3_ENDPOINT=https://localhost
+# --- On test-env or dev-env you must set the ${OML_HOSTNAME} variable with 127.0.0.1
+BUCKET_ENDPOINT=https://${OML_HOSTNAME}
 # *** used by omni-callrec-move.sh Asterisk AGI
 # https://docs.min.io/docs/how-to-use-aws-sdk-for-python-with-minio-server.html
-S3_ENDPOINT_MINIO=http://minio:9000
+BUCKET_ENDPOINT_MINIO=http://${OML_HOSTNAME}:9000
 
+# --- MinIO server params
+# --- MinIO web and console credentials
+MINIO_HTTP_ADMIN_USER=minio
+MINIO_HTTP_ADMIN_PASS=s3minio123
+
+MINIO_EXT_BIND_IP=${OML_HOSTNAME}
+MINIO_EXT_PORT=9000
+MINIO_EXT_CONSOLE_PORT=9001
+
+#########################################################################################################
+#                                   OMniDialer                                                          #
+#########################################################################################################
+
+# --- Django and Dialer API connection params
+DIALER_PASSWORD=0mn1d14l3r765
+
+# --- Only used on test-env or dev-env to test the dialer
+DIALER_ASTERISK_IPV4=10.22.22.199
+
+# --- Select "omnidialer" or "wombat" like dialer engine
+DIALER_ENGINE=omnidialer
+# --- Set with ${DIALER_ASTERISK_IPV4} on dev-env or test-env deployment
+DIALER_SIP_ADDR=127.0.0.1
+
+# --- IP or hostname that each instance will invoke when locating the other    
+# When omnidialer run in other host, you must set the OMNIDIALER_HOST variable with 
+# the IP or hostname of the host
+DIALER_API_HOST=dialer-api:1440
+DIALER_SCHEDULER_API_HOST=scheduler-api:1441
+
+# --- Dialer API connection params
+DIALER_API_EXT_BIND_IP=${OML_HOSTNAME}
+DIALER_API_EXT_PORT=1440
+DIALER_SCHEDULER_EXT_BIND_IP=${OML_HOSTNAME}
+DIALER_SCHEDULER_EXT_PORT=1441
+
+# --- Asterisk dialer container params
+# --- On test-env or dev-env you must set the ASTERISK_DIALER_HOSTNAME variable with "dialer-asterisk-dev" string
+DIALER_ASTERISK_HOSTNAME=${OML_HOSTNAME}
+DIALER_ASTERISK_ARI_PORT=8888
+DIALER_ASTERISK_APP=call_manager_dialer
+
+# --- Redis OML & dialer conn params
+DIALER_REDIS_SERVER=${REDIS_HOSTNAME}
+DIALER_REDIS_PORT=${REDIS_PORT}
+DIALER_REDIS_DB=3
+
+# --- OML Websocket channel path (adjust if OML is running in other host)
+DIALER_DCHANNELS_URL=wss://${NGINX_HOSTNAME}/channels/omnidialer/0mn1d14l3r
+
+# --- Postgres dialer conn params
+DIALER_POSTGRES_USER=omnidialer
+DIALER_POSTGRES_PASSWORD=dialer456
+DIALER_POSTGRES_SERVER=dialer-postgresql
+DIALER_POSTGRES_PORT=5433
+DIALER_POSTGRES_DB=omnidialer
+
+# --- Gearman conn params
+DIALER_GEARMAN_JOBS=start-campaign|stop-campaign|resume-campaign|process-contact|schedule-contact|process-event|create-campaign|edit-campaign|pause-campaign|delete-campaign|send-reports|add-incidence-rule-disposition|create-incidence-rule|process-campaign|delete-incidence-rule|update-incidence-rule|schedule-agenda|change-database|render-template|manage-dialer
+
+# --- Log level
+DIALER_PYTHON_LOGLEVEL=debug
+
+# --- Call attempts per second
+DIALER_CAPS=1
+
+# --- Workers replicas
+DIALER_PROCESS_CAMPAIGN_REPLICAS=3
+DIALER_PROCESS_CONTACT_REPLICAS=3
+DIALER_PROCESS_EVENT_REPLICAS=3
+
+# --- Dial through PSTN Gateway settings
+# --- In order to use this feature, you must have a PSTN Gateway configured
+# --- with SIP registration and authentication enabled.
+DIALER_PSTNGW_REGISTER=false # true or false
+DIALER_PSTNGW_AUTH=false # true or false
+DIALER_PSTNGW_USER=01177660010
+DIALER_PSTNGW_PASS=omnileads
+DIALER_PSTNGW_HOSTNAME=pbxemulator:5070
+
+
+###################### Wombat Dialer settings ######################################
+# --- If you select wombat, you must set the wombat credentials
+WOMBAT_HOSTNAME=wombat
+WOMBAT_USER=demoadmin
+WOMBAT_PASSWORD=demo
 
 #########################################################################################################
 #                                          Monitoring                                                   #
 #########################################################################################################
 
 HOMER_ENABLE=false
-
 # --- IP or hostname that each instance will invoke when locating the other    
 HOMER_HOSTNAME=heplify-server
-
 HOMER_PORT=9060
-
-#########################################################################################################
-#                                    DIALER                                                             #
-#########################################################################################################
-
-OML_DIALER_ENGINE=omnidialer
-OMNIDIALER_SIP_ADDR=10.22.22.199
-OMNIDIALER_HOST=omnidialer-api-1:1440
-
-#########################################################################################################
-#                                    WOMBAT DIALER                                                      #
-#########################################################################################################
-
-WOMBAT_HOSTNAME=wombat
-
-WOMBAT_USER=demoadmin
-WOMBAT_PASSWORD=demo
 
 #########################################################################################################
 #                                          VIDEO CALLS                                                  #
@@ -266,39 +364,6 @@ GOOGLE_CLOUD_PROJECTID=your_project_id
 #########################################################################################################
 OPENAI_API_KEY=fghsfdghshj5e4hjg2hj432ghj423ghj
 
-
-#########################################################################################################
-#                                          Monitoring                                                   #
-#########################################################################################################
-
-HOMER_ENABLE=false
-
-# --- IP or hostname that each instance will invoke when locating the other    
-HOMERHOST=heplify-server
-
-HOMERPORT=9060
-
-
-#########################################################################################################
-#       Subnet for the docker bridge network, change it if this subnet conflicts with yours             #
-#########################################################################################################
-NETWORK_NAME=omnileads
-SUBNET=10.22.22.0/24
-GATEWAY=10.22.22.254
-
-#########################################################################################################
-#                                       Django default settings                                         #
-#########################################################################################################
-OMLAPP_VERSION=241121
-DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
-PYTHONPATH=/opt/omnileads/ominicontacto
-INSTALL_PREFIX=/opt/omnileads/
-OML_COMMIT=XCOMIT
-OML_BRANCH=docker-compose
-OML_BUILD_DATE="241121"
-MONITORFORMAT=mp3
-S3_STORAGE_ENABLED=true
-
 #########################################################################################################
 #                                       QA & Testing                                                    #
 #########################################################################################################
@@ -317,3 +382,4 @@ S3_STORAGE_ENABLED=true
 # ---       9: CONGESTION
 
 PSTN_EMULATOR_MODE=default
+
