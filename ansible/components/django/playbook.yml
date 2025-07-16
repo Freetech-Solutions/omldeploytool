@@ -49,7 +49,8 @@
       dest: "{{ item.dest }}"
     loop:
       - { src: "{{ django_repo_path }}templates/django.service", dest: "/etc/systemd/system/omnileads.service" }
-      - { src: "{{ django_repo_path }}templates/background_tasks_worker.service", dest: "/etc/systemd/system/background_tasks.service" }
+      - { src: "{{ django_repo_path }}templates/background_callrec_tasks.service", dest: "/etc/systemd/system/background_tasks.service" }
+      - { src: "{{ django_repo_path }}templates/background_dialer_tasks.service", dest: "/etc/systemd/system/background_dialer_tasks.service" }
       - { src: "{{ django_repo_path }}templates/whatsapp.service", dest: "/etc/systemd/system/whatsapp.service" }
     tags:
       - install
@@ -105,6 +106,7 @@
     loop:
       - omnileads.service
       - background_tasks.service
+      - background_dialer_tasks.service
       - whatsapp.service
     tags:
       - install
@@ -129,6 +131,7 @@
     loop:
       - omnileads.service
       - background_tasks.service
+      - background_dialer_tasks.service
       - whatsapp.service
     tags:
       - upgrade

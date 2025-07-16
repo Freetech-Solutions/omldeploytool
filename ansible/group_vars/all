@@ -2,41 +2,51 @@
 
 #################### containers img tags  ################################
 
-fastagi_img: docker.io/omnileads/fastagi:250312.01
-sentiment_analysis_img: docker.io/omnileads/sentiment_analysis:240427.01
-interaction_processor_img: docker.io/omnileads/interaction_processor:240506.01
-asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:250224.01
-astami_img: docker.io/omnileads/astami:241017.01
-dialer_api_img: docker.io/freetechsolutions/dialer_api:250106.01
-dialer_asterisk_img: docker.io/freetechsolutions/dialer_asterisk:250121.01
-dialer_dialplan_img: docker.io/freetechsolutions/dialer_dialplan:250106.01
-dialer_listener_img: docker.io/freetechsolutions/dialer_listener:250106.01
-dialer_scheduler_img: docker.io/freetechsolutions/dialer_scheduler:250106.01
-dialer_worker_img: docker.io/freetechsolutions/dialer_worker:250122.01
-gearman_img: docker.io/artefactual/gearmand:1.1.18-alpine
-nginx_img: docker.io/omnileads/nginx:241009.01
-websockets_img: docker.io/omnileads/websockets:240705.01
-kamailio_img: docker.io/omnileads/kamailio:241109.01
-rtpengine_img: docker.io/omnileads/rtpengine:240625.01
+# --- OMniLeads core application images
+nginx_img: docker.io/freetechsolutions/nginx:20250710-3d642158
+websockets_img: docker.io/freetechsolutions/websockets:20250627-ebd513a5
+
+asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:20250605-47b3aa78
+fastagi_img: docker.io/freetechsolutions/fastagi:20250616-6782cc3c
+astami_img: docker.io/omnileads/astami:20250605-5d38d2e1
+kamailio_img: docker.io/freetechsolutions/kamailio:20250605-0c87ff3d
+rtpengine_img: docker.io/freetechsolutions/rtpengine:20250716-0601b0df
+interaction_processor_img: docker.io/freetechsolutions/interaction_processor:20250605-972f1468
+call_logger_img: docker.io/omnileads/chan_tel_logger:20250605-0cd256e4
+
+# --- OMnidialer components images
+dialer_api_img: docker.io/omnileads/dialer_api:20250711-5e7a2efa
+dialer_listener_img: docker.io/omnileads/dialer_listener:20250711-5e7a2efa
+dialer_worker_img: docker.io/omnileads/dialer_worker:20250711-5e7a2efa
+dialer_scheduler_img: docker.io/omnileads/dialer_scheduler:20250711-5e7a2efa
+dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20250711-5e7a2efa
+dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20250711-5e7a2efa
+
+# --- Backend components images
 redis_img: docker.io/omnileads/redis:231125.01
-postgres_img: docker.io/postgres:14.9-bullseye
 postgres_ha_img: docker.io/omnileads/postgres:240902.02
-#postgres_img: docker.io/omnileads/postgres:230624.01 # for upgrade from centos7 1.X
-prometheus_img: docker.io/prom/prometheus:v2.49.1
+postgres_img: docker.io/postgres:14.9-bullseye
+# for upgrade from centos7 1.X:
+#postgres_img: docker.io/omnileads/postgres:230624.01 
+minio_img: quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
+gearman_img: docker.io/artefactual/gearmand:1.1.21.2-alpine
+
+# --- Monitoring components images
+prometheus_img: docker.io/prom/prometheus:v3.4.0
 prometheus_node_exp_img: docker.io/prom/node-exporter:v1.7.0
 prometheus_podman_exp_img: quay.io/navidys/prometheus-podman-exporter:latest
-promtail_img: docker.io/grafana/promtail:latest
-minio_img: quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
-rabbitmq_img: docker.io/rabbitmq:3.12
 postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
 redis_prometheus_img: docker.io/oliver006/redis_exporter:latest
+promtail_img: docker.io/grafana/promtail:latest
+
+# --- Testing components images
 nginxcgi_img: docker.io/omnileads/nginxqa:latest
 pstn_emulator_img: docker.io/omnileads/pstn_emulator:241209.01
 wombat_img: docker.io/freetechsolutions/wombat:21.06.4-9
 mysql_img: docker.io/bitnami/mariadb:latest
-survey_worker_img: docker.io/omnileads/survey_worker:231201.01
+
+# --- Other components images
 certbot_img: docker.io/omnileads/certbot:240201.01
-haproxy_img: docker.io/omnileads/2.0-buster
 
 ################ Some components NETWORKING ports ########################
 
@@ -47,6 +57,7 @@ redis_port: 6379
 fastagi_port: 4573
 postgres_port: 5432
 kamailio_wss_port: 14443
+kamailio_webrtc_udp_port: 10060
 
 ################################ paths ####################################
 

@@ -1,4 +1,11 @@
 #!/bin/bash
+set -e
+set -e
+set -e
+set -e
+set -e
+set -e
+set -e
 
 
 set -e
@@ -162,7 +169,7 @@ case ${oml_action} in
     ansible-playbook matrix.yml --extra-vars \
     "django_repo_path=$(pwd)/components/django/ \
     redis_repo_path=$(pwd)/components/redis/ \
-    rabbitmq_repo_path=$(pwd)/components/rabbitmq/ \
+    gearman_repo_path=$(pwd)/components/gearman/ \
     pgsql_repo_path=$(pwd)/components/postgresql/ \
     kamailio_repo_path=$(pwd)/components/kamailio/ \
     asterisk_repo_path=$(pwd)/components/asterisk/ \
@@ -182,6 +189,7 @@ case ${oml_action} in
     dialer_repo_path=$(pwd)/components/dialer/ \
     keepalived_repo_path=$(pwd)/components/keepalived/ \
     qa_repo_path=$(pwd)/components/qa/ \
+    call_logger_repo_path=$(pwd)/components/call_logger/ \
     addons_repo_path=$(pwd)/components/addons/ \
     observability_repo_path=$(pwd)/components/observability/ \
     rebrand=false \
@@ -219,7 +227,7 @@ if [ $1 == 0 ];then
   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                                           The Open Source Contact Center Solution
-                                           Copyright (C) 2024 Freetech Solutions"
+                                           Copyright (C) 2025 Freetech Solutions"
   echo ""
   echo "#############################################################"
   echo "#         OMniLeads installation ended successfully         #"

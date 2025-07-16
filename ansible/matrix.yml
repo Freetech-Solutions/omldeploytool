@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Freetech Solutions
+# Copyright (C) 2025 Freetech Solutions
 
 # This file is part of OMniLeads
 
@@ -25,6 +25,7 @@
     - omnileads_data
     - omnileads_voice
     - omnileads_app
+    - omnileads_dialer
     - omnileads_aio
   gather_facts: True
   roles:
@@ -47,9 +48,9 @@
     - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']    
 
 
-- import_playbook: components/rabbitmq/playbook.yml
+- import_playbook: components/gearman/playbook.yml
   when: 
-    - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']    
+    - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']
 
 
 - import_playbook: components/rtpengine/playbook.yml
@@ -102,11 +103,11 @@
     - inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_aio']
     
 
-# - import_playbook: components/dialer/playbook.yml
-#   when: 
-#     - inventory_hostname in groups['omnileads_dialer'] or inventory_hostname in groups['omnileads_aio']
-#     - dialer_engine is defined and dialer_engine == 'omnileads'
-    
+- import_playbook: components/dialer/playbook.yml
+  when: 
+    - inventory_hostname in groups['omnileads_dialer'] or inventory_hostname in groups['omnileads_aio']
+    - dialer_engine is defined and dialer_engine == 'omnidialer'
+
 
 - import_playbook: components/nginx/playbook.yml
   when: 
@@ -114,6 +115,11 @@
 
 
 - import_playbook: components/cron/playbook.yml
+  when: 
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+
+
+- import_playbook: components/call_logger/playbook.yml
   when: 
     - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
 
@@ -133,6 +139,6 @@
     - qa_env is defined
 
 
-- import_playbook: components/addons/playbook.yml
-  when: 
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+# - import_playbook: components/addons/playbook.yml
+#   when: 
+#     - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']

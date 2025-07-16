@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Freetech Solutions
+# Copyright (C) 2025 Freetech Solutions
 
 # This file is part of OMniLeads
 
@@ -30,10 +30,19 @@ all:
           omni_ip_lan: 172.16.101.44
         tenant_example_2:
           tenant_id: tenant_example_2
-          ansible_host: 190.19.11.2
-          omni_ip_lan: 10.10.10.2          
-          infra_env: lan
-          ansible_ssh_port: 2234
+          ansible_host: 66.97.35.23
+          omni_ip_lan: 192.168.200.150
+          infra_env: cloud
+          ansible_ssh_port: 5204
+          fqdn: omnidialer.sephir.tech
+          certs: custom
+          cert_file_name: Sephir_cert.pem
+          key_file_name: Sephir_key.pem
+        tenant_example_2_dialer:
+          tenant_id: tenant_example_2_dialer
+          ansible_host: 
+          omni_ip_lan: 
+          ansible_ssh_port: 
         tenant_example_nat:
           tenant_id: tenant_example_nat
           ansible_host: 190.19.11.2
@@ -69,39 +78,27 @@ all:
         tenant_example_5:
           hosts:
             tenant_example_5_data:
-              ansible_host: 172.16.101.41
-              omni_ip_lan: 172.16.101.41
+              ansible_host: 164.92.101.39
+              omni_ip_lan: 10.10.10.23
               ansible_ssh_port: 22
             tenant_example_5_voice:
-              ansible_host: 172.16.101.42
-              omni_ip_lan: 172.16.101.42
+              ansible_host: 143.198.142.25
+              omni_ip_lan: 10.10.10.21
               ansible_ssh_port: 22
             tenant_example_5_app:
-              ansible_host: 172.16.101.43
-              omni_ip_lan: 172.16.101.43
+              ansible_host: 165.232.137.234
+              omni_ip_lan: 10.10.10.22
+              ansible_ssh_port: 22
+            tenant_example_5_dialer:
+              ansible_host: 143.198.151.31
+              omni_ip_lan: 10.10.10.20
               ansible_ssh_port: 22
           vars:
             tenant_id: tenant_example_5
-            data_host: 172.16.101.41
-            voice_host: 172.16.101.42
-            application_host: 172.16.101.43
-            infra_env: lan
-        tenant_example_6:
-          hosts:
-            tenant_example_6_data:
-              ansible_host: 179.34.22.11
-              omni_ip_lan: 192.168.0.2
-            tenant_example_6_voice:
-              ansible_host: 179.134.12.18
-              omni_ip_lan: 192.168.0.3
-            tenant_example_6_app:
-              ansible_host: 190.134.62.33
-              omni_ip_lan: 192.168.0.4
-          vars:
-            tenant_id: tenant_example_6
-            data_host: 192.168.0.2
-            voice_host: 192.168.0.3
-            application_host: 192.168.0.4
+            data_host: 10.10.10.23
+            voice_host: 10.10.10.21
+            application_host: 10.10.10.22
+            dialer_host: 10.10.10.20
             infra_env: cloud
     # -----------------------------------------
     # -----------------------------------------              
@@ -194,24 +191,12 @@ all:
     SCA: 3600
     # --- Session API token (seconds)
     #api_token_expired_after: 3600
-    # --- Ephemeral Credentials TTL (ECTTL) is the time in seconds            #
-    # --- that will last the SIP credentials used to authenticate a SIP user  #
+    # --- Ephemeral Credentials TTL (ECTTL) is the time in seconds 
+    # --- that will last the SIP credentials used to authenticate a SIP user
     # --- in the telephony system
     ECCTL: 28800
     # --- is the attempts a user has to enter an incorrect password in login
-    LOGIN_FAILURE_LIMIT: 10
-    
-    # --- Dialer Settings
-    # --- The Dialer Engine: omnidialer or wombat.
-    dialer_engine: wombat
-    # --- The Dialer host address (FQDN or IP)
-    dialer_host: dialer.example.com
-    # --- Dialer API user & password
-    dialer_user: demoadmin
-    dialer_password: demo
-    # --- Dialer API port
-    dialer_port: 8080
-
+    LOGIN_FAILURE_LIMIT: 10 
     # --- SMTP server params, if you want to use your own SMTP, put true and
     # --- uncomment all necesary
     email_smtp_relay: false
@@ -232,6 +217,24 @@ all:
     # ------------------------------------------------------------------------------------------------ #
     # --------------------------------------- Integrations-------------------------------------------- #
     # ------------------------------------------------------------------------------------------------ #
+    
+    # --- The Dialer Engine: omnidialer or wombat.
+    dialer_engine: omnidialer
+    dialer_caps: 1
+    dialer_worker_replicas: 5
+    # - Uncomment to enable PSTN passthrough mode from the dialer ACD
+    # dialer_passthrough_dial_out: true
+    # dialer_trunk_hostname: trunk_hostname
+    # - Uncomment if each INVITE generated from the dialer to the PSTN needs to be authenticated
+    # dialer_trunk_auth_enable: true
+    # dialer_trunk_username: sip_username
+    # dialer_trunk_password: sip_password
+    
+    # --- Dialer API user & password
+    dialer_user: demoadmin
+    dialer_password: demo
+    dialer_port: 10040
+    # dialer_host: dialer.example.com    
 
     # --- Text to Speech external "gcp", "aws", "ibm", etc.
     #tts_external_engine: 
@@ -370,8 +373,8 @@ all:
     # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
     # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
 
-    omnileads_img: docker.io/omnileads/omlapp:250701.01
-    asterisk_img: docker.io/omnileads/asterisk:250422.01
+    omnileads_img: docker.io/omnileads/omlapp:20250711-d8c2556a
+    asterisk_img: docker.io/freetechsolutions/asterisk:20250716-fccd69db
     
 ##############################################################################################################
 ## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #
@@ -384,9 +387,7 @@ omnileads_aio:
   hosts:
     #tenant_example_1:
     #tenant_example_2:
-    #tenant_example_3:
-    #tenant_example_4:
-    #tenant_example_5:
+    #tenant_example_7_aio:
 
 ################ Active/Pasive HA cluster ######################
 ################ Active/Pasive HA cluster ######################
@@ -412,3 +413,8 @@ omnileads_app:
     #tenant_example_5_app:
     #tenant_example_6_app:
 
+omnileads_dialer:
+  hosts:
+    #tenant_example_5_dialer:
+    #tenant_example_2_dialer
+    

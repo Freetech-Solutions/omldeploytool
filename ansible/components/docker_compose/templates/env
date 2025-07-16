@@ -5,7 +5,7 @@ COMPOSE_PROJECT_NAME={{ tenant_id }}
 
 # --- "cloud" instance (access through public IP)
 # --- "lan" instance (access through private IP)
-# --- "devenv" is for run on docker-desktop (access through localhost)
+# --- "devenv" is for run on docker-desktop (access through 127.0.0.1)
 ENV={{ infra_env }}
 
 PUBLIC_IP={{ omni_ip_wan }}
@@ -50,8 +50,8 @@ TZ={{ TZ }}
 ###################################################################################################
 
 # --- IP or hostname that each instance will invoke when locating the other    
-DJANGO_HOSTNAME=localhost
-DAPHNE_HOSTNAME=localhost
+DJANGO_HOSTNAME=127.0.0.1
+DAPHNE_HOSTNAME=127.0.0.1
 
 # Session Cookie Age (SCA) is the time in seconds that will last the https session when inactivity
 # is detected in the session (by default is 1 hour)
@@ -193,15 +193,15 @@ AWS_DEFAULT_REGION=us-east-1
 CALLREC_DEVICE=s3-minio
 {% if infra_env == "cloud" %}
 S3_ENDPOINT=https://{{ omni_ip_wan }}
-S3_ENDPOINT_MINIO=http://localhost:9000
+S3_ENDPOINT_MINIO=http://127.0.0.1:9000
 {% else %}
 S3_ENDPOINT=https://{{ omni_ip_lan }}
-S3_ENDPOINT_MINIO=http://localhost:9000
+S3_ENDPOINT_MINIO=http://127.0.0.1:9000
 {% endif %}
 {% elif bucket_url is not defined and fqdn is defined %}
 CALLREC_DEVICE=s3-minio
 S3_ENDPOINT=https://{{ fqdn }}
-S3_ENDPOINT_MINIO=http://localhost:9000
+S3_ENDPOINT_MINIO=http://127.0.0.1:9000
 {% elif bucket_url == "aws" %}
 S3_ENDPOINT_AWS=
 S3_REGION_NAME={{ bucket_region }}
@@ -209,7 +209,7 @@ CALLREC_DEVICE=s3-aws
 AWS_DEFAULT_REGION={{ bucket_region }}
 {% else %}
 S3_ENDPOINT={{ bucket_url }}
-S3_ENDPOINT_MINIO=http://localhost:9000
+S3_ENDPOINT_MINIO=http://127.0.0.1:9000
 CALLREC_DEVICE=s3
 {% endif %}
 

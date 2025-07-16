@@ -1,12 +1,9 @@
-docker-compose/.env
 ansible/instances
 ansible/.inventory.yml
 docker-compose/.custom_conf/
-docker-compose/dev-env/omnileads-repos
+docker-compose/prod-env/oml_manage.sh
+docker-compose/test-env/oml_manage.sh
+docker-compose/dev-env/oml_manage.sh
 docker-compose/dev-env/.env
-docker-compose/dev-env/oml_manage
-docker-compose/test-env/.env
-docker-compose/test-env/oml_manage
 docker-compose/prod-env/.env
-docker-compose/prod-env/oml_manage
-docker-compose/dialer/.env
+docker-compose/test-env/.env

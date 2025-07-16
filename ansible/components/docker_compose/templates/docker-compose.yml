@@ -120,7 +120,7 @@ services:
       - OML_BRANCH=${OML_BRANCH}
       - OML_COMMIT=${OML_COMMIT}
       - OML_BUILD_DATE=${OML_BUILD_DATE}
-      - WOMBAT_HOSTNAME=localhost
+      - WOMBAT_HOSTNAME=127.0.0.1
       - WOMBAT_USER=${WOMBAT_USER}
       - WOMBAT_PASSWORD=${WOMBAT_PASSWORD}
       - OML_LOGGING_SLOWSQL_ENABLED=
@@ -183,7 +183,7 @@ services:
       - OML_BRANCH=${OML_BRANCH}
       - OML_COMMIT=${OML_COMMIT}
       - OML_BUILD_DATE=${OML_BUILD_DATE}
-      - WOMBAT_HOSTNAME=localhost
+      - WOMBAT_HOSTNAME=127.0.0.1
       - WOMBAT_USER=${WOMBAT_USER}
       - WOMBAT_PASSWORD=${WOMBAT_PASSWORD}
       - OML_LOGGING_SLOWSQL_ENABLED=
@@ -387,7 +387,7 @@ services:
       - PYTHONUNBUFFERED=1
     network_mode: host
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health-checks"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health-checks"]
       interval: 1s
       timeout: 10s
       retries: 10
@@ -401,7 +401,7 @@ services:
     tty: true
     container_name: oml-minio-server
     image: ${OMLMINIO_IMG}
-    command: server --console-address "localhost:9001" /data
+    command: server --console-address "127.0.0.1:9001" /data
     environment:
       - MINIO_ROOT_USER=${S3_HTTP_ADMIN_USER}
       - MINIO_ROOT_PASSWORD=${S3_HTTP_ADMIN_PASS}
@@ -411,7 +411,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -431,7 +431,7 @@ services:
     entrypoint: >
       /bin/sh -c "
       /usr/bin/mc config host rm local;
-      /usr/bin/mc config host add --quiet --api s3v4 local http://localhost:9000 {{ s3_http_admin_user }} {{ s3_http_admin_pass }};
+      /usr/bin/mc config host add --quiet --api s3v4 local http://127.0.0.1:9000 {{ s3_http_admin_user }} {{ s3_http_admin_pass }};
       /usr/bin/mc mb --quiet local/omnileads/;
       /usr/bin/mc admin user add local {{ bucket_access_key }} {{ bucket_secret_key }};
       /usr/bin/mc admin policy attach local readwrite --user {{ bucket_access_key }};
@@ -474,7 +474,7 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-      - '--web.listen-address=localhost:9100'
+      - '--web.listen-address=127.0.0.1:9100'
     restart: unless-stopped
     network_mode: host
     labels:
@@ -502,7 +502,7 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-      - REDIS_ADDR=localhost:6379
+      - REDIS_ADDR=127.0.0.1:6379
       - REDIS_USER=null
       - REDIS_PASSWORD=null
 
