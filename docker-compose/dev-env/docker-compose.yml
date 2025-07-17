@@ -661,11 +661,11 @@ services:
   # ----------------------------------------------------------------------------
   # PROCESSING SERVICES
   # ----------------------------------------------------------------------------
-  callrec-processor:
+  callrec-compressor:
     build: 
-      context: ./$REPO_PATH/postcall_actions/
+      context: ./$REPO_PATH/postcall_actions/callrec_compressor/
       dockerfile: Dockerfile
-    image: ${OMLINTERACTION_PROC_IMG}
+    image: ${CALLREC_COMPRESSOR_IMG}
     depends_on:
       minio:
         condition: service_healthy
@@ -686,7 +686,38 @@ services:
     restart: on-failure
     logging: *default-logging
     stop_grace_period: 10s
-    command: python /app/app.py
+    command: python /app/callrec_compressor.py
+    volumes:
+      - asterisk_callrec:/var/spool/asterisk/monitor/
+
+  callrec-transcriber:
+    build: 
+      context: ./$REPO_PATH/postcall_actions/callrec_transcriber/
+      dockerfile: Dockerfile
+      target: saas
+    image: ${CALLREC_TRANSCRIBER_IMG}
+    depends_on:
+      minio:
+        condition: service_healthy
+      gearman:
+        condition: service_healthy
+    dns: 8.8.8.8
+    environment:
+      AWS_ACCESS_KEY_ID: ${BUCKET_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${BUCKET_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${BUCKET_DEFAULT_REGION}
+      CALLREC_DEVICE: ${CALLREC_DEVICE}
+      GEARMAN_HOST: ${GEARMAN_HOSTNAME}
+      S3_BUCKET_NAME: ${BUCKET_NAME}
+      S3_ENDPOINT: ${BUCKET_ENDPOINT_MINIO}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      TZ: ${TZ}
+    networks:
+      - omnileads
+    restart: on-failure
+    logging: *default-logging
+    stop_grace_period: 10s
+    command: python /app/callrec_transcriber.py
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
 
