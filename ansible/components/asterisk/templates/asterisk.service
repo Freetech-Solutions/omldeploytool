@@ -10,7 +10,7 @@ Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
 TimeoutStopSec=70
 {% if scale_asterisk is defined and scale_asterisk %}
-MemoryMax={{ asterisk_mem_limit }}
+MemoryMax={{ asterisk_mem_limit | default("1G", true) }}
 {% else %}
 MemoryMax=
 {% endif %}
