@@ -268,6 +268,17 @@ clean_all() {
     fi
 }
 
+send_call() {
+    if ! docker_compose ps -q pbxemulator &>/dev/null; then
+        error "PBX Emulator service is not running. Please start it first."
+        exit 1
+    fi
+    docker_compose exec -it pbxemulator sipp -sn uac pbxemulator:5070 -s test -m 1 -r 1 -d 60000 -l 1 || {
+        error "Failed to send call"
+        exit 1
+    }
+}
+
 # -----------------------------------------------------------------------------
 # Rebuild Services
 # -----------------------------------------------------------------------------
@@ -311,6 +322,7 @@ show_help() {
       data-generate      Generate example data in the database
       rebuild [svc]      Rebuild one or all service images
       env                Display first 20 env vars from .env
+      send-call          Send a test call using the PSTN-Emulator
       version            Show Docker & Compose versions
       help               Display this help message
 
@@ -341,7 +353,8 @@ main() {
         health)         check_health ;;  
         clean)          clean_system ;;  
         clean-all)      clean_all ;;  
-        rebuild)        shift; rebuild_services "$1" ;;  
+        send-call)      send_call ;;
+        rebuild)        shift; rebuild_services "${1:-}" ;;  
         env)            if [[ -f "$ENV_FILE" ]]; then grep -h '^[A-Z_]\+=' "$ENV_FILE" | head -20; else warning ".env not found"; fi ;;  
         version)        printf "Docker: %s\nCompose: %s\n" "$(docker --version)" "${DC_CMD[*]} --version" ;;  
         help|--help|"" ) show_help ;;  

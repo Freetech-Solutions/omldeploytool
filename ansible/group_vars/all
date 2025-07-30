@@ -3,7 +3,7 @@
 #################### containers img tags  ################################
 
 # --- OMniLeads core application images
-nginx_img: docker.io/freetechsolutions/nginx:20250710-3d642158
+nginx_img: docker.io/freetechsolutions/nginx:20250719-8686b573
 websockets_img: docker.io/freetechsolutions/websockets:20250627-ebd513a5
 
 asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:20250605-47b3aa78
@@ -11,16 +11,17 @@ fastagi_img: docker.io/freetechsolutions/fastagi:20250616-6782cc3c
 astami_img: docker.io/omnileads/astami:20250605-5d38d2e1
 kamailio_img: docker.io/freetechsolutions/kamailio:20250605-0c87ff3d
 rtpengine_img: docker.io/freetechsolutions/rtpengine:20250716-0601b0df
-interaction_processor_img: docker.io/freetechsolutions/interaction_processor:20250605-972f1468
 call_logger_img: docker.io/omnileads/chan_tel_logger:20250605-0cd256e4
+callrec_compressor_img: docker.io/freetechsolutions/callrec_compressor:20250719-84e14930
+callrec_transcriber_img: docker.io/freetechsolutions/callrec_transcriber:20250719-14a17abb-saas
 
 # --- OMnidialer components images
-dialer_api_img: docker.io/omnileads/dialer_api:20250711-5e7a2efa
-dialer_listener_img: docker.io/omnileads/dialer_listener:20250711-5e7a2efa
-dialer_worker_img: docker.io/omnileads/dialer_worker:20250711-5e7a2efa
-dialer_scheduler_img: docker.io/omnileads/dialer_scheduler:20250711-5e7a2efa
-dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20250711-5e7a2efa
-dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20250711-5e7a2efa
+dialer_api_img: docker.io/omnileads/dialer_api:20250724-5e7a2efa
+dialer_listener_img: docker.io/omnileads/dialer_listener:20250724-5e7a2efa
+dialer_worker_img: docker.io/omnileads/dialer_worker:20250724-5e7a2efa
+dialer_scheduler_img: docker.io/omnileads/dialer_scheduler:20250724-5e7a2efa
+dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20250724-5e7a2efa
+dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20250724-5e7a2efa
 
 # --- Backend components images
 redis_img: docker.io/omnileads/redis:231125.01

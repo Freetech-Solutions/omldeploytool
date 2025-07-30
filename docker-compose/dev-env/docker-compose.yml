@@ -470,6 +470,8 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+      # - ../.custom_conf/certs/:/etc/omnileads/certs:ro
+
  
   # ----------------------------------------------------------------------------
   # TELEPHONY SERVICES
@@ -499,6 +501,7 @@ services:
       HOMERPORT: ${HOMER_PORT}
       RTP_PORT_MAX: ${ACD_RTP_PORT_MAX}
       RTP_PORT_MIN: ${ACD_RTP_PORT_MIN}
+      SCALE: ${ACD_SCALE}
       PUBLIC_IP: ${PUBLIC_IP}
       NAT:  ${VOIP_NAT}
       TZ: ${TZ}    
@@ -686,7 +689,6 @@ services:
     restart: on-failure
     logging: *default-logging
     stop_grace_period: 10s
-    command: python /app/callrec_compressor.py
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
 
@@ -710,14 +712,14 @@ services:
       GEARMAN_HOST: ${GEARMAN_HOSTNAME}
       S3_BUCKET_NAME: ${BUCKET_NAME}
       S3_ENDPOINT: ${BUCKET_ENDPOINT_MINIO}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      STT_ENGINE: ${STT_ENGINE}
+      STT_API_KEY: ${STT_API_KEY}
       TZ: ${TZ}
     networks:
       - omnileads
     restart: on-failure
     logging: *default-logging
     stop_grace_period: 10s
-    command: python /app/callrec_transcriber.py
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
 

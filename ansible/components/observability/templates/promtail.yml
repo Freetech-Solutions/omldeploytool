@@ -190,6 +190,7 @@ scrape_configs:
   {'name': 'asterisk', 'unit': 'asterisk.service', 'family': 'telephony'},
   {'name': 'asterisk_retrieve_conf', 'unit': 'asterisk_retrieve_conf.service', 'family': 'telephony'},
   {'name': 'callrec_processor', 'unit': 'interaction_processor.service', 'family': 'telephony'},
+  {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.service', 'family': 'telephony'},
 ] %}
 
 {% for service in voice_services %}
@@ -269,7 +270,8 @@ scrape_configs:
   {'name': 'redis', 'unit': 'redis.service', 'family': 'infrastructure'},
   {'name': 'rtpengine', 'unit': 'rtpengine.service', 'family': 'telephony'},
   {'name': 'websockets', 'unit': 'websockets.service', 'family': 'communication'},
-  {'name': 'callrec_processor', 'unit': 'interaction_processor.service', 'family': 'telephony'},
+  {'name': 'callrec_compressor', 'unit': 'interaction_processor.service', 'family': 'telephony'},
+  {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.service', 'family': 'telephony'},
   {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
 ] %}
 

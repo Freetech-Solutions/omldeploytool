@@ -13,7 +13,7 @@ As part of the roadmap of the develop we are planning to include SMS, Social Net
 
 OML currently facilitates robust management and telephonic support using various campaign types:
 
-* Dialer campaigns: Automatic Dialer to manage outgoing calls and route them to appropriate agents. ✅
+* Dialer campaigns: Automatic Dialer to manage outgoing calls and route them to appropriate agents, outgoing IVR or intergate with custom business logic. ✅
 * Inbound Campaigns: Efficiently manage incoming calls and route them to appropriate agents. ✅ 
 * Preview Campaigns: Prepare agents with relevant information before they make a call. ✅ 
 * Manual Outbound Campaigns: Provide tools for agents to manually reach out to customers with ease. ✅ 

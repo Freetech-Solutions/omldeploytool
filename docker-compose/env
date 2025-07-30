@@ -28,18 +28,20 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads core application images
-OMLAPP_IMG=docker.io/omnileads/omlapp:20250711-d8c2556a
-OMLNGINX_IMG=docker.io/freetechsolutions/nginx:20250710-3d642158
+OMLAPP_IMG=docker.io/omnileads/omlapp:20250724-3125fbed
+OMLNGINX_IMG=docker.io/freetechsolutions/nginx:20250719-8686b573
 OMLWS_IMG=docker.io/freetechsolutions/websockets:20250627-ebd513a5
 
-OMLACD_IMG=docker.io/freetechsolutions/asterisk:20250716-fccd69db
+OMLACD_IMG=docker.io/freetechsolutions/asterisk:20250729-59853796
 OMLACD_RETRIEVE_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250605-47b3aa78
 OMLFASTAGI_IMG=docker.io/freetechsolutions/fastagi:20250616-6782cc3c
 OMLAMI_IMG=docker.io/omnileads/astami:20250605-5d38d2e1
 OMLKAM_IMG=docker.io/freetechsolutions/kamailio:20250605-0c87ff3d
 OMLRTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20250716-0601b0df
-OMLINTERACTION_PROC_IMG=docker.io/freetechsolutions/interaction_processor:20250605-972f1468
 OMLCHAN_TEL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250605-0cd256e4
+CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20250719-84e14930
+# if you want to run Speech to text onpremise change de suffix tag from "-saas" to "-local"
+CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20250719-14a17abb-saas
 
 # --- OMniDialer images
 API_IMG=docker.io/omnileads/dialer_api:20250711-5e7a2efa
@@ -69,6 +71,7 @@ OMLNGINXQA_IMG=docker.io/omnileads/nginxqa:latest
 #               you mus to put *callrec_device=s3-no-check-cert* in order to don't verify CA.     #
 ###################################################################################################
 CALLREC_DEVICE=s3-minio
+
 
 ###################################################################################################
 #                                       DJANGO APP                                                #
@@ -122,11 +125,29 @@ ACD_RTP_PORT_MIN=30001
 ACD_RTP_PORT_MAX=40000
 ACD_AMI_USER=omnileadsami
 ACD_AMI_PASSWORD=5_MeO_DMT
-ACD_CALLREC_SPLIT=false
-
 # --- OMniLeads ACD SIP Peer when dialer send calls
 # --- On test-env or dev-env you must set the ACD_DIALER_PJSIP_TRANSPORT variable with "acd-dev:5260" string
 ACD_DIALER_PJSIP_TRANSPORT=127.0.0.1:5260
+
+# --- Callrec transcriptions "True" or "False"
+ACD_CALLREC_SPLIT=False
+STT_API_KEY=your_stt_api_key
+# Set the Speech to Text engine: openai, gemini or local
+STT_ENGINE=local
+
+# --- Asterisk scale parameters
+# Scale var "True" or "False"
+ACD_SCALE=False
+# ACD_MEM_LIMIT=
+# ACD_THREADPOOL_IDLE_TIMEOUT=
+# ACD_THREADPOOL_MAX_SIZE=
+# ACD_THREADPOOL_INITIAL_SIZE=
+# ACD_THREADPOOL_AUTO_INCREMENT=
+# ACD_STASIS_INITIAL_SIZE=
+# ACD_STASIS_IDLE_TIMEOUT_SEC=
+# ACD_STASIS_MAX_SIZE=
+# ACD_TIMER_T1=
+# ACD_TIMER_B=
 
 #####################################################################################################
 #                                       FASTAGI                                                     #
@@ -192,7 +213,7 @@ SHM_SIZE=64
 PKG_SIZE=8
 
 #########################################################################################################
-#                                       NGINX - RTPENGINE - REDIS - RABBITMQ                            #
+#                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
 #########################################################################################################
 # --- IP or hostname that each instance will invoke when locating the other
 # "${OML_HOSTNAME}" is the prod profile or "nginx-dev" is the dev profile
@@ -346,23 +367,12 @@ VIDEOCALLS_USERNAME=click2video
 VIDEOCALLS_PASSWORD=098098ZZZ
 
 #########################################################################################################
-#                                        AI Engine                                                      #
-#########################################################################################################
-# openai or gcp
-AI_ENGINE=gcp
-
-#########################################################################################################
 #                                        Google integrations                                            #
 #########################################################################################################
 GOOGLE_MAPS_API_KEY=NULL
 GOOGLE_MAPS_CENTER='{ "lat": -31.416668, "lng": -64.183334 }'
 GOOGLE_API_KEY=jkjghjkgjk65467GHFGHF5646ghghfghFHGFghf
 GOOGLE_CLOUD_PROJECTID=your_project_id
-
-#########################################################################################################
-#                                        OpenAI integrations                                            #
-#########################################################################################################
-OPENAI_API_KEY=fghsfdghshj5e4hjg2hj432ghj423ghj
 
 #########################################################################################################
 #                                       QA & Testing                                                    #

@@ -17,38 +17,26 @@
 
 ---
 
-- name: INTERACTION_PROCESSOR OMniLeads application installation
+- name: callrec_transcriber OMniLeads application installation
   hosts: 
     - omnileads_voice
     - omnileads_aio
   tags:
-    - interaction_processor
+    - callrec_transcriber
   vars:
 
   tasks:
 
-  - name: INTERACTION_PROCESSOR environment variables
+  - name: callrec_transcriber Copy systemd service file
     template:
-      src: "{{ interaction_processor_repo_path }}templates/interaction_processor.env"
-      dest: /etc/default/interaction_processor.env
-      mode: 666
-      owner: "{{ usuario }}"
-      group: "{{ usuario }}"
+      src: "{{ interaction_processor_repo_path }}templates/callrec_transcriber.service"
+      dest: /etc/systemd/system/callrec_transcriber.service
     tags:
       - install
       - upgrade
       - update
 
-  - name: INTERACTION_PROCESSOR Copy systemd service file
-    template:
-      src: "{{ interaction_processor_repo_path }}templates/interaction_processor.service"
-      dest: /etc/systemd/system/interaction_processor.service
-    tags:
-      - install
-      - upgrade
-      - update
-
-  - name: INTERACTION_PROCESSOR Pull image
+  - name: callrec_transcriber Pull image
     command: podman pull --quiet {{ callrec_compressor_img }}
     register: podman_pull
     until: podman_pull is success
@@ -57,9 +45,9 @@
       - upgrade
       - update
 
-  - name: INTERACTION_PROCESSOR Enable and start systemd service
+  - name: callrec_transcriber Enable and start systemd service
     systemd:
-      name: interaction_processor.service
+      name: callrec_transcriber.service
       state: started
       enabled: yes
       daemon_reload: yes
@@ -67,23 +55,16 @@
       - install
       - upgrade
 
-  - name: INTERACTION_PROCESSOR ReStart systemd service
+  - name: callrec_transcriber ReStart systemd service
     systemd:
-      name: interaction_processor.service
+      name: callrec_transcriber.service
       state: restarted
       enabled: yes
       daemon_reload: yes
     tags:
       - upgrade
       - restart
-      - restart_interaction_processor
+      - restart_callrec_transcriber
       - restart_core
     when:       
       - inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_aio']  
-
-- name: INTERACTION_PROCESSOR Include callrec transcriptions
-  import_playbook: callrec_transcriber.yml
-  when: callrec_transcriptions is defined and callrec_transcriptions == true
-  tags:
-    - install
-    - upgrade

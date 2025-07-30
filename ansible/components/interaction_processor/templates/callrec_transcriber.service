@@ -19,10 +19,10 @@ ExecStart=/usr/bin/podman run \
   --network=host \
   --log-driver=journald \
   --env-file=/etc/default/interaction_processor.env \
-  --name=oml-interaction_processor-server \
+  --name=oml-callrec-transcriber-server \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
   --rm  \
-{{ callrec_compressor_img }}
+{{ callrec_transcriber_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
