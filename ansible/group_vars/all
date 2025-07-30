@@ -33,7 +33,7 @@ minio_img: quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
 gearman_img: docker.io/artefactual/gearmand:1.1.21.2-alpine
 
 # --- Monitoring components images
-prometheus_img: docker.io/prom/prometheus:v3.4.0
+prometheus_img: docker.io/prom/prometheus:v2.55.1
 prometheus_node_exp_img: docker.io/prom/node-exporter:v1.7.0
 prometheus_podman_exp_img: quay.io/navidys/prometheus-podman-exporter:latest
 postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
