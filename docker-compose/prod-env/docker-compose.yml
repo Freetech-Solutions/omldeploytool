@@ -340,12 +340,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      django-app:
+        condition: service_healthy  
     environment:
       <<: *django-env
-      DJANGO_HOSTNAME: "cronos"
-      UWSGI_PORT: 8097
-      CRON_ENABLE: "True"
-    command: /opt/omnileads/bin/docker-entrypoint.sh
+    command: /opt/omnileads/bin/init_cronos.sh
     working_dir: /opt/omnileads
     stop_grace_period: 90s
   

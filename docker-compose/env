@@ -28,11 +28,11 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads core application images
-OMLAPP_IMG=docker.io/omnileads/omlapp:20250724-3125fbed
+OMLAPP_IMG=docker.io/omnileads/omlapp:20250802-45aef170
 OMLNGINX_IMG=docker.io/freetechsolutions/nginx:20250719-8686b573
 OMLWS_IMG=docker.io/freetechsolutions/websockets:20250627-ebd513a5
 
-OMLACD_IMG=docker.io/freetechsolutions/asterisk:20250729-59853796
+OMLACD_IMG=docker.io/freetechsolutions/asterisk:20250802-28cae7f3
 OMLACD_RETRIEVE_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250605-47b3aa78
 OMLFASTAGI_IMG=docker.io/freetechsolutions/fastagi:20250616-6782cc3c
 OMLAMI_IMG=docker.io/omnileads/astami:20250605-5d38d2e1
@@ -56,7 +56,7 @@ REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
 POSTGRES_IMG=docker.io/library/postgres:14.9-bullseye
 MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
-PROMETHEUS_IMG=docker.io/prom/prometheus:v3.4.0
+PROMETHEUS_IMG=docker.io/prom/prometheus:v2.55.1
 
 # --- Images for testing and development
 OMLPSTNEMULATOR_IMG=docker.io/omnileads/pstn_emulator:241209.01
@@ -131,6 +131,9 @@ ACD_DIALER_PJSIP_TRANSPORT=127.0.0.1:5260
 
 # --- Callrec transcriptions "True" or "False"
 ACD_CALLREC_SPLIT=False
+3 --- In case o SaaS STT put here the STT API key
+# for Gemini STT use the API key from the Google Cloud project
+# for OpenAI STT use the API key from the OpenAI account
 STT_API_KEY=your_stt_api_key
 # Set the Speech to Text engine: openai, gemini or local
 STT_ENGINE=local
@@ -138,6 +141,8 @@ STT_ENGINE=local
 # --- Asterisk scale parameters
 # Scale var "True" or "False"
 ACD_SCALE=False
+# ACD_POD_CPU_LIMIT=100m
+# ACD_POD_MEM_LIMIT=512Mi
 # ACD_MEM_LIMIT=
 # ACD_THREADPOOL_IDLE_TIMEOUT=
 # ACD_THREADPOOL_MAX_SIZE=

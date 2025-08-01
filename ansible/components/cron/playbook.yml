@@ -29,18 +29,6 @@
 
   tasks:
 
-  - name: CRON Crones environment variables
-    template:
-      src: "{{ cron_repo_path }}templates/cron.env"
-      dest: /etc/default/omlcron.env
-      mode: 666
-      owner: "{{ usuario }}"
-      group: "{{ usuario }}"
-    tags:
-      - install
-      - upgrade
-      - update
-
   - name: CRON Copy CRONES systemd service
     template:
       src: "{{ cron_repo_path }}templates/cron.service"
@@ -49,15 +37,6 @@
       - install
       - update
       - upgrade
-
-  - name: CRON Pull image
-    command: podman pull --quiet {{ omnileads_img }}
-    register: podman_pull
-    until: podman_pull is success
-    tags:
-      - install
-      - upgrade
-      - update
 
   - name: CRON Crones Enable and start systemd service
     systemd:

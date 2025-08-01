@@ -16,12 +16,14 @@ ExecStart=/usr/bin/podman run \
   --sdnotify=conmon \
   --replace \
   --detach \
+  --cpus=1 \
+  --cpu-shares=256 \
   --network=host \
   --log-driver=journald \
-  --env-file=/etc/default/omlcron.env \
+  --env-file=/etc/default/django.env \
   --name=oml-cron-server \
   --rm  \
-  {{ omnileads_img }} /opt/omnileads/bin/docker-entrypoint.sh
+  {{ omnileads_img }} /opt/omnileads/bin/init_cronos.sh
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

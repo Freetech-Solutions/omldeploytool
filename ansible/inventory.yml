@@ -275,11 +275,15 @@ all:
     callrec_transcriptions_engine: local    
     callrec_transcriber_api_key: 
 
-    # If you set scale_asterisk to true, then you must assign values to 
+    # --- Log level for ACD
+    # --- 0: Error, 1: Warning, 2: Verbose & DTMF, 3: Debug
+    acd_log_level: 0
+    # If you set scale_asterisk to true, then you must assign values to
     # asterisk_mem_limit, pjsip_threadpool_idle_timeout & pjsip_threadpool_max_size
     # https://docs.asterisk.org/Deployment/Performance-Tuning/ 
     
     # scale_asterisk: true
+    # acd_pod_cpus: 1
     # asterisk_mem_limit: 1G
     # pjsip_threadpool_idle_timeout: 120
     # pjsip_threadpool_max_size: 25 # 25 for 4 cores, 50 for 8 cores
@@ -331,7 +335,12 @@ all:
     
     # kamailio_shm_size: 64
     # kamailio_pkg_size: 8
-
+    kamailio-certs-location: /etc/kamailio/certs
+    
+    # --- Kamailio log level
+    # --- 0: Error, 1: Warning, 2: Debug
+    kamailio_log_level: 0
+    
     #####################################################################################################
     #                                       DIALER                                                      #
     #####################################################################################################
@@ -340,6 +349,9 @@ all:
     dialer_engine: omnidialer
     dialer_caps: 1
     dialer_worker_replicas: 5
+    # --- Log level for Dialer
+    # --- 0: Error, 1: Warning, 2: Debug
+    dialer_log_level: 1
     # - Uncomment to enable PSTN passthrough mode from the dialer ACD
     # dialer_passthrough_dial_out: true
     # dialer_trunk_hostname: trunk_hostname
@@ -422,8 +434,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20250724-3125fbed
-    asterisk_img: docker.io/freetechsolutions/asterisk:20250729-59853796
+    omnileads_img: docker.io/omnileads/omlapp:20250804-c4d13f99
+    asterisk_img: docker.io/freetechsolutions/asterisk:20250802-28cae7f3
     
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #

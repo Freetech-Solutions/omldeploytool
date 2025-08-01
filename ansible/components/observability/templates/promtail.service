@@ -20,6 +20,8 @@ ExecStartPre=/bin/rm -f %t/%n.ctr-id
 
 # Main Promtail container
 ExecStart=/usr/bin/podman run \
+  --cpus=1 \
+  --cpu-shares=512 \
   --cidfile=%t/%n.ctr-id \
   --cgroups=no-conmon \
   --sdnotify=conmon \

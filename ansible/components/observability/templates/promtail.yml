@@ -4,6 +4,7 @@ server:
 
 positions:
   filename: /tmp/positions.yaml
+  sync_period: 1m
 
 clients:
 {% if tenant_id is defined and tenant_id != '' %}
@@ -12,6 +13,12 @@ clients:
 {% else %}
   - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
 {% endif %}
+    batchsize: 102400
+    batchwait: 1s
+    backoff_config:
+      min_period: 1s
+      max_period: 10s
+#    max_retries: 5
 
 # ============================================
 # DIALER SERVICE MACROS (Defined first)
@@ -21,7 +28,7 @@ clients:
   - job_name: dialer_process_{{ worker_type }}
     journal:
       json: false
-      max_age: 12h
+      max_age: 6h
       path: /var/log/journal
       labels:
         job: dialer_process_{{ worker_type }}
@@ -67,7 +74,7 @@ clients:
   - job_name: {{ service }}
     journal:
       json: false
-      max_age: 12h
+      max_age: 6h
       path: /var/log/journal
       matches: "_SYSTEMD_UNIT={{ service }}.service"
       labels:
@@ -161,7 +168,7 @@ scrape_configs:
   - job_name: {{ service.name }}
     journal:
       json: false
-      max_age: 12h
+      max_age: 6h
       path: /var/log/journal
       matches: "_SYSTEMD_UNIT={{ service.unit }}"
       labels:
@@ -197,7 +204,7 @@ scrape_configs:
   - job_name: {{ service.name }}
     journal:
       json: false
-      max_age: 12h
+      max_age: 6h
       path: /var/log/journal
       matches: "_SYSTEMD_UNIT={{ service.unit }}"
       labels:
@@ -231,7 +238,7 @@ scrape_configs:
   - job_name: {{ service.name }}
     journal:
       json: false
-      max_age: 12h
+      max_age: 6h
       path: /var/log/journal
       matches: "_SYSTEMD_UNIT={{ service.unit }}"
       labels:
@@ -279,7 +286,7 @@ scrape_configs:
   - job_name: {{ service.name }}
     journal:
       json: false
-      max_age: 12h
+      max_age: 6h
       path: /var/log/journal
       matches: "_SYSTEMD_UNIT={{ service.unit }}"
       labels:

@@ -285,12 +285,12 @@ send_call() {
 rebuild_services() {
     if [[ -n "${1:-}" ]]; then
         log "Rebuilding image for $1..."
-        docker_compose build --no-cache "$1"
+        docker_compose build "$1"
         docker_compose up -d "$1"
         success "Service '$1' rebuilt and restarted"
     else
-        log "Rebuilding all images without cache..."
-        docker_compose build --no-cache
+        log "Rebuilding all images cache..."
+        docker_compose build
         success "All images rebuilt"
     fi
 }
