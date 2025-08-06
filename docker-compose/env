@@ -131,7 +131,7 @@ ACD_DIALER_PJSIP_TRANSPORT=127.0.0.1:5260
 
 # --- Callrec transcriptions "True" or "False"
 ACD_CALLREC_SPLIT=False
-3 --- In case o SaaS STT put here the STT API key
+# --- In case o SaaS STT put here the STT API key
 # for Gemini STT use the API key from the Google Cloud project
 # for OpenAI STT use the API key from the OpenAI account
 STT_API_KEY=your_stt_api_key
