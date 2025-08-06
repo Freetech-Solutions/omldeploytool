@@ -917,6 +917,7 @@ services:
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "process-campaign"
+      SCHEDULER_API_HOST: ${DIALER_SCHEDULER_API_HOST}      
     deploy:
       replicas: ${DIALER_PROCESS_CAMPAIGN_REPLICAS:-2}
 

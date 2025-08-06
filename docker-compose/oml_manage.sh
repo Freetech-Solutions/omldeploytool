@@ -234,7 +234,7 @@ generate_data() {
 # -----------------------------------------------------------------------------
 
 build-vuejs() {
-    if ! docker_compose ps -q oml-vuejs-cli &>/dev/null; then
+    if ! docker_compose ps -q vue-cli &>/dev/null; then
         error "VueJS CLI service is not running. Please start it first."
         exit 1
     fi  
@@ -314,7 +314,7 @@ show_help() {
       logs    [-f] [svc] Show or follow logs
       status             Show container status + averages + raw stats
       health             Perform health check of critical services
-      buidl-vuejs        Build VueJS assets
+      build-vuejs        Build VueJS assets
       clean              Prune stopped containers, unused images/volumes/networks
       clean-all          Full system prune (including volumes and images)
       reset-pass         Reset admin password as admin admin

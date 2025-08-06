@@ -399,7 +399,7 @@ services:
       DJANGO_HOSTNAME: "cronos"
       UWSGI_PORT: 8097
       CRON_ENABLE: "True"
-    command: /opt/omnileads/bin/docker-entrypoint.sh
+    command: /opt/omnileads/bin/init_cronos.sh
     working_dir: /opt/omnileads
     stop_grace_period: 90s
     
@@ -915,6 +915,7 @@ services:
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "process-campaign"
+      SCHEDULER_API_HOST: ${DIALER_SCHEDULER_API_HOST} 
     deploy:
       replicas: ${PROCESS_CAMPAIGN_REPLICAS:-2}
 
