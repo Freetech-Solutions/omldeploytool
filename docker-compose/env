@@ -22,10 +22,10 @@ REPO=omnileads
 #                              versions of each image to deploy                     #
 #####################################################################################
 
-OMLAPP_IMG=${REPO}/omlapp:250623.01
-OMLACD_IMG=${REPO}/asterisk:250422.01
+OMLAPP_IMG=${REPO}/omlapp:250730.01
+OMLACD_IMG=${REPO}/asterisk:250730.01
 OMLACD_RETRIEVE_CONF_IMG=${REPO}/acd_retrieve_conf:250224.01
-OMLFASTAGI_IMG=${REPO}/fastagi:250312.01
+OMLFASTAGI_IMG=${REPO}/fastagi:250730.01
 OMLAMI_IMG=${REPO}/astami:241017.01
 OMLNGINX_IMG=${REPO}/nginx:241009.01
 OMLKAM_IMG=${REPO}/kamailio:241109.01

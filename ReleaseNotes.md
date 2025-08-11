@@ -1,28 +1,24 @@
-# Release Notes - OMniLeads 2.4.4
-[2025-07-08]
+# Release Notes - OMniLeads 2.4.5
+[2025-08-05]
 
 ## Added
 
-* oml-2977 Allow for showing extra non Contact data from landing page.
-* oml-3070 Buttons for calling Wombat Dialer Start/Stop APIs
-
-## Fixed
-
-* oml-3073 Fix Calling External System interactions
-* oml-3034 Whatsapp Interface for contact data and popups improvements.
-* oml-792 AWS buckets integration & automation
+* oml-3080 Show historical dispositions for preview campaigns.
+* oml-3096 Allow preview recicling without changing database.
+* oml-3087 Detects Media Access Denied on SIP session failure.
+* oml-3099 Add Timer for call on hold.
 
 ## Changed
 
-* oml-782 Whatsapp Events Listener runs in another container.
+* oml-3069 Database upload optimizations for speed.
+* oml-3108 Allow CRM interactions parameters with character "."
+* oml-800 CRON component was optimized.
 
 ## Fixed
 
-* oml-3067 Optimization for blacklist uploading.
-
-## Component changes
-
-### OMLAPP (Django/VueJS)
-
-* Container Img: https://hub.docker.com/layers/omnileads/omlapp/250701.01/images/sha256-8febdf2d171b4eface1c4b33f1c3ec0eb714c0bc245403396b6a4aea935d044e
-* Gitlab Repo: https://gitlab.com/omnileads/ominicontacto/-/tree/250701.01?ref_type=tags
+* oml-3107 Fix button "Get preview contact".
+* oml-3041 Fix empty subdisposition in campaign creation from template.
+* oml-3114 Fix Whatsapp contact data saving. Show contact name.
+* oml-3106 Fix multiple scrollbars in agent console.
+* oml-3074 Fix base report for ended Preview Campaigns.
+* oml-801 [ANSIBLE] Fix Systemd components service TYPO.
