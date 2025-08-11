@@ -21,7 +21,7 @@ ExecStartPre=/bin/rm -f %t/%n.ctr-id
 # Main Promtail container
 ExecStart=/usr/bin/podman run \
   --cpus=1 \
-  --cpu-shares=512 \
+  --cpu-shares=256 \
   --cidfile=%t/%n.ctr-id \
   --cgroups=no-conmon \
   --sdnotify=conmon \
@@ -35,7 +35,6 @@ ExecStart=/usr/bin/podman run \
   --volume=promtail_data:/tmp \
   --volume=/run/log/journal/:/var/log/journal/:ro \
   --volume=/etc/machine-id:/etc/machine-id:ro \
-  --volume=/var/log:/var/log:ro \
   --label="tenant={{ tenant_id }}" \
   --label="service=promtail" \
   --label="node_type={{ 'aio' if inventory_hostname in groups['omnileads_aio'] else 'app' if inventory_hostname in groups['omnileads_app'] else 'voice' if inventory_hostname in groups['omnileads_voice'] else 'data' if inventory_hostname in groups['omnileads_data'] else 'dialer' }}" \
