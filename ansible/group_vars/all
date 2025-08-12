@@ -10,7 +10,7 @@ asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:20250605-47b3a
 fastagi_img: docker.io/freetechsolutions/fastagi:20250616-6782cc3c
 astami_img: docker.io/omnileads/astami:20250605-5d38d2e1
 kamailio_img: docker.io/freetechsolutions/kamailio:20250807-b2e0dbe7
-rtpengine_img: docker.io/freetechsolutions/rtpengine:20250716-0601b0df
+rtpengine_img: docker.io/freetechsolutions/rtpengine:20250812-58288c86
 call_logger_img: docker.io/omnileads/chan_tel_logger:20250605-0cd256e4
 callrec_compressor_img: docker.io/freetechsolutions/callrec_compressor:20250719-84e14930
 callrec_transcriber_img: docker.io/freetechsolutions/callrec_transcriber:20250719-14a17abb-saas

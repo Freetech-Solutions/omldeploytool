@@ -37,7 +37,7 @@ OMLACD_RETRIEVE_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250605-47b3aa78
 OMLFASTAGI_IMG=docker.io/freetechsolutions/fastagi:20250616-6782cc3c
 OMLAMI_IMG=docker.io/omnileads/astami:20250605-5d38d2e1
 OMLKAM_IMG=docker.io/freetechsolutions/kamailio:20250807-b2e0dbe7
-OMLRTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20250716-0601b0df
+OMLRTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20250812-58288c86
 OMLCHAN_TEL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250605-0cd256e4
 CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20250719-84e14930
 # if you want to run Speech to text onpremise change de suffix tag from "-saas" to "-local"
