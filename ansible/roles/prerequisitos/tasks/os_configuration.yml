@@ -375,7 +375,7 @@
 
 - name: OS_CONF rm Django static_files
   become: yes
-  shell: "podman volume rm django_static"
+  shell: "podman volume rm -f django_static"
   tags:
     - upgrade
   when:
