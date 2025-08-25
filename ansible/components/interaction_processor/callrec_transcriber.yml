@@ -1,0 +1,70 @@
+# Copyright (C) 2024 Freetech Solutions
+
+# This file is part of OMniLeads
+
+# This program is free software: You can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY, without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see http://www.gnu.org/licenses/.
+
+---
+
+- name: callrec_transcriber OMniLeads application installation
+  hosts: 
+    - omnileads_voice
+    - omnileads_aio
+  tags:
+    - callrec_transcriber
+  vars:
+
+  tasks:
+
+  - name: callrec_transcriber Copy systemd service file
+    template:
+      src: "{{ interaction_processor_repo_path }}templates/callrec_transcriber.service"
+      dest: /etc/systemd/system/callrec_transcriber.service
+    tags:
+      - install
+      - upgrade
+      - update
+
+  - name: callrec_transcriber Pull image
+    command: podman pull --quiet {{ callrec_compressor_img }}
+    register: podman_pull
+    until: podman_pull is success
+    tags:
+      - install
+      - upgrade
+      - update
+
+  - name: callrec_transcriber Enable and start systemd service
+    systemd:
+      name: callrec_transcriber.service
+      state: started
+      enabled: yes
+      daemon_reload: yes
+    tags:
+      - install
+      - upgrade
+
+  - name: callrec_transcriber ReStart systemd service
+    systemd:
+      name: callrec_transcriber.service
+      state: restarted
+      enabled: yes
+      daemon_reload: yes
+    tags:
+      - upgrade
+      - restart
+      - restart_callrec_transcriber
+      - restart_core
+    when:       
+      - inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_aio']  

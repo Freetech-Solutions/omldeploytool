@@ -119,7 +119,7 @@ services:
       - OML_BRANCH=${OML_BRANCH}
       - OML_COMMIT=${OML_COMMIT}
       - OML_BUILD_DATE=${OML_BUILD_DATE}
-      - WOMBAT_HOSTNAME=localhost
+      - WOMBAT_HOSTNAME=127.0.0.1
       - WOMBAT_USER=${WOMBAT_USER}
       - WOMBAT_PASSWORD=${WOMBAT_PASSWORD}
       - OML_LOGGING_SLOWSQL_ENABLED=
@@ -185,7 +185,7 @@ services:
       - OML_BRANCH=${OML_BRANCH}
       - OML_COMMIT=${OML_COMMIT}
       - OML_BUILD_DATE=${OML_BUILD_DATE}
-      - WOMBAT_HOSTNAME=localhost
+      - WOMBAT_HOSTNAME=127.0.0.1
       - WOMBAT_USER=${WOMBAT_USER}
       - WOMBAT_PASSWORD=${WOMBAT_PASSWORD}
       - OML_LOGGING_SLOWSQL_ENABLED=
@@ -366,7 +366,7 @@ services:
       - PYTHONUNBUFFERED=1
     network_mode: host
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health-checks"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health-checks"]
       interval: 1s
       timeout: 10s
       retries: 10
@@ -414,7 +414,7 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-      - '--web.listen-address=localhost:9100'
+      - '--web.listen-address=127.0.0.1:9100'
     restart: unless-stopped
     network_mode: host
     labels:
@@ -442,7 +442,7 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-      - REDIS_ADDR=localhost:6379
+      - REDIS_ADDR=127.0.0.1:6379
       - REDIS_USER=null
       - REDIS_PASSWORD=null
 

@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Freetech Solutions
+# Copyright (C) 2025 Freetech Solutions
 
 # This file is part of OMniLeads
 
@@ -30,10 +30,19 @@ all:
           omni_ip_lan: 172.16.101.44
         tenant_example_2:
           tenant_id: tenant_example_2
-          ansible_host: 190.19.11.2
-          omni_ip_lan: 10.10.10.2          
-          infra_env: lan
-          ansible_ssh_port: 2234
+          ansible_host: 66.97.35.23
+          omni_ip_lan: 192.168.200.150
+          infra_env: cloud
+          ansible_ssh_port: 5204
+          fqdn: omnidialer.sephir.tech
+          certs: custom
+          cert_file_name: Sephir_cert.pem
+          key_file_name: Sephir_key.pem
+        tenant_example_2_dialer:
+          tenant_id: tenant_example_2_dialer
+          ansible_host: 
+          omni_ip_lan: 
+          ansible_ssh_port: 
         tenant_example_nat:
           tenant_id: tenant_example_nat
           ansible_host: 190.19.11.2
@@ -69,39 +78,27 @@ all:
         tenant_example_5:
           hosts:
             tenant_example_5_data:
-              ansible_host: 172.16.101.41
-              omni_ip_lan: 172.16.101.41
+              ansible_host: 164.92.101.39
+              omni_ip_lan: 10.10.10.23
               ansible_ssh_port: 22
             tenant_example_5_voice:
-              ansible_host: 172.16.101.42
-              omni_ip_lan: 172.16.101.42
+              ansible_host: 143.198.142.25
+              omni_ip_lan: 10.10.10.21
               ansible_ssh_port: 22
             tenant_example_5_app:
-              ansible_host: 172.16.101.43
-              omni_ip_lan: 172.16.101.43
+              ansible_host: 165.232.137.234
+              omni_ip_lan: 10.10.10.22
+              ansible_ssh_port: 22
+            tenant_example_5_dialer:
+              ansible_host: 143.198.151.31
+              omni_ip_lan: 10.10.10.20
               ansible_ssh_port: 22
           vars:
             tenant_id: tenant_example_5
-            data_host: 172.16.101.41
-            voice_host: 172.16.101.42
-            application_host: 172.16.101.43
-            infra_env: lan
-        tenant_example_6:
-          hosts:
-            tenant_example_6_data:
-              ansible_host: 179.34.22.11
-              omni_ip_lan: 192.168.0.2
-            tenant_example_6_voice:
-              ansible_host: 179.134.12.18
-              omni_ip_lan: 192.168.0.3
-            tenant_example_6_app:
-              ansible_host: 190.134.62.33
-              omni_ip_lan: 192.168.0.4
-          vars:
-            tenant_id: tenant_example_6
-            data_host: 192.168.0.2
-            voice_host: 192.168.0.3
-            application_host: 192.168.0.4
+            data_host: 10.10.10.23
+            voice_host: 10.10.10.21
+            application_host: 10.10.10.22
+            dialer_host: 10.10.10.20
             infra_env: cloud
     # -----------------------------------------
     # -----------------------------------------              
@@ -131,17 +128,17 @@ all:
             postgres_ro_vip: 172.16.101.207   
             infra_env: lan
 
-##################################################################################################################
-# -- OMniLeads Common Variables                                                                                  #
-################################################################################################################## 
+  #####################################################################################################
+  #                                       ANSIBLE VARIABLES                                           #
+  #####################################################################################################
   vars:
     # --- ansible user auth connection
     ansible_user: root
     ansible_ssh_port: 22
 
-    # ------------------------------------------------------------------------------------------------ #
-    # ------------------------------ Generic OMniLeads runtime variables ----------------------------- #
-    # ------------------------------------------------------------------------------------------------ #
+    ###################################################################################################
+    #                                       GRAL ENVIRONMENT                                          #
+    ###################################################################################################
 
     # --- Asterisk & RTPengine scenary for SIP & RTP
     # --- "cloud" instance (access through public IP)
@@ -150,20 +147,67 @@ all:
     # --- "hybrid" instance (agent WebRTC through Public NAT IP, but PSTN acces through LAN VoIP GW)
     # --- or "all" in order to access through all NICs
     infra_env: cloud
-    #nat_ip_addr: X.X.X.X
+    # nat_ip_addr: X.X.X.X
+
     # --- If you have an DNS FQDN resolution, you must to uncomment and set this param
     # --- otherwise leave commented to work invoking through an IP address
-    #fqdn: fts.sefirot.cloud
-    # --- If you want to work with Dialer, then you must install Wombat Dialer on a separate host 
-    # --- and indicate the IP address or FQDN of that host here (uncomment and set this param):
+    # fqdn: fts.sefirot.cloud
+
     # --- time zone (for example: America/Argentina/Cordoba)
     TZ: America/Argentina/Cordoba
     # --- TLS/SSL Certs configuration (selfsigned, custom or certbot letsencrypt)
     # --- docs:
     # --- https://gitlab.com/omnileads/omldeploytool/-/blob/develop/ansible/README.md?ref_type=heads#tls-cert-provisioning
     certs: selfsigned
+
+    # --- Your email for notifications 
     notification_email: your_email@domain.com
-    # --- PostgreSQL    
+
+    #--- OS swap memory setting     
+    # swap_space: 1G
+
+    ###################################################################################################
+    #                                       DJANGO UWSGI                                              #
+    ###################################################################################################
+    # --- Session Cookie Age, is the time in seconds that will last 
+    # --- the https session when inactivity
+    SCA: 3600
+    # --- Session API token (seconds)
+    # api_token_expired_after: 3600
+    # --- Ephemeral Credentials TTL (ECTTL) is the time in seconds 
+    # --- that will last the SIP credentials used to authenticate a SIP user
+    # --- in the telephony system
+    ECCTL: 28800
+    # --- is the attempts a user has to enter an incorrect password in login
+    LOGIN_FAILURE_LIMIT: 10 
+    # --- SMTP server params, if you want to use your own SMTP, put true and
+    # --- uncomment all necesary
+    email_smtp_relay: false
+    # email_backend:
+    # email_default_from:
+    # email_host:
+    # email_password:
+    # email_user:
+    # email_port:
+    # email_ssl_certfile:
+    # email_ssl_keyfile:
+    # email_use_ssl:
+    # email_use_tls:    
+
+    # If you set scale_uwsgi to true, then you must assign values to 
+    # processes, threads, listen_queue_size, and worker_reload_mercy.
+    # https://uwsgi-docs.readthedocs.io/en/latest/index.html
+    
+    # scale_uwsgi: true
+    # uwsgi_processes: 8
+    # uwsgi_threads: 1
+    # uwsgi_listen_queue_size: 2048
+    # uwsgi_worker_reload_mercy: 60
+    # uwsgi_evil_reload_on_rss: 3096
+    
+    #####################################################################################################
+    #                                       POSTGRESQL                                                  #
+    #####################################################################################################
     postgres_port: 5432
     postgres_user: omnileads
     postgres_password: HJGKJHGDSAKJHK7856765DASDAS675765JHGJHSAjjhgjhaaa
@@ -175,7 +219,34 @@ all:
     # --- If you have a PGSQL cluster you can activated cluster mode
     # --- in order to split INSERT (RW node) & QUERIES (RO node)
     postgres_ha: false
-    # --- OBJECT STORAGE
+    # --- Read Only connection host address (in case of RW/RO postgres cluster):
+    # postgres_ro_vip: 
+
+    # --- set postgres_host if you have your own postgres (standalone host or cloud service)
+    # --- otherwise leave commented to deploy PostgreSQL on Application Host instance
+    # postgres_host:
+    # --- if you have your own bucket (standalone host or cloud service) put here the URL
+    # --- example VULTR: https://ewr1.vultrobjects.com
+    # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
+    # --- example onpremise: https://192.168.100.10
+    # --- if you want to deploy MinIO objects storage on application_host, you must to put '#' before
+
+    # Postgres performance tuning
+    # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
+    # scale_postgres: True
+    # postgres_max_connections: 20 # max(4 * number of CPU cores, 100)
+    # postgres_shared_buffers: 1GB #  Min 128kB Max 25% of total MEM RAM
+    # postgres_idle_in_transaction_session_timeout: 60000 # max time in milliseconds that a session can remain idle, 0 is disabled
+    # postgres_statement_timeout: 60000 # query timeout in milliseconds, 0 is disabled
+    # postgres_effective_cache_size: 4GB # between 50% and 75% of total MEM RAM
+    # postgres_wal_buffers: 32MB # between 64KB & 16MB
+    # postgres_checkpoint_timeout: 10min # range 30s-1d s (sec), min (minutes), h (hour) or d (days)
+    # postgres_work_mem:  12MB # Increase the working memory to allow for more complex query operations
+    # postgres_maintenance_work_mem: 128MB # Increase the maintenance memory to speed up vacuum and index creation operations
+
+    #####################################################################################################
+    #                                Object Storage BUCKET config                                       #
+    #####################################################################################################
     # --- minio auth Web and Console admin params
     s3_http_admin_user: omnileads
     s3_http_admin_pass: jdhsgahkdgaskdasdhe2h4231hg4jjhgHJKG
@@ -186,161 +257,156 @@ all:
     #bucket_ssl_selfsigned: true
     # --- if your bucket doesn't need region, leave this value (us-east-1)
     bucket_region: us-east-1
-    # --- Asterisk Manager Interface (AMI) user & password
+    # if you have your own bucket (standalone host or cloud service) put here the URL, otherwise leave commented
+    # --- example VULTR: https://ewr1.vultrobjects.com
+    # bucket_url: https://sfo3.digitaloceanspaces.com
+
+    #####################################################################################################
+    #                                       ACD                                                         #
+    #####################################################################################################
+    # --- Asterisk AMI params
     ami_user: omnileads
     ami_password: C12H17N2O4P_o98o98
-    # --- Session Cookie Age, is the time in seconds that will last 
-    # --- the https session when inactivity
-    SCA: 3600
-    # --- Session API token (seconds)
-    #api_token_expired_after: 3600
-    # --- Ephemeral Credentials TTL (ECTTL) is the time in seconds            #
-    # --- that will last the SIP credentials used to authenticate a SIP user  #
-    # --- in the telephony system
-    ECCTL: 28800
-    # --- is the attempts a user has to enter an incorrect password in login
-    LOGIN_FAILURE_LIMIT: 10
-    
-    # --- Dialer Settings
-    # --- The Dialer Engine: omnidialer or wombat.
-    dialer_engine: wombat
-    # --- The Dialer host address (FQDN or IP)
-    dialer_host: dialer.example.com
-    # --- Dialer API user & password
-    dialer_user: demoadmin
-    dialer_password: demo
-    # --- Dialer API port
-    dialer_port: 8080
+    acd_rtp_port_min: 40000
+    acd_rtp_port_max: 50000
+    # --- Call transcriptions, put true if you want to enable it
+    callrec_transcriptions: false
+    # openai, google or local
+    callrec_transcriptions_engine: local    
+    callrec_transcriber_api_key: 
 
-    # --- SMTP server params, if you want to use your own SMTP, put true and
-    # --- uncomment all necesary
-    email_smtp_relay: false
-    #email_backend:
-    #email_default_from:
-    #email_host:
-    #email_password:
-    #email_user:
-    #email_port:
-    #email_ssl_certfile:
-    #email_ssl_keyfile:
-    #email_use_ssl:
-    #email_use_tls:    
-
-    # --- Web Proxy setting
-    # proxy_url: https://X.X.X.X:PPPP
-        
-    # ------------------------------------------------------------------------------------------------ #
-    # --------------------------------------- Integrations-------------------------------------------- #
-    # ------------------------------------------------------------------------------------------------ #
-
-    # --- Text to Speech external "gcp", "aws", "ibm", etc.
-    #tts_external_engine: 
-    # --- Speech analytics & sentiment analysis
-    # --- "openai" or "gcp" (google cloud) or "local" (whisper for transcription & psysentiment for analysis)
-    #speech_analytics_model: local
-    # --- google maps integration credentials
-    google_maps_api_key: NULL
-    google_maps_center: '{ "lat": -31.416668, "lng": -64.183334 }'
-    google_api_key: jhghjfdaghjkfdgsa43423hg4hg3f4ghjf2j
-    google_cloud_projectid: your_project_id
-    # --- openai integrations
-    openai_api_key:    
-    # --- set postgres_host if you have your own postgres (standalone host or cloud service)
-    # --- otherwise leave commented to deploy PostgreSQL on Application Host instance
-    #postgres_host:
-    # --- Read Only connection host address (in case of RW/RO postgres cluster):
-    #postgres_ro_vip: 
-    # --- if you have your own bucket (standalone host or cloud service) put here the URL
-    # --- example VULTR: https://ewr1.vultrobjects.com
-    # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
-    # --- example onpremise: https://192.168.100.10
-    # --- if you want to deploy MinIO objects storage on application_host, you must to put '#' before
-    #bucket_url: https://sfo3.digitaloceanspaces.com
-    # --- RTPEngine if you have your own instances put here the IP or hostname
-    #rtpengine_host: 
-    # --- Observability integrations with Loki & Homer
-    # --- Request by promtail:
-    #loki_host:
-    # --- Request by Asterisk hep module:
-    #homer_host:
-    # --- Request by Web-Video Inbound Calls 
-    # --- Put here the JITSI host URL
-    #video_host: 
-    # --- Request by CRM integration callrec search & list API endpoint
-    #custom_cors_allowed_origins: https://example1.net,https://example2.com,https://example3.tech
-    #custom_cors_allow_headers: access-control-allow-origin,cache-control
-
-    # ------------------------------------------------------------------------------------------------ #
-    # ------------------------------------ Scale tunnings -------------------------------------------- #
-    # ------------------------------------------------------------------------------------------------ #
-    # OS swap memory setting
-    
-    #swap_space: 1G
-    
-    # If you set scale_uwsgi to true, then you must assign values to 
-    # processes, threads, listen_queue_size, and worker_reload_mercy.
-    # https://uwsgi-docs.readthedocs.io/en/latest/index.html
-    
-    #scale_uwsgi: true
-    #uwsgi_processes: 8
-    #uwsgi_threads: 1
-    #uwsgi_listen_queue_size: 2048
-    #uwsgi_worker_reload_mercy: 60
-    #uwsgi_evil_reload_on_rss: 3096
-
-    # If you set scale_asterisk to true, then you must assign values to 
+    # --- Log level for ACD
+    # --- 0 ERROR, 1 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG
+    acd_log_level: 3
+    # If you set scale_asterisk to true, then you must assign values to
     # asterisk_mem_limit, pjsip_threadpool_idle_timeout & pjsip_threadpool_max_size
     # https://docs.asterisk.org/Deployment/Performance-Tuning/ 
     
-    #scale_asterisk: true
-    #asterisk_mem_limit: 1G
-    #pjsip_threadpool_idle_timeout: 120
-    #pjsip_threadpool_max_size: 150
+    # scale_asterisk: true
+    # acd_pod_cpus: 1
+    # asterisk_mem_limit: 1G
+    # pjsip_threadpool_idle_timeout: 120
+    # pjsip_threadpool_max_size: 25 # 25 for 4 cores, 50 for 8 cores
+    # pjsip_threadpool_initial_size=8 # number of cores x 2
+    # pjsip_threadpool_auto_increment=5
+    # pjsip_timer_t1=100
+    # pjsip_timer_b=6400
+    # stasis_initial_size = 10
+    # stasis_idle_timeout_sec = 120
+    # stasis_max_size = 60
+
+    #####################################################################################################
+    #                                       RTPENGINE                                                   #
+    #####################################################################################################
+    rtpengine_rtp_port_min: 20000
+    rtpengine_rtp_port_max: 30000
+
+    # --- Log level for RTPengine
+    # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
+    rtpengine_log_level: 1
+
+    # if you have your own instances put here the IP or hostname, otherwise leave commented
+    # rtpengine_host: 
 
     # If you set scale_rtpengine to true, then you must assign values to 
     # rtpengine_timeout, rtpengine_offer-timeout, rtpengine_silent-timeout & rtpengine_final-timeout
     # https://rtpengine.readthedocs.io/en/latest/rtpengine.html
     
-    #scale_rtpengine: true
-    #rtpengine_timeout: 15
-    #rtpengine_offer_timeout: 15
-    #rtpengine_silent_timeout: 120
-    #rtpengine_final_timeout: 3600
+    # scale_rtpengine: true
+    # rtpengine_timeout: 15
+    # rtpengine_offer_timeout: 15
+    # rtpengine_silent_timeout: 120
+    # rtpengine_final_timeout: 3600
+
+    #####################################################################################################
+    #                                       REDIS                                                       #
+    #####################################################################################################
+    # Redis performance tuning
+    # https://loadforge.com/guides/enhancing-redis-performance-top-configuration-tweaks-to-accelerate-data-access
+    # scale_redis: True
+    # redis_maxmemory: 2gb
+    # redis_maxmemory_policy: allkeys-lru
+    # redis_tcp_backlog: 511
+    # redis_maxclients: 2000
+    # redis_lazyfree_lazy_eviction: yes
+    # redis_lazyfree_lazy_expire: yes
+
+    #####################################################################################################
+    #                                       KAMAILIO                                                    #
+    #####################################################################################################
 
     # kamailio shm & pkg memory params 
     # https://www.kamailio.org/wiki/tutorials/troubleshooting/memory
     
-    #kamailio_shm_size: 64
-    #kamailio_pkg_size: 8
+    # kamailio_shm_size: 64
+    # kamailio_pkg_size: 8
+    kamailio-certs-location: /etc/kamailio/certs
+    
+    # --- Kamailio log level
+    # --- 0: Error, 1: Warning, 2: Debug
+    kamailio_log_level: 0
+    
+    #####################################################################################################
+    #                                       DIALER                                                      #
+    #####################################################################################################
 
-    # Postgres performance tuning
-    # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
-    #scale_postgres: True
-    #postgres_max_connections: 20 # max(4 * number of CPU cores, 100)
-    #postgres_shared_buffers: 1GB #  Min 128kB Max 25% of total MEM RAM
-    #postgres_idle_in_transaction_session_timeout: 60000 # max time in milliseconds that a session can remain idle, 0 is disabled
-    #postgres_statement_timeout: 60000 # query timeout in milliseconds, 0 is disabled
-    #postgres_effective_cache_size: 4GB # between 50% and 75% of total MEM RAM
-    #postgres_wal_buffers: 32MB # between 64KB & 16MB
-    #postgres_checkpoint_timeout: 10min # range 30s-1d s (sec), min (minutes), h (hour) or d (days)
-    #postgres_work_mem:  12MB # Increase the working memory to allow for more complex query operations
-    #postgres_maintenance_work_mem: 128MB # Increase the maintenance memory to speed up vacuum and index creation operations
+    # --- The Dialer Engine: omnidialer or wombat.
+    dialer_engine: omnidialer
+    dialer_caps: 1
+    dialer_worker_replicas: 5
+    # --- Log level for Dialer
+    # --- 0: Error, 1: Warning, 2: Debug
+    dialer_log_level: 1
+    # - Uncomment to enable PSTN passthrough mode from the dialer ACD
+    # dialer_passthrough_dial_out: true
+    # dialer_trunk_hostname: trunk_hostname
+    # - Uncomment if each INVITE generated from the dialer to the PSTN needs to be authenticated
+    # dialer_trunk_auth_enable: true
+    # dialer_trunk_username: sip_username
+    # dialer_trunk_password: sip_password
+    # --- Dialer API user & password
+    dialer_user: demoadmin
+    dialer_password: demo
+    dialer_port: 10040
+    # dialer_host: dialer.example.com    
 
-    # Redis performance tuning
-    # https://loadforge.com/guides/enhancing-redis-performance-top-configuration-tweaks-to-accelerate-data-access
-    #scale_redis: True
-    #redis_maxmemory: 2gb
-    #redis_maxmemory_policy: allkeys-lru
-    #redis_tcp_backlog: 511
-    #redis_maxclients: 2000
-    #redis_lazyfree_lazy_eviction: yes
-    #redis_lazyfree_lazy_expire: yes
+    #####################################################################################################
+    #                                       INTEGRATIONS                                                #
+    #####################################################################################################
 
 
-    # ------------------------------------------------------------------------------------------------ #
-    # ---------------------------------- Backup Automation ------------------------------------------- #
-    # ------------------------------------------------------------------------------------------------ #
+    #------------------------------------- Web Proxy setting ----------------------------------
+    # --- Web Proxy setting
+    # proxy_url: https://X.X.X.X:PPPP
 
+    #------------------------------------- Google Maps ----------------------------------
+    # --- google maps integration credentials
+    google_maps_api_key: NULL
+    google_maps_center: '{ "lat": -31.416668, "lng": -64.183334 }'
+    google_api_key: jhghjfdaghjkfdgsa43423hg4hg3f4ghjf2j
+    google_cloud_projectid: your_project_id
+    
+    #------------------------------------- Observability ----------------------------------
+    # --- Observability integrations with Loki & Homer
+    # --- Request by promtail:
+    # loki_host:
+    # --- Request by Asterisk hep module:
+    # homer_host:
+    # homer_port:
+
+    #------------------------------------- Jitsi Video Calls ----------------------------------
+    # --- Request by Web-Video Inbound Calls 
+    # --- Put here the JITSI host URL
+    # video_host: 
+
+    #------------------------------------- CRM Integration ----------------------------------
+    # --- Request by CRM integration callrec search & list API endpoint
+    # custom_cors_allowed_origins: https://example1.net,https://example2.com,https://example3.tech
+    # custom_cors_allow_headers: access-control-allow-origin,cache-control
+
+    #####################################################################################################
+    #                                       BACKUP AUTOMATIONS                                          #
+    #####################################################################################################
     # Enable daily PostgreSQL Database backups into centralized Object Storage bucket
 
     # backup_bucket_url: https://sfo3.digitaloceanspaces.com
@@ -352,41 +418,42 @@ all:
     # cron_backup_mm: 00
     # cron_backup_hh: 01 
 
-    # ------------------------------------------------------------------------------------------------ #
-    # ------------------------------------ Upgrade from OML 1.X -------------------------------------- #
-    # ------------------------------------ Restore filename ------------------------------------------ #
-    # ------------------------------------------------------------------------------------------------ #
+    #####################################################################################################
+    #                                       UPGRADE FROM OML 1.X                                        #
+    #####################################################################################################
     
     # --- Restore filename id, request by restore filename
-    #restore_file_timestamp: 1681215859
-    # Uncomment in case of upgrading from OML 1.X
-    #upgrade_from_oml_1: true
+    # restore_file_timestamp: 1681215859
+    # --- Uncomment in case of upgrading from OML 1.X
+    # upgrade_from_oml_1: true
 
-    # ------------------------------------------------------------------------------------------------ #
-    # ---------------------------- Container IMG TAG customization ----------------------------------- #
-    # ------------------------------------------------------------------------------------------------ #
-    # --- For each OML Deploy Tool release, a versioned stack with the latest stable images of each component is maintained on inventory.yml
-    # --- You can combine the versions as you like, also use your own TAGs, using the following TAG version variables
-    # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to the omnileads_img image tag
-    # --- for example: omnileads_img: docker.io/omnileads/omlapp:240216.01-enterprise.
+    #####################################################################################################
+    #                                       Django App & ACD container IMG                              #
+    #####################################################################################################
 
-    omnileads_img: docker.io/omnileads/omlapp:250801.01
-    asterisk_img: docker.io/omnileads/asterisk:250730.01
+    # --- For each OML Deploy Tool release, a versioned stack with the latest stable images of each 
+    # --- component is maintained on inventory.yml. You can combine the versions as you like, 
+    # --- also use your own TAGs, using the following TAG version variables.
     
-##############################################################################################################
-## -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).  -- #
-## -- here you can control which host the action deployed by the deploy.sh script will be applied to      -- #
-## -- The Ansible playbooks are applied on the hosts below declared and classified according to the       -- #
-## -- architecture of the instance on which they are deployed.                                            -- #
-##############################################################################################################
+    # --- If you want to deploy OMniLeads Enterprise, you just need to add "-enterprise" as a suffix to 
+    # --- the omnileads_img image tag:
+    # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
+
+    omnileads_img: docker.io/omnileads/omlapp:20250807-3843c6ff
+    asterisk_img: docker.io/freetechsolutions/asterisk:20250811-a16a6ea8
+    
+##########################################################################################################
+## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
+## here you can control which host the action deployed by the deploy.sh script will be applied to        #
+## The Ansible playbooks are applied on the hosts below declared and classified according to the         #
+## architecture of the instance on which they are deployed.                                              #
+##########################################################################################################
 
 omnileads_aio:
   hosts:
     #tenant_example_1:
     #tenant_example_2:
-    #tenant_example_3:
-    #tenant_example_4:
-    #tenant_example_5:
+    #tenant_example_7_aio:
 
 ################ Active/Pasive HA cluster ######################
 ################ Active/Pasive HA cluster ######################
@@ -412,3 +479,8 @@ omnileads_app:
     #tenant_example_5_app:
     #tenant_example_6_app:
 
+omnileads_dialer:
+  hosts:
+    #tenant_example_5_dialer:
+    #tenant_example_2_dialer
+    

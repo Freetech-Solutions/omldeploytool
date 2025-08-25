@@ -10,7 +10,7 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_host'
     static_configs:
-      - targets: ['localhost:9100']
+      - targets: ['127.0.0.1:9100']
         labels:
           tenant: '{{ tenant_id }}'
           arq: 'ha'
@@ -26,7 +26,7 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_asterisk'
     static_configs:
-      - targets: ['localhost:7088']
+      - targets: ['127.0.0.1:7088']
         labels:
           tenant: '{{ tenant_id }}'
           arq: 'ha'
@@ -52,7 +52,7 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_host'
     static_configs:
-      - targets: ['localhost:9100']
+      - targets: ['127.0.0.1:9100']
         labels:
           tenant: '{{ tenant_id }}'
           arq: 'aio'
@@ -68,7 +68,7 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_asterisk'
     static_configs:
-      - targets: ['localhost:7088']
+      - targets: ['127.0.0.1:7088']
         labels:
           tenant: '{{ tenant_id }}'
           arq: 'aio'

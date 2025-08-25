@@ -49,7 +49,7 @@
       - update
 
   - name: INTERACTION_PROCESSOR Pull image
-    command: podman pull --quiet {{ interaction_processor_img }}
+    command: podman pull --quiet {{ callrec_compressor_img }}
     register: podman_pull
     until: podman_pull is success
     tags:
@@ -80,3 +80,10 @@
       - restart_core
     when:       
       - inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_aio']  
+
+- name: INTERACTION_PROCESSOR Include callrec transcriptions
+  import_playbook: callrec_transcriber.yml
+  when: callrec_transcriptions is defined and callrec_transcriptions == true
+  tags:
+    - install
+    - upgrade

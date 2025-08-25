@@ -10,29 +10,8 @@ Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
 TimeoutStopSec=70
 {% if scale_asterisk is defined and scale_asterisk %}
-MemoryMax={{ asterisk_mem_limit }}
-{% else %}
-MemoryMax=
-{% endif %}
+MemoryMax={{ asterisk_mem_limit | default("1G", true) }}
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
-{% if tts_external_engine is defined and tts_external_engine == "gcp" %}  
-ExecStart=/usr/bin/podman run \
-  --cidfile=%t/%n.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  --replace \
-  --detach \
-  --network=host \
-  --log-driver=journald \
-  --env-file=/etc/default/asterisk.env \
-  --name=oml-asterisk-server \
-  --rm  \
-  --volume=asterisk_callrec:/var/spool/asterisk/monitor \
-  --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
-  --volume=asterisk_sounds:/var/lib/asterisk/sounds \
-  --volume=/etc/omnileads/google_credential.json:/tmp/google_credential.json \
-  {{ asterisk_img }}  
-{% else %}
 ExecStart=/usr/bin/podman run \
   --cidfile=%t/%n.ctr-id \
   --cgroups=no-conmon \
@@ -48,8 +27,26 @@ ExecStart=/usr/bin/podman run \
   --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
   --volume=asterisk_sounds:/var/lib/asterisk/sounds \
   {{ asterisk_img }}
-{% endif %}
+{% else %}
+MemoryMax=
+ExecStartPre=/bin/rm -f %t/%n.ctr-id
+ExecStart=/usr/bin/podman run \
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --replace \
+  --detach \
+  --network=host \
+  --log-driver=journald \
+  --env-file=/etc/default/asterisk.env \
+  --name=oml-asterisk-server \
+  --rm  \
+  --volume=asterisk_callrec:/var/spool/asterisk/monitor \
+  --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
+  --volume=asterisk_sounds:/var/lib/asterisk/sounds \
+  {{ asterisk_img }}
 
+{% endif %}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 StandardOutput=journal

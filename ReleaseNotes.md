@@ -1,24 +1,27 @@
-# Release Notes - OMniLeads 2.4.5
-[2025-08-05]
+# Release Notes - OMniLeads 2.5.0
+[2025-07-24]
 
 ## Added
 
-* oml-3080 Show historical dispositions for preview campaigns.
-* oml-3096 Allow preview recicling without changing database.
-* oml-3087 Detects Media Access Denied on SIP session failure.
-* oml-3099 Add Timer for call on hold.
+* oml-2679 Automatic outbound dialer module.
+* oml-2923 Order and filtering adding agents in Campaigns Wizard.
+* oml-2893 Massive download and deletion of agendas.
+* oml-2886 Allow contact database structure definition on campaign wizard.
+* oml-2921 Allow configuring Agents as IVR destinations.
+* oml-772 New service for call transcriptions.
 
 ## Changed
 
-* oml-3069 Database upload optimizations for speed.
-* oml-3108 Allow CRM interactions parameters with character "."
-* oml-800 CRON component was optimized.
+* oml-3040 Asterisk & Kamailio Webrtc SIP Register was optimized.
+* oml-708 Migrate callrec postcall actions from RabbitMQ to gearman job server.
 
 ## Fixed
 
-* oml-3107 Fix button "Get preview contact".
-* oml-3041 Fix empty subdisposition in campaign creation from template.
-* oml-3114 Fix Whatsapp contact data saving. Show contact name.
-* oml-3106 Fix multiple scrollbars in agent console.
-* oml-3074 Fix base report for ended Preview Campaigns.
-* oml-801 [ANSIBLE] Fix Systemd components service TYPO.
+* oml-2931 Fix "enmodoselect" Incidence rule.
+* oml-2997 Fix "easyaudits" logs ip field.
+
+##  New Environment Variables (docker-compose .env & Ansible inventory.yml)
+
+Release 2.5 introduces OMniLeads' native Automatic Dialer, which means new containers and, consequently, new variables. Therefore, for deployments using docker-compose or Ansible, these new variables must be added to their respective files.
+
+To do this, we recommend regenerating both files and then adjusting your previously set variables step-by-step.

@@ -1,204 +1,218 @@
-#### This project is part of OMniLeads
+#### This project is part of OMniLeads.
 
-![Diagrama deploy tool](../ansible/png/omnileads_logo_1.png)
+![OMniLeads deployment diagram](../ansible/png/omnileads_logo_1.png)
 
-#### 100% Open-Source Contact Center Software
+#### 100% Open‑Source Contact Center Software
 
-#### [Community discord](https://discord.gg/FEDkVmSQ)
+#### [Community Discord](https://discord.gg/FEDkVmSQ)
 
 ---
-# Index
+
+## Table of Contents
 
 * [Requirements](#requirements)
-* [Quick localhost test environment](#test-env)
-* [Security](#security)
-* [Cloud VPS or Onpremise VM](#vps_vm)
-* [OMniLeads Eneterprise](#oml_enterprise)
-* [OMniLeads interaction tool](#oml_manage)
-* [Develpment environment](#dev-env)
-* [Simulate calls (only for docker-desktop ENV)](#pstn_emulator)
+* [Quick Localhost Test Environment](#test-env)
+* [Security Considerations](#security)
+* [On‑Premise / Cloud VPS Deployment](#vps-vm)
+* [OMniLeads Enterprise](#oml-enterprise)
+* [OMniLeads Management Tool](#oml-manage)
+* [Development Environment](#dev-env)
+* [PSTN Emulator (test-env & dev-env)](#pstn-emulator)
 
-You need docker & docker-compose installed (on Linux, Mac or Windows) and this reposotory cloned <a name="requirements"></a>
+## Requirements <a name="requirements"></a>
 
-* [Docker Install documentation](https://docs.docker.com/get-docker/)
+You need Docker & Docker Compose installed on Linux, macOS, or Windows, and this repository cloned:
 
-```
-$ git clone https://gitlab.com/omnileads/omldeploytool.git
-$ cd omldeploytool/docker-compose
-```
-
-# OMniLeads & Docker Compose 
-
-In this folder, we will find three Docker Compose environments.
-
-* **test-env**: is used to launch the stack on your local workstation with Docker Desktop.
-* **prod-env**: is used to launch the stack on a VPS or VM for production.
-* **dev-env**: is used to launch the deveelopment stack on sthe workstation with Docker Desktop
-
-## **Workstation Docker-Desktop test-env deploy** <a name="test-env"></a>
-
-This environment is ideal for quickly testing the application locally. It is not recommended for production.
-
-```
-$ cp env test-env/.env
-$ cd test-env
-$ docker-compose up -d
-$ ../oml_manage --reset_pass
-$ ../oml_manage --init_env
+```bash
+git clone https://gitlab.com/omnileads/omldeploytool.git
+cd omldeploytool/docker-compose
 ```
 
-Once the environment is up, you can proceed to log in at https://localhost using the username admin and password admin
+[Docker installation guide](https://docs.docker.com/get-docker/)
 
-# Security  <a name="security"></a>
+On Linux OS:
 
-OMniLeads is an application that combines Web (https), WebRTC (wss & sRTP) and VoIP (SIP & RTP) technologies. This implies a certain complexity and 
-when deploying it in production under an Internet exposure scenario. 
-
-On the Web side of the things the ideal is to implement a Reverse Proxy or Load Balancer ahead of OMnileads, i.e. exposed to the Internet (TCP 443)
-and that it forwards the requests to the Nginx of the OMniLeads stack. On the VoIP side, when connecting to the PSTN via VoIP it is ideal to 
-operate behind an SBC (Session Border Controller) exposed to the Internet.
-
-However, we can intelligently use the **Cloud Firewall** technology when operating over VPS exposed to the Internet.
-
-<img src="../ansible/png/security_docker.png" alt="Security" width="700">
-
-Below are the Firewall rules to be applied:
-
-* 443/tcp Nginx: This is where Web/WebRTC requests to Nginx are processed. Port 443 can be opened to the entire Internet.
-
-* 20000/30000 UDP WebRTC sRTP RTPengine: this port range can be opened to the entire Internet.
-
-* 5060/UDP Asterisk: This is where SIP requests for incoming calls from the ITSP(s) are processed. This port must be opened by restricting by origin on the IP(s) of the PSTN SIP termination provider(s).
-
-* 40000/50000 UDP: VoIP RTP Asterisk: this port range can be opened to the entire Internet.
-
-* 9090/tcp Prometheus metrics: This is where the connections coming from the monitoring center. This port can be opened by restricting by origin in the IP of the monitoring center.
-
-## **Onpremise Virtual Machine or Cloud VPS deploy for production env** <a name="vps_vm"></a>
-
-This environment is ideal for quick and simple production deployments, suitable for small operations (up to 100 users).
-
-```
-$ curl -o deploy.sh -L "https://gitlab.com/omnileads/omldeploytool/-/raw/main/docker-compose/prod-env/deploy.sh?ref_type=heads" && chmod +x deploy.sh
-$ export DOCKER_ENGINE_IPV4=X.X.X.X && ./deploy.sh
+```bash
+./docker_install_linux.sh
 ```
 
-Once the environment is up, you can proceed to log in at https://LINUX_HOST_ADDR using the username admin and password admin
+## Quick Localhost Test Environment <a name="test-env"></a>
 
-#### OMniLeads Behind NAT
+This environment is ideal for quickly testing the application locally. It is **not** recommended for production.
 
-Because VoIP is sensitive to NAT, and OMniLeads is often deployed on a LAN IP address, adjustments are needed for internet connectivity. Specifically, to connect to external PBXs or SBCs via SIP Trunk, and to allow users internet access, run the deploy script with the NAT_IPV4 argument.
-
+```bash
+cp oml_manage.sh test-env/
+cp env test-env/.env
+cd test-env
+./set_test_env.sh
+./oml_manage.sh up -d
+./oml_manage.sh reset-pass
+./oml_manage.sh data-generate
 ```
-$ export DOCKER_ENGINE_IPV4=X.X.X.X NAT_IPV4=Z.Z.Z.Z && ./deploy.sh
+
+Once up, go to https://localhost and log in with:
+
+- Username: `admin`
+- Password: `admin`
+
+## Security Considerations <a name="security"></a>
+
+OMniLeads combines web (HTTPS), WebRTC (WSS & SRTP), and VoIP (SIP & RTP) technologies. Exposing these services to the Internet requires careful planning:
+
+- **Session Border Controller (SBC)** for secure PSTN connectivity on the VoIP side.
+- **Cloud Firewall** rules to restrict access.
+
+Recommended firewall rules:
+
+| Port         | Protocol | Purpose                               | Access Scope              |
+|--------------|----------|---------------------------------------|---------------------------|
+| 443          | TCP      | Web / WebRTC (Nginx)                  | Open to Internet          |
+| 20000–30000  | UDP      | WebRTC SRTP (RTPengine)               | Open to Internet          |
+| 30001–40000  | UDP      | VoIP RTP (Asterisk)                   | Restrict to ITSP IP(s)    |
+| 5060         | UDP      | SIP signaling (Asterisk)              | Restrict to ITSP IP(s)    |
+| 9090         | TCP      | Prometheus metrics                    | Restrict to monitoring    |
+
+sRTP (WebRTC) and RTP (VoIP) ports can be specified in the ".env" file, allowing you to customize the port range when opening them to the internet.
+
+## On‑Premise / Cloud VPS Deployment <a name="vps-vm"></a>
+
+Suitable for small production deployments (up to ~100 users):
+
+```bash
+cp oml_manage.sh prod-env/
+cp env prod-env/.env
+cd prod-env
 ```
 
-## OMniLeads Enterprise <a name="oml_enterprise"></a>
+Edit `.env` and set:
 
-What is OMniLeads Enterprise?
-
-It is an additional layer with complementary modules to OMniLeads Community (GPLV3). It includes functionalities such as advanced reports, wallboards, and automated satisfaction surveys implemented as modules.
-
-This version can be implemented simply by referencing the image for the container that implements the web application.
-Therefore, in our ".env" variable file, we must invoke the Enterprise image. To do this, we add the string "-enterprise" to the end of the tag that describes the image of the OMLAPP_IMG component:
-
+```dotenv
+OML_HOSTNAME=<docker-host-ip>
+FQDN=<optional-FQDN>
 ```
+
+Then:
+
+```bash
+./oml_manage.sh up -d
+./oml_manage.sh reset-pass
+```
+
+Log in at `https://<OML_HOSTNAME>` with:
+
+- Username: `admin`
+- Password: `admin`
+
+### LAN & WAN NIC interfaces
+
+If your host has two network interfaces (LAN & WAN), you can specify the public IP address:
+
+```dotenv
+PUBLIC_IP=<your-public-ip>
+```
+
+### Behind NAT
+
+If your host is behind NAT and needs PSTN connectivity, set:
+
+```dotenv
+PUBLIC_IP=<your-public-ip>
+VOIP_NAT=true
+```
+
+## OMniLeads Enterprise <a name="oml-enterprise"></a>
+
+OMniLeads Enterprise adds advanced modules (reports, wallboards, surveys) on top of the Community edition.
+
+In your `.env`, append `-enterprise` to the `OMLAPP_IMG` tag:
+
+```dotenv
 OMLAPP_IMG=${REPO}/omlapp:240117.01-enterprise
 ```
 
-Finally, we run the command:
-If you are using Docker Desktop on localhost:
+Then launch:
 
-```
-$ docker-compose up -d --force-recreate django_app nginx
-```
-
-## The oml_manage script <a name="oml_manage"></a>
-
-This is used to launch some administration actions like, read containers logs, delete postgres logs tables and more. 
-
-```
-$ ./oml_oml_manage --help
+```bash
+docker-compose up -d
 ```
 
-For example: create some testing data:
+## OMniLeads Management Tool <a name="oml-manage"></a>
 
-```
-$ ./oml_manage --init_env
-```
+The `oml_manage.sh` script provides administrative tasks (logs, database maintenance, etc.):
 
-Users:
-
-```
-ag1
-ag2
-gerente
+```bash
+./oml_manage.sh help
 ```
 
-For all users the pass is:
+Example, to generate test data:
 
-```
-098098ZZZ
-```
-
-## **Development environment deploy** <a name="dev-env"></a>
-
-In this environment, the Django application runs using the framework's development mode. Additionally, Docker binding is used to mount the code of each component into its respective container.
-
-If you want to set up the development environment on a Linux machine, simply run the docker_install_linux.sh script to install the necessary tools.
-
-```
-$ ./docker_install_linux.sh
+```bash
+./oml_manage.sh data-generate
 ```
 
+Default users (password `098098ZZZ`):
 
-With the following sequence of commands, you will have an environment ready to start using your development setup:
+- `ag1`
+- `ag2`
+- `gerente`
 
-```
-$ cd dev-env
-$ ./deploy.sh --gitlab_clone=https or ssh
-$ ../oml_manage --reset_pass
-```
+## Development Environment <a name="dev-env"></a>
 
-Once the environment is up, you can proceed to log in at https://localhost using the username admin and password admin
+In the dev environment, services run in development mode and mount source code via Docker volumes.
 
+Initialize submodules:
 
-## Simulate calls from/to PSTN (Only on test-env & dev-env) <a name="pstn_emulator"></a>
-
-Adittionally with omnileads container is the pstn-emulator, this an emulation of a PSTN provider,
-so you can make calls via Omnileads and have different results of the call based on what you dialed
-as well as generate calls from the command line to OMniLeads inbound routes.
-
-##### Dialplan outbound rules:
-
-* Any number dialed finished with 0: PSTN is going to send you a BUSY signal
-* Any number dialed finished with 1: PSTN is going to answer your call and playback audios
-* Any number dialed finished with 2: PSTN will anwer your call, play short audio then hangup. This will emulate a calle hangup
-* Any number dialed finished with 3: PSTN will answer your call after 35 seconds
-* Any number dialed finished with 5: PSTN will make you wait 120 seconds and then hangup. This will emulate a NO_ANSWER
-* Any number dialed finished with 9: PSTN will simulate a congestion
-
-##### Generate inbound calls to omnileads stack:
-
-```
-$ ./oml_manage --call_generate
+```bash
+git submodule update --init --recursive
 ```
 
-This actions will make an inbound call to the default inbound campaign created from testing data. 
-You can attend the call and listen some cool music, then the recordings appear on the recordings search views. 
+On Linux, install prerequisites:
 
-##### Register your IAX2 softphone to test the stack 
-
-You can register a IAX2 account on pstn-emulator container in order to play with OMniLeads and the softphone you want. 
-
-This are the IAX2 account credentials:
-
-```
-username: 1234567
-secret: omnileads
-domain: YOUR_HOSTNAME
+```bash
+./docker_install_linux.sh
 ```
 
-(Change "YOUR_HOSTNAME" with the VM hostname/IPADDR  or localhost)
+Then set up and start:
 
-Then you can send calls to DID 01177660010 to 01177660015, an also send calls from an agent to this IAX2 account phone calling 1234567.
+```bash
+cp oml_manage.sh dev-env/
+cp env dev-env/.env
+cd dev-env
+./set_dev_env.sh
+./oml_manage.sh build
+./oml_manage.sh up -d
+./oml_manage.sh reset-pass
+./oml_manage.sh data-generate
+```
+
+Log in at https://localhost with:
+
+- Username: `admin`
+- Password: `admin`
+
+## PSTN Emulator (test-env & dev-env) <a name="pstn-emulator"></a>
+
+The PSTN emulator lets you simulate calls:
+
+- **Outbound dialing rules** (based on last digit):
+  - `0`: Busy
+  - `1`: Answer + playback audio
+  - `2`: Answer + short audio + hangup (simulate caller hang‑up)
+  - `3`: Answer after 35 seconds
+  - `5`: Wait 120 seconds then hang up (simulate no answer)
+  - `9`: Congestion
+- **Generate inbound calls**:
+  ```bash
+  ./oml_manage.sh --call_generate
+  ```
+- **IAX2 softphone registration**:
+  ```text
+  username: 1234567
+  secret: omnileads
+  domain: <YOUR_HOSTNAME>
+  ```
+Dial DID `01177660010`–`01177660015`, or from an agent call `1234567`.
+
+---
+
+Enjoy OMniLeads!
