@@ -112,22 +112,22 @@
     #     - upgrade
     #     - validate
 
-    - name: OBSERVABILITY Promtail Reload systemd daemon
-      systemd:
-        daemon_reload: yes
-      tags:
-        - install
-        - upgrade
+    # - name: OBSERVABILITY Promtail Reload systemd daemon
+    #   systemd:
+    #     daemon_reload: yes
+    #   tags:
+    #     - install
+    #     - upgrade
 
-    - name: OBSERVABILITY Promtail Enable and start service
-      systemd:
-        name: promtail.service
-        state: started
-        enabled: yes
-      tags:
-        - install
-        - upgrade
-        - service
+    # - name: OBSERVABILITY Promtail Enable and start service
+    #   systemd:
+    #     name: promtail.service
+    #     state: started
+    #     enabled: yes
+    #   tags:
+    #     - install
+    #     - upgrade
+    #     - service
 
     # Task específica para verificar conectividad con Loki
     - name: OBSERVABILITY Promtail Test Loki connectivity

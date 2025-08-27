@@ -143,6 +143,7 @@ x-worker-common: &worker-common
     REDIS_DIALER_SERVER: ${REDIS_HOSTNAME}
     REDIS_DIALER_PORT: ${REDIS_PORT}
     PYTHON_LOGLEVEL: ${DIALER_PYTHON_LOGLEVEL}
+    TIME_BETWEEN_CALLS: ${DIALER_TIME_BETWEEN_CALLS}
     TZ: ${TZ}
 
 # ============================================================================

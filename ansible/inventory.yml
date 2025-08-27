@@ -353,7 +353,9 @@ all:
     # --- The Dialer Engine: omnidialer or wombat.
     dialer_engine: omnidialer
     dialer_caps: 1
-    dialer_worker_replicas: 5
+    dialer_process_campaign_replicas: 10
+    dialer_process_event_replicas: 1
+    dialer_process_contact_replicas: 1
     # --- Log level for Dialer
     # --- 0: Error, 1: Warning, 2: Debug
     dialer_log_level: 1
