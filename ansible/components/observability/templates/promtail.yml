@@ -18,117 +18,77 @@ clients:
     backoff_config:
       min_period: 1s
       max_period: 10s
-#    max_retries: 5
 
 # ============================================
 # DIALER SERVICE MACROS (Defined first)
 # ============================================
+{%- macro dialer_worker_type_config(worker_type, node_type) -%}
+- job_name: dialer_process_{{ worker_type }}
+  journal:
+    json: false
+    max_age: 6h
+    path: /var/log/journal
+    labels:
+      job: dialer_process_{{ worker_type }}
+      tenant: {{ tenant_id | default('unknown') }}
+      host: {{ inventory_hostname }}
+      node_type: {{ node_type }}
+      service_family: dialer
+      service_type: worker
+      worker_type: {{ worker_type }}
+      total_replicas: {{ vars['dialer_process_' ~ worker_type ~ '_replicas'] | default('unknown') }}
+  relabel_configs:
+    - source_labels: ['__journal__systemd_unit']
+      regex: 'dialer_process_{{ worker_type }}@.*\.service'
+      action: keep
+    - source_labels: ['__journal__systemd_unit']
+      target_label: 'unit'
+    - source_labels: ['__journal__systemd_unit']
+      regex: 'dialer_process_{{ worker_type }}@(.+)\.service'
+      target_label: 'instance_id'
+      replacement: '${1}'
+    - source_labels: ['instance_id']
+      target_label: 'worker_instance'
+      replacement: '{{ worker_type }}-${1}'
+    - source_labels: ['__journal_container_name']
+      target_label: 'container_name'
+    - source_labels: ['__journal_container_id']
+      regex: '(.{12}).*'
+      target_label: 'container_id'
+      replacement: '${1}'
+{%- endmacro -%}
 
-{% macro dialer_worker_type_config(worker_type, node_type) %}
-  - job_name: dialer_process_{{ worker_type }}
-    journal:
-      json: false
-      max_age: 6h
-      path: /var/log/journal
-      labels:
-        job: dialer_process_{{ worker_type }}
-        tenant: {{ tenant_id | default('unknown') }}
-        host: {{ inventory_hostname }}
-        node_type: {{ node_type }}
-        service_family: dialer
-        service_type: worker
-        worker_type: {{ worker_type }}
-        total_replicas: {{ dialer_worker_replicas | default('unknown') }}
-    relabel_configs:
-      # Filter only this specific worker type
-      - source_labels: ['__journal__systemd_unit']
-        regex: 'dialer_process_{{ worker_type }}@.*\.service'
-        action: keep
-      
-      - source_labels: ['__journal__systemd_unit']
-        target_label: 'unit'
-      
-      # Extract instance ID
-      - source_labels: ['__journal__systemd_unit']
-        regex: 'dialer_process_{{ worker_type }}@(.+)\.service'
-        target_label: 'instance_id'
-        replacement: '${1}'
-      
-      # Create worker instance identifier
-      - source_labels: ['instance_id']
-        target_label: 'worker_instance'
-        replacement: '{{ worker_type }}-${1}'
-      
-      # Container information (if available)
-      - source_labels: ['__journal_container_name']
-        target_label: 'container_name'
-      
-      - source_labels: ['__journal_container_id']
-        regex: '(.{12}).*'
-        target_label: 'container_id'
-        replacement: '${1}'
-{% endmacro %}
-
-{% macro dialer_services_config(node_type, services_list) %}
+{%- macro dialer_services_config(node_type, services_list) -%}
 {% for service in services_list %}
-  - job_name: {{ service }}
-    journal:
-      json: false
-      max_age: 6h
-      path: /var/log/journal
-      matches: "_SYSTEMD_UNIT={{ service }}.service"
-      labels:
-        job: {{ service }}
-        tenant: {{ tenant_id | default('unknown') }}
-        host: {{ inventory_hostname }}
-        node_type: {{ node_type }}
-        service_family: dialer
-    relabel_configs:
-      - source_labels: ['__journal__systemd_unit']
-        target_label: 'unit'
-      - source_labels: ['__journal_container_name']
-        target_label: 'container_name'
-      - source_labels: ['__journal_container_id']
-        regex: '(.{12}).*'
-        target_label: 'container_id'
-        replacement: '${1}'
+- job_name: {{ service }}
+  journal:
+    json: false
+    max_age: 6h
+    path: /var/log/journal
+    matches: "_SYSTEMD_UNIT={{ service }}.service"
+    labels:
+      job: {{ service }}
+      tenant: {{ tenant_id | default('unknown') }}
+      host: {{ inventory_hostname }}
+      node_type: {{ node_type }}
+      service_family: dialer
+  relabel_configs:
+    - source_labels: ['__journal__systemd_unit']
+      target_label: 'unit'
+    - source_labels: ['__journal_container_name']
+      target_label: 'container_name'
+    - source_labels: ['__journal_container_id']
+      regex: '(.{12}).*'
+      target_label: 'container_id'
+      replacement: '${1}'
 {% endfor %}
-{% endmacro %}
+{%- endmacro -%}
 
-{% macro dialer_app_services_block() %}
-{{ dialer_worker_type_config('campaign', 'app') }}
-{{ dialer_worker_type_config('contact', 'app') }}
-{{ dialer_worker_type_config('event', 'app') }}
-
-{% set dialer_app_services = [
-  'dialer_add_incidence_rule', 'dialer_change_database', 'dialer_create_campaign',
-  'dialer_create_incidence_rule', 'dialer_delete_campaign', 'dialer_delete_incidence_rule',
-  'dialer_edit_campaign', 'dialer_flask', 'dialer_listener', 'dialer_pause_campaign',
-  'dialer_render_template', 'dialer_resume_campaign', 'dialer_schedule_agenda',
-  'dialer_scheduler', 'dialer_send_reports', 'dialer_start_campaign',
-  'dialer_stop_campaign', 'dialer_update_incidence_rule'
-] %}
-
-{{ dialer_services_config('app', dialer_app_services) }}
-{% endmacro %}
-
-{% macro dialer_voice_services_block() %}
-{% set dialer_voice_services = ['dialer_asterisk', 'dialer_dialplan'] %}
-{{ dialer_services_config('voice', dialer_voice_services) }}
-{% endmacro %}
-
-{% macro dialer_data_services_block() %}
-{% set dialer_data_services = ['dialer_postgresql'] %}
-{{ dialer_services_config('data', dialer_data_services) }}
-{% endmacro %}
-
-{% macro dialer_all_services_block() %}
+{%- macro dialer_all_services_block() -%}
 {% set node_type = 'aio' if inventory_hostname in groups.get('omnileads_aio', []) else 'standalone' %}
-
-{{ dialer_worker_type_config('campaign', node_type) }}
-{{ dialer_worker_type_config('contact', node_type) }}
-{{ dialer_worker_type_config('event', node_type) }}
-
+{{ dialer_worker_type_config('campaign', node_type) | indent(2, true) }}
+{{ dialer_worker_type_config('contact', node_type) | indent(2, true) }}
+{{ dialer_worker_type_config('event', node_type) | indent(2, true) }}
 {% set all_dialer_services = [
   'dialer_add_incidence_rule', 'dialer_asterisk', 'dialer_change_database',
   'dialer_create_campaign', 'dialer_create_incidence_rule', 'dialer_delete_campaign',
@@ -136,132 +96,18 @@ clients:
   'dialer_flask', 'dialer_listener', 'dialer_pause_campaign', 'dialer_postgresql',
   'dialer_render_template', 'dialer_resume_campaign', 'dialer_schedule_agenda',
   'dialer_scheduler', 'dialer_send_reports', 'dialer_start_campaign',
-  'dialer_stop_campaign', 'dialer_update_incidence_rule'
-] %}
-
-{{ dialer_services_config(node_type, all_dialer_services) }}
-{% endmacro %}
+  'dialer_stop_campaign', 'dialer_update_incidence_rule'] %}
+{{ dialer_services_config(node_type, all_dialer_services) | indent(2, true) }}
+{%- endmacro -%}
 
 # ============================================
 # SCRAPE CONFIGURATIONS
 # ============================================
-
 scrape_configs:
-
-{% if inventory_hostname in groups.get('omnileads_app', []) %}
-# ============================================
-# OMNILEADS APP NODE (Application Services)
-# ============================================
-
-{% set app_services = [
-  {'name': 'background_callrec', 'unit': 'background_callrec_tasks.service', 'family': 'omnileads'},
-  {'name': 'background_dialer', 'unit': 'background_dialer_tasks.service', 'family': 'omnileads'},
-  {'name': 'nginx', 'unit': 'nginx.service', 'family': 'omnileads'},
-  {'name': 'omnileads', 'unit': 'omnileads.service', 'family': 'omnileads'},
-  {'name': 'astami', 'unit': 'astami.service', 'family': 'communication'},
-  {'name': 'fastagi', 'unit': 'fastagi.service', 'family': 'communication'},
-  {'name': 'omlcron', 'unit': 'omlcron.service', 'family': 'processing'},
-  {'name': 'daphne', 'unit': 'daphne.service', 'family': 'communication'},
-] %}
-
-{% for service in app_services %}
-  - job_name: {{ service.name }}
-    journal:
-      json: false
-      max_age: 6h
-      path: /var/log/journal
-      matches: "_SYSTEMD_UNIT={{ service.unit }}"
-      labels:
-        job: {{ service.name }}
-        tenant: {{ tenant_id | default('unknown') }}
-        host: {{ inventory_hostname }}
-        node_type: app
-        service_family: {{ service.family }}
-    relabel_configs:
-      - source_labels: ['__journal__systemd_unit']
-        target_label: 'unit'
-{% endfor %}
-
-# Dialer services on APP node (only if dialer is not external)
-{% if dialer_host is not defined or dialer_host == inventory_hostname %}
-{{ dialer_app_services_block() }}
-{% endif %}
-
-{% elif inventory_hostname in groups.get('omnileads_voice', []) %}
-# ============================================
-# OMNILEADS VOICE NODE (VoIP Services)
-# ============================================
-
-{% set voice_services = [
-  {'name': 'rtpengine', 'unit': 'rtpengine.service', 'family': 'telephony'},
-  {'name': 'asterisk', 'unit': 'asterisk.service', 'family': 'telephony'},
-  {'name': 'asterisk_retrieve_conf', 'unit': 'asterisk_retrieve_conf.service', 'family': 'telephony'},
-  {'name': 'callrec_processor', 'unit': 'interaction_processor.service', 'family': 'telephony'},
-  {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.service', 'family': 'telephony'},
-] %}
-
-{% for service in voice_services %}
-  - job_name: {{ service.name }}
-    journal:
-      json: false
-      max_age: 6h
-      path: /var/log/journal
-      matches: "_SYSTEMD_UNIT={{ service.unit }}"
-      labels:
-        job: {{ service.name }}
-        tenant: {{ tenant_id | default('unknown') }}
-        host: {{ inventory_hostname }}
-        node_type: voice
-        service_family: {{ service.family }}
-    relabel_configs:
-      - source_labels: ['__journal__systemd_unit']
-        target_label: 'unit'
-{% endfor %}
-
-# Dialer voice services (only if dialer is not external)
-{% if dialer_host is not defined or dialer_host == inventory_hostname %}
-{{ dialer_voice_services_block() }}
-{% endif %}
-
-{% elif inventory_hostname in groups.get('omnileads_data', []) %}
-# ============================================
-# OMNILEADS DATA NODE (Database Services)
-# ============================================
-
-{% set data_services = [
-  {'name': 'postgresql', 'unit': 'postgresql.service', 'family': 'infrastructure'},
-  {'name': 'redis', 'unit': 'redis.service', 'family': 'infrastructure'},
-  {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
-] %}
-
-{% for service in data_services %}
-  - job_name: {{ service.name }}
-    journal:
-      json: false
-      max_age: 6h
-      path: /var/log/journal
-      matches: "_SYSTEMD_UNIT={{ service.unit }}"
-      labels:
-        job: {{ service.name }}
-        tenant: {{ tenant_id | default('unknown') }}
-        host: {{ inventory_hostname }}
-        node_type: data
-        service_family: {{ service.family }}
-    relabel_configs:
-      - source_labels: ['__journal__systemd_unit']
-        target_label: 'unit'
-{% endfor %}
-
-# Dialer data services (only if dialer is not external)
-{% if dialer_host is not defined or dialer_host == inventory_hostname %}
-{{ dialer_data_services_block() }}
-{% endif %}
-
-{% elif inventory_hostname in groups.get('omnileads_aio', []) %}
+{% if inventory_hostname in groups.get('omnileads_aio', []) %}
 # ============================================
 # OMNILEADS AIO NODE (All Services)
 # ============================================
-
 {% set aio_services = [
   {'name': 'background_callrec', 'unit': 'background_callrec_tasks.service', 'family': 'omnileads'},
   {'name': 'background_dialer', 'unit': 'background_dialer_tasks.service', 'family': 'omnileads'},
@@ -281,7 +127,6 @@ scrape_configs:
   {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.service', 'family': 'telephony'},
   {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
 ] %}
-
 {% for service in aio_services %}
   - job_name: {{ service.name }}
     journal:
@@ -299,15 +144,11 @@ scrape_configs:
       - source_labels: ['__journal__systemd_unit']
         target_label: 'unit'
 {% endfor %}
-
 # All Dialer services on AIO
 {{ dialer_all_services_block() }}
-
 {% elif inventory_hostname in groups.get('omnileads_dialer', []) %}
 # ============================================
 # DIALER STANDALONE NODE
 # ============================================
-
 {{ dialer_all_services_block() }}
-
 {% endif %}

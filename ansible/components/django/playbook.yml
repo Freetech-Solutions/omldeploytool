@@ -52,6 +52,7 @@
       - { src: "{{ django_repo_path }}templates/background_callrec_tasks.service", dest: "/etc/systemd/system/background_tasks.service" }
       - { src: "{{ django_repo_path }}templates/background_dialer_tasks.service", dest: "/etc/systemd/system/background_dialer_tasks.service" }
       - { src: "{{ django_repo_path }}templates/whatsapp.service", dest: "/etc/systemd/system/whatsapp.service" }
+      - { src: "{{ django_repo_path }}templates/daphne.service", dest: "/etc/systemd/system/daphne.service" }
     tags:
       - install
       - upgrade
@@ -104,6 +105,7 @@
       enabled: yes
       daemon_reload: yes
     loop:
+      - daphne.service
       - omnileads.service
       - background_tasks.service
       - background_dialer_tasks.service
@@ -129,6 +131,7 @@
       enabled: yes
       daemon_reload: yes
     loop:
+      - daphne.service
       - omnileads.service
       - background_tasks.service
       - background_dialer_tasks.service

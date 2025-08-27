@@ -132,28 +132,44 @@
       - restart
     when: omnileads_ha is not defined
 
-  - name: DIALER Guardar número original de réplicas
-    set_fact:
-      dialer_replicas_count: "{{ dialer_worker_replicas }}"
-    tags:
-      - install
-      - upgrade
+  - name: DIALER | Validar cantidades de réplicas
+    ansible.builtin.assert:
+      that:
+        - (dialer_process_campaign_replicas | int) >= 0
+        - (dialer_process_contact_replicas  | int) >= 0
+        - (dialer_process_event_replicas    | int) >= 0
+      fail_msg: "Cantidad de réplicas inválida (debe ser >= 0)."
+    tags: [install, upgrade]
 
-  - name: DIALER Generar lista de replicas
-    set_fact:
-      dialer_replicas_list: "{{ range(1, dialer_replicas_count | int + 1) | list | map('string') | list }}"
-    tags:
-      - install
-      - upgrade
+  # Hacé un daemon-reload una sola vez antes de tocar servicios
+  - name: DIALER | systemd daemon-reload (una vez)
+    ansible.builtin.systemd:
+      daemon_reload: true
+    tags: [install, upgrade, update]
 
-  - name: DIALER Enable y Restart systemd services con replicas
-    systemd:
-      name: "{{ item.0 }}@{{ item.1 }}"
-      state: restarted
-      enabled: yes
-      daemon_reload: yes
-    loop: "{{ ['dialer_process_event', 'dialer_process_contact', 'dialer_process_campaign'] | product(dialer_replicas_list) | list }}"
-    tags:
-      - install
-      - upgrade
-      - restart
+  # --- campaign replicas ---
+  - name: DIALER | Enable/Start process-campaign replicas
+    ansible.builtin.systemd:
+      name: "dialer_process_campaign@{{ item }}"
+      enabled: true
+      state: started         # usa 'restarted' sólo si querés forzar reinicio
+    loop: "{{ query('sequence', 'start=1 end=' ~ (dialer_process_campaign_replicas | int | string)) }}"
+    tags: [install, upgrade, restart]
+
+  # --- contact replicas ---
+  - name: DIALER | Enable/Start process-contact replicas
+    ansible.builtin.systemd:
+      name: "dialer_process_contact@{{ item }}"
+      enabled: true
+      state: started
+    loop: "{{ query('sequence', 'start=1 end=' ~ (dialer_process_contact_replicas | int | string)) }}"
+    tags: [install, upgrade, restart]
+
+  # --- event replicas ---
+  - name: DIALER | Enable/Start process-event replicas
+    ansible.builtin.systemd:
+      name: "dialer_process_event@{{ item }}"
+      enabled: true
+      state: started
+    loop: "{{ query('sequence', 'start=1 end=' ~ (dialer_process_event_replicas | int | string)) }}"
+    tags: [install, upgrade, restart]

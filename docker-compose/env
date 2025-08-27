@@ -28,28 +28,28 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads core application images
-OMLAPP_IMG=docker.io/omnileads/omlapp:20250825-4ea39ba5
+OMLAPP_IMG=docker.io/freetechsolutions/omlapp:20250902-98d5bb96
 OMLNGINX_IMG=docker.io/omnileads/nginx:20250825-8b1ac6ba
 OMLWS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
 
-OMLACD_IMG=docker.io/omnileads/asterisk:20250825-b9ebd5e4
+OMLACD_IMG=docker.io/freetechsolutions/asterisk:20250904-45ab607b
 OMLACD_RETRIEVE_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
 OMLFASTAGI_IMG=docker.io/omnileads/fastagi:20250825-2e557c10
 OMLAMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
 OMLKAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
-OMLRTPENGINE_IMG=docker.io/omnileads/rtpengine:20250825-41f9517d
+OMLRTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20250901-bdbcb762
 OMLCHAN_TEL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
 CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20250719-84e14930
 # if you want to run Speech to text onpremise change de suffix tag from "-saas" to "-local"
 CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20250719-14a17abb-saas
 
 # --- OMniDialer images
-API_IMG=docker.io/omnileads/dialer_api:20250825-5e7a2efa
-LISTENER_IMG=docker.io/omnileads/dialer_listener:20250825-5e7a2efa
-WORKER_IMG=docker.io/omnileads/dialer_worker:20250825-5e7a2efa
-SCHEDULER_IMG=docker.io/omnileads/dialer_scheduler:20250825-5e7a2efa
-DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20250825-5e7a2efa
-ASTERISK_IMG=docker.io/omnileads/dialer_asterisk:20250825-5e7a2efa
+API_IMG=docker.io/freetechsolutions/dialer_api:20250902-2c2703c2
+LISTENER_IMG=docker.io/freetechsolutions/dialer_listener:20250902-2c2703c2
+WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20250902-2c2703c2
+SCHEDULER_IMG=docker.io/freetechsolutions/dialer_scheduler:20250902-2c2703c2
+DIALPLAN_IMG=docker.io/freetechsolutions/dialer_dialplan:20250902-2c2703c2
+ASTERISK_IMG=docker.io/freetechsolutions/dialer_asterisk:20250902-2c2703c2
 
 # --- Backend services images
 REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
@@ -139,7 +139,7 @@ ACD_LOG_LEVEL=3
 # for OpenAI STT use the API key from the OpenAI account
 STT_API_KEY=your_stt_api_key
 # Set the Speech to Text engine: openai, gemini or local
-STT_ENGINE=local
+STT_ENGINE=openai
 
 # --- Asterisk scale parameters
 # Scale var "True" or "False"
@@ -343,11 +343,13 @@ DIALER_PYTHON_LOGLEVEL=debug
 
 # --- Call attempts per second
 DIALER_CAPS=1
+# --- Time between the iterations when there are no contacts to call (in seconds)
+DIALER_TIME_BETWEEN_CALLS=1
 
 # --- Workers replicas
-DIALER_PROCESS_CAMPAIGN_REPLICAS=3
-DIALER_PROCESS_CONTACT_REPLICAS=3
-DIALER_PROCESS_EVENT_REPLICAS=3
+DIALER_PROCESS_CAMPAIGN_REPLICAS=5
+DIALER_PROCESS_CONTACT_REPLICAS=1
+DIALER_PROCESS_EVENT_REPLICAS=1
 
 # --- Dial through PSTN Gateway settings
 # --- In order to use this feature, you must have a PSTN Gateway configured

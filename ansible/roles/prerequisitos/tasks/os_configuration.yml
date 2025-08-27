@@ -367,11 +367,24 @@
   loop:
     - omnileads.service
     - nginx.service
-    - postgresql.service
   tags:
     - upgrade
   when:
     - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+
+- name: OS_CONF stop PostgreSQL for Upgrade
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: yes
+    daemon_reload: yes
+  loop:
+    - postgresql.service
+  tags:
+    - upgrade
+  when:
+    - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']
+    - postgresql_host_ha is not defined
 
 - name: OS_CONF rm Django static_files
   become: yes

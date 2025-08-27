@@ -573,15 +573,40 @@
     - upgrade
     - update
 
-# Set dialer_worker_replicas as 5 when dialer_engine is omnidialer and dialer_worker_replicas is not defined
-- name: CHECKS Setting dialer_worker_replicas default value for omnidialer
+- name: CHECKS Setting dialer_process_campaign_replicas default value for omnidialer
   set_fact:
-    dialer_worker_replicas: 5
+    dialer_process_campaign_replicas: 10
   changed_when: false
   when:
     - dialer_engine is defined
     - dialer_engine == "omnidialer"
-    - dialer_worker_replicas is not defined
+    - dialer_process_campaign_replicas is not defined
+  tags: 
+    - install
+    - upgrade
+    - update
+
+- name: CHECKS Setting dialer_process_contact_replicas default value for omnidialer
+  set_fact:
+    dialer_process_contact_replicas: 1
+  changed_when: false
+  when:
+    - dialer_engine is defined
+    - dialer_engine == "omnidialer"
+    - dialer_process_contact_replicas is not defined
+  tags: 
+    - install
+    - upgrade
+    - update
+
+- name: CHECKS Setting dialer_process_event_replicas default value for omnidialer
+  set_fact:
+    dialer_process_event_replicas: 1
+  changed_when: false
+  when:
+    - dialer_engine is defined
+    - dialer_engine == "omnidialer"
+    - dialer_process_event_replicas is not defined
   tags: 
     - install
     - upgrade
