@@ -3,19 +3,19 @@
 ###################################################################################################
 # --- Path to the repositories where the OML git submodules are cloned
 REPO_PATH=../../components-git-repo
-# --- Environment type, can be "prod" or "dev"
-# For "test" environment, set ENV=dev
-ENV=prod
 # IPV4 address of the docker engine host
 OML_HOSTNAME=
 # If you want to use a public IP, set it here
 PUBLIC_IP=${OML_HOSTNAME}
-# If you want to advertise the public IP in the SIP & RTP headers, set this variable true.
-VOIP_NAT=false
 # If you want to use a FQDN, set it here
 FQDN=
 # --- Timezone for the environment
 TZ=America/Argentina/Cordoba
+# --- VoIP (SIP & RTP) Environment type, can be "prod", "dev" or "custom"
+# For "test" environment, set ENV=dev
+VOIP_ENV=prod
+# If you want to advertise the public IP in the SIP & RTP headers, set this variable true.
+VOIP_NAT=false
 # --- If you want to use the docker-compose scale option, set this variable to true
 SCALE=false
 # --- If you want to use a custom docker network bridge params:
@@ -44,12 +44,12 @@ CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20250719-8
 CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20250719-14a17abb-saas
 
 # --- OMniDialer images
-API_IMG=docker.io/freetechsolutions/dialer_api:20250902-2c2703c2
-LISTENER_IMG=docker.io/freetechsolutions/dialer_listener:20250902-2c2703c2
-WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20250902-2c2703c2
-SCHEDULER_IMG=docker.io/freetechsolutions/dialer_scheduler:20250902-2c2703c2
-DIALPLAN_IMG=docker.io/freetechsolutions/dialer_dialplan:20250902-2c2703c2
-ASTERISK_IMG=docker.io/freetechsolutions/dialer_asterisk:20250902-2c2703c2
+API_IMG=docker.io/omnileads/dialer_api:20250910-9dc6ff44
+LISTENER_IMG=docker.io/omnileads/dialer_listener:20250910-9dc6ff44
+WORKER_IMG=docker.io/omnileads/dialer_worker:20250910-9dc6ff44
+SCHEDULER_IMG=docker.io/omnileads/dialer_scheduler:20250910-9dc6ff44
+DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20250910-9dc6ff44
+ASTERISK_IMG=docker.io/omnileads/dialer_asterisk:20250910-9dc6ff44
 
 # --- Backend services images
 REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
@@ -134,6 +134,13 @@ ACD_CALLREC_SPLIT=False
 
 # --- 0 ERROR, 1 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG
 ACD_LOG_LEVEL=3
+
+# --- Only if VOIP_ENV=custom, you can set custom SIP PJSIP transport ip  & port
+ACD_PJSIP_TRANSPORT_DIALER=127.0.0.1
+ACD_PJSIP_TRANSPORT_AGENT=${ACD_HOSTNAME}
+ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
+ACD_API_LISTEN_IP=${ACD_HOSTNAME}
+
 # --- In case o SaaS STT put here the STT API key
 # for Gemini STT use the API key from the Google Cloud project
 # for OpenAI STT use the API key from the OpenAI account
@@ -156,6 +163,12 @@ ACD_SCALE=False
 # ACD_STASIS_MAX_SIZE=
 # ACD_TIMER_T1=
 # ACD_TIMER_B=
+
+
+# API_BIND_IP=${OML_HOSTNAME}
+# SIP_AGENT_IP=${OML_HOSTNAME}
+# SIP_TRUNK_IP=${PUBLIC_IP}
+# SIP_DIALER_TRUNK_IP=${OML_HOSTNAME}
 
 #####################################################################################################
 #                                       FASTAGI                                                     #
@@ -250,7 +263,12 @@ RTPENGINE_RTP_PORT_MAX=30000
 
 # --- 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
 RTPENGINE_LOG_LEVEL=1
-# NAT_IPADDR
+
+# --- Only if VOIP_ENV=custom, you can set custom RTPENGINE_RTP_ADDR
+# --- you can change ${RTPENGINE_HOSTNAME} and ${PUBLIC_IP}
+# (https://rtpengine.readthedocs.io/en/latest/rtpengine.html)
+RTPENGINE_RTP_ADDR="internal/${RTPENGINE_HOSTNAME};external/${PUBLIC_IP}"
+
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other
 # "${OML_HOSTNAME}" is the prod profile or "gearman" is the dev profile   

@@ -109,11 +109,12 @@ scrape_configs:
 # OMNILEADS AIO NODE (All Services)
 # ============================================
 {% set aio_services = [
-  {'name': 'background_callrec', 'unit': 'background_callrec_tasks.service', 'family': 'omnileads'},
+  {'name': 'background_tasks', 'unit': 'background_tasks.service', 'family': 'omnileads'},
   {'name': 'background_dialer', 'unit': 'background_dialer_tasks.service', 'family': 'omnileads'},
   {'name': 'asterisk', 'unit': 'asterisk.service', 'family': 'telephony'},
   {'name': 'asterisk_retrieve_conf', 'unit': 'asterisk_retrieve_conf.service', 'family': 'telephony'},
   {'name': 'nginx', 'unit': 'nginx.service', 'family': 'omnileads'},
+  {'name': 'whatsapp', 'unit': 'whatsapp.service', 'family': 'omnileads'},
   {'name': 'omnileads', 'unit': 'omnileads.service', 'family': 'omnileads'},
   {'name': 'astami', 'unit': 'astami.service', 'family': 'communication'},
   {'name': 'fastagi', 'unit': 'fastagi.service', 'family': 'communication'},

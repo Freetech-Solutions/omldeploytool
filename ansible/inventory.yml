@@ -145,6 +145,7 @@ all:
 
     # --- Asterisk & RTPengine scenary for SIP & RTP
     # --- "cloud" instance (access through public IP)
+    # --- "custom" instance (you can set your own PJSIP Asterisk contact address and RTPengine interface)
     # --- "lan" instance (access through private IP)
     # --- "nat" instance (access through Public NAT IP)
     # --- "hybrid" instance (agent WebRTC through Public NAT IP, but PSTN acces through LAN VoIP GW)
@@ -256,7 +257,7 @@ all:
     bucket_access_key: Hghjkdghjkdhasjdasdsada
     bucket_secret_key: jknkjhkjh4523kjhcksjdhkjfdhKJHHKJGKJh786876876NBVJHB
     bucket_name: omnileads
-    #bucket_ssl_selfsigned: true
+    # bucket_ssl_selfsigned: true
     # --- if your bucket doesn't need region, leave this value (us-east-1)
     bucket_region: us-east-1
 
@@ -268,7 +269,7 @@ all:
     # bucket_url: https://sfo3.digitaloceanspaces.com
 
     #####################################################################################################
-    #                                       ACD                                                         #
+    #                              ACD (Automatic Call Distribution)                                    #
     #####################################################################################################
     # --- Asterisk AMI params
     ami_user: omnileads
@@ -284,6 +285,13 @@ all:
     # --- Log level for ACD
     # --- 0 ERROR, 1 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG
     acd_log_level: 3
+
+    # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip  & port
+    acd_pjsip_transport_dialer: 127.0.0.1:5260
+    acd_pjsip_transport_agent: 127.0.0.1:5160
+    acd_pjsip_transport_trunk: 127.0.0.1:5060
+    acd_api_listen_ip: 127.0.0.1
+
     # If you set scale_asterisk to true, then you must assign values to
     # asterisk_mem_limit, pjsip_threadpool_idle_timeout & pjsip_threadpool_max_size
     # https://docs.asterisk.org/Deployment/Performance-Tuning/ 
@@ -310,6 +318,11 @@ all:
     # --- Log level for RTPengine
     # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
     rtpengine_log_level: 1
+
+    # --- Only if VOIP_ENV=custom, you can set custom RTPENGINE_RTP_ADDR
+    # --- you can change ${RTPENGINE_HOSTNAME} and ${PUBLIC_IP}
+    # (https://rtpengine.readthedocs.io/en/latest/rtpengine.html)
+    rtpengine_rtp_addr: "internal/${RTPENGINE_HOSTNAME};external/${PUBLIC_IP}"
 
     # if you have your own instances put here the IP or hostname, otherwise leave commented
     # rtpengine_host: 
@@ -441,8 +454,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/freetechsolutions/omlapp:20250902-98d5bb96
-    asterisk_img: docker.io/freetechsolutions/asterisk:20250904-45ab607b
+    omnileads_img: docker.io/freetechsolutions/omlapp:20250911-8bde18f9
+    asterisk_img: docker.io/omnileads/asterisk:20250911-118ac5b2
 
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
