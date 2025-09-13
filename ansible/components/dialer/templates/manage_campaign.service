@@ -1,5 +1,5 @@
 [Unit]
-Description=Podman wallboard_listener.service
+Description=Podman dialer-create_campaign.service
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
 After=network-online.target
@@ -8,8 +8,8 @@ RequiresMountsFor=%t/containers
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
-RestartSec=10
-TimeoutStopSec=30
+RestartSec=60
+TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
 --cidfile=%t/%n.ctr-id \
@@ -17,13 +17,13 @@ ExecStart=/usr/bin/podman run \
 --sdnotify=conmon \
 --replace \
 --detach \
---network=host \
+--network=omnidialer \
 --log-driver=journald \
---env-file=/etc/default/django.env \
--e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
---name=oml-callrec-tasks-worker \
+-e GEARMAN_JOBS=create-campaign|start-campaign|pause-campaign|resume-campaign|stop-campaign|edit-campaign|delete-campaign|change-database \
+--env-file=/etc/default/dialer.env \
+--name=dialer-manage-campaign \
 --rm  \
-{{ omnileads_img }} /opt/omnileads/bin/init_worker_bgtasks.sh
+{{ dialer_worker_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

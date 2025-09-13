@@ -3,14 +3,14 @@
 #################### containers img tags  ################################
 
 # --- OMniLeads core application images
-nginx_img: docker.io/omnileads/nginx:20250825-8b1ac6ba
+nginx_img: docker.io/omnileads/nginx:20250909-b9e079d4
 websockets_img: docker.io/omnileads/websockets:20250825-3b0448ff
 
 asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
 fastagi_img: docker.io/omnileads/fastagi:20250825-2e557c10
 astami_img: docker.io/omnileads/astami:20250825-5d38d2e1
 kamailio_img: docker.io/omnileads/kamailio:20250825-6b854038
-rtpengine_img: docker.io/omnileads/rtpengine:20250829-1f5bef66
+rtpengine_img: docker.io/omnileads/rtpengine:20250911-0d2c9b76
 call_logger_img: docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
 callrec_compressor_img: docker.io/omnileads/callrec_compressor:20250825-802afa6c
 
@@ -20,12 +20,12 @@ callrec_transcriber_img: docker.io/omnileads/callrec_transcriber:20250825-802afa
 # docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
 
 # --- OMnidialer components images
-dialer_api_img: docker.io/omnileads/dialer_api:20250829-971b7717
-dialer_listener_img: docker.io/omnileads/dialer_listener:20250829-971b7717
-dialer_worker_img: docker.io/omnileads/dialer_worker:20250829-971b7717
-dialer_scheduler_img: docker.io/omnileads/dialer_scheduler:20250829-971b7717
-dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20250829-971b7717
-dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20250829-971b7717
+dialer_api_img: docker.io/omnileads/dialer_api:20250910-9dc6ff44
+dialer_listener_img: docker.io/omnileads/dialer_listener:20250910-9dc6ff44
+dialer_worker_img: docker.io/omnileads/dialer_worker:20250910-9dc6ff44
+dialer_scheduler_img: docker.io/omnileads/dialer_scheduler:20250910-9dc6ff44
+dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20250910-9dc6ff44
+dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20250910-9dc6ff44
 
 # --- Backend components images
 redis_img: docker.io/omnileads/redis:231125.01

@@ -47,14 +47,21 @@
         - omnileads_ha is defined
         - ha_role == "main"
 
-    - name: DJANGO Enable and start systemd UWSGI service
+    - name: DJANGO Enable and start systemd services
       systemd:
-        name: omnileads.service
+        name: "{{ item }}"
         state: started
         enabled: no
         daemon_reload: yes
+      loop:
+        - omnileads.service
+        - daphne.service
+        - background_tasks.service
+        - background_dialer_tasks.service
+        - whatsapp.service
       tags:
         - install
+        - upgrade
       when: 
         - omnileads_ha is defined
         - ha_role == "main"
@@ -67,17 +74,26 @@
         - omnileads_ha is defined
         - ha_role == "main"
 
-    - name: DJANGO Restart systemd UWSGI service
+    - name: DJANGO Restart systemd services
       systemd:
-        name: omnileads.service
+        name: "{{ item }}"
         state: restarted
         enabled: no
         daemon_reload: yes
+      loop:
+        - omnileads.service
+        - daphne.service
+        - background_tasks.service
+        - background_dialer_tasks.service
+        - whatsapp.service
       tags:
         - upgrade
         - restart
         - restart_django
         - restart_core
+        - restart_background_tasks
+        - restart_whatsapp
+          - restart_core
       when: 
         - omnileads_ha is defined
         - ha_role == "main"

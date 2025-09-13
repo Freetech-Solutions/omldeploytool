@@ -1,27 +1,31 @@
-# Release Notes - OMniLeads 2.5.0
-[2025-07-24]
+# Release Notes - OMniLeads 2.5.1
+[2025-09-11]
 
 ## Added
 
-* oml-2679 Automatic outbound dialer module.
-* oml-2923 Order and filtering adding agents in Campaigns Wizard.
-* oml-2893 Massive download and deletion of agendas.
-* oml-2886 Allow contact database structure definition on campaign wizard.
-* oml-2921 Allow configuring Agents as IVR destinations.
-* oml-772 New service for call transcriptions.
+* oml-3000 Add Agent Group setting to restrict password update.
+* oml-3002 User bulk remove.
+* oml-3115 Add Campaign setting to allow showing callid in disposition form.
+* oml-3116 DTMF input form for agent's softphone (allowing copying long DTMF codes).
 
 ## Changed
 
-* oml-3040 Asterisk & Kamailio Webrtc SIP Register was optimized.
-* oml-708 Migrate callrec postcall actions from RabbitMQ to gearman job server.
+* oml-2996 Disposition form is always displayed for Inbound calls.
+* oml-3136 A fallback routine is now in place to handle scenarios where an audio file for the telephony channel cannot be located.
 
 ## Fixed
 
-* oml-2931 Fix "enmodoselect" Incidence rule.
-* oml-2997 Fix "easyaudits" logs ip field.
+* oml-2999 Fix phone validation regex.
+* oml-3037 Fix recording search tests.
+* oml-3028 Fix recording search pagination buttons.
+* oml-3048 Fix Respect call autoattend configuration for transfers to campaigns (OOS).
+* oml-3135 Eliminated the sending of redundant jobs that activate the process-campaign.
+* oml-3132 Management of a Postgres connection pool, a delay configurable between each contact search iteration, implementation of various caches.
 
-##  New Environment Variables (docker-compose .env & Ansible inventory.yml)
+## Removed
 
-Release 2.5 introduces OMniLeads' native Automatic Dialer, which means new containers and, consequently, new variables. Therefore, for deployments using docker-compose or Ansible, these new variables must be added to their respective files.
+No removals in this release.
 
-To do this, we recommend regenerating both files and then adjusting your previously set variables step-by-step.
+## PostgreSQL Migrations
+
+ominicontacto_app: 0112, 0113

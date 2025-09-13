@@ -12,6 +12,8 @@ case $ENDSTATE in
         systemctl stop nginx
         systemctl stop ami
         systemctl stop omnileads
+        systemctl stop whatsapp
+        systemctl stop background_tasks
         systemctl stop omlcron
         systemctl stop asterisk            
         systemctl stop asterisk_retrieve_conf
@@ -20,6 +22,8 @@ case $ENDSTATE in
         log_transition "transition to FAULT"
         systemctl stop nginx
         systemctl stop ami
+        systemctl stop whatsapp
+        systemctl stop background_tasks
         systemctl stop omnileads
         systemctl stop omlcron
         systemctl stop asterisk            
@@ -30,7 +34,9 @@ case $ENDSTATE in
         systemctl start asterisk
         sleep 5
         systemctl start ami
-        systemctl start omnileads            
+        systemctl start omnileads
+        systemctl start whatsapp
+        systemctl start background_tasks
         sleep 10
         systemctl start nginx
         sleep 2

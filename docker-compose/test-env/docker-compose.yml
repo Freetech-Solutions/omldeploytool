@@ -107,7 +107,7 @@ x-django-web-common: &django-web-common
 # Worker common template
 x-worker-common: &worker-common
   build:
-    context: ./$REPO_PATH/dialer/workers/handle-campaign/src
+    context: ./$REPO_PATH/omnidialer/workers/handle-campaign/src
   image: ${WORKER_IMG}
   networks:
     - omnileads
@@ -506,23 +506,28 @@ services:
     environment:
       AMI_USER: ${ACD_AMI_USER}
       AMI_PASSWORD: ${ACD_AMI_PASSWORD}
+      API_LISTEN_IP: ${ACD_API_LISTEN_IP}
       ASTERISK_HOSTNAME: ${ACD_HOSTNAME}
       CALLREC_SPLIT_CHANNELS: ${ACD_CALLREC_SPLIT}
       DIALER_ENGINE: ${DIALER_ENGINE}
       DIALER_HOST: ${DIALER_SIP_ADDR}
-      ENV: ${ENV}
+      ENV: ${VOIP_ENV}
       FASTAGI: ${FASTAGI_HOSTNAME}
       GEARMAN_HOST: ${GEARMAN_HOSTNAME}    
       HOMER_ENABLE: ${HOMER_ENABLE}
       HOMERHOST: ${HOMER_HOSTNAME}
       HOMERPORT: ${HOMER_PORT}
       LOG_LEVEL: ${ACD_LOG_LEVEL}
+      RTP_ADDR: ${RTPENGINE_RTP_ADDR}
       RTP_PORT_MAX: ${ACD_RTP_PORT_MAX}
       RTP_PORT_MIN: ${ACD_RTP_PORT_MIN}
       SCALE: ${ACD_SCALE}
+      PJSIP_IP_DIALER: ${ACD_PJSIP_TRANSPORT_DIALER}
+      PJSIP_IP_AGENT: ${ACD_PJSIP_TRANSPORT_AGENT}
+      PJSIP_IP_TRUNK: ${ACD_PJSIP_TRANSPORT_TRUNK}
       PUBLIC_IP: ${PUBLIC_IP}
       NAT: ${VOIP_NAT}    
-      TZ: ${TZ}    
+      TZ: ${TZ}          
     healthcheck:
       test: ["CMD-SHELL", "asterisk -rx 'core show channels' | grep -q 'active channels' || exit 1"]
       <<: *healthcheck-tcp
@@ -649,7 +654,7 @@ services:
       dockerfile: Dockerfile
     image: ${OMLRTPENGINE_IMG}
     environment:
-      ENV: ${ENV}
+      ENV: ${VOIP_ENV}
       NG_BIND_UDP_PORT: ${RTPENGINE_BIND_UDP_PORT}
       NAT: ${VOIP_NAT}
       LOG_LEVEL: ${RTPENGINE_LOG_LEVEL}
@@ -657,6 +662,7 @@ services:
       RTPENGINE_HOSTNAME: ${RTPENGINE_HOSTNAME}
       RTP_PORT_MIN: ${RTPENGINE_RTP_PORT_MIN}
       RTP_PORT_MAX: ${RTPENGINE_RTP_PORT_MAX}
+      RTP_ADDR: ${RTPENGINE_RTP_ADDR}
       TZ: ${TZ}  
     privileged: true
     restart: on-failure
@@ -807,7 +813,7 @@ services:
       WEBSOCKET_SERVER: ${DIALER_DCHANNELS_URL}
       TZ: ${TZ}
 
-  scheduler-api:
+  dialer-scheduler-api:
     image: ${SCHEDULER_IMG}
     build:
       context: ./$REPO_PATH/dialer/scheduler/src
@@ -826,7 +832,7 @@ services:
       REDIS_DIALER_PORT: ${DIALER_REDIS_PORT}
       TZ: ${TZ}
 
-  listener:
+  dialer-acd-events-listener:
     image: ${LISTENER_IMG}
     build:
       context: ./$REPO_PATH/dialer/websocket_ari/src
@@ -848,7 +854,7 @@ services:
     depends_on:
       dialer-postgresql:
         condition: service_healthy
-      start-campaign:
+      dialer-manage-campaign:
         condition: service_started
 
   dialer-acd:
@@ -877,7 +883,7 @@ services:
       omnileads:
         ipv4_address: ${DIALER_ASTERISK_IPV4} 
 
-  dialer-dialplan:
+  dialer-acd-dialplan:
     image: ${DIALPLAN_IMG}
     build:
       target: run
@@ -902,13 +908,19 @@ services:
   # ----------------------------------------------------------------------------
   # DIALER WORKERS
   # ----------------------------------------------------------------------------
-  start-campaign:
+  dialer-manage-campaign:
     <<: *worker-common
     environment:
       <<: *worker-env
-      GEARMAN_JOBS: "start-campaign"
+      GEARMAN_JOBS: "create-campaign|start-campaign|pause-campaign|resume-campaign|stop-campaign|edit-campaign|delete-campaign|change-database|schedule-agenda"
 
-  process-contact-worker:
+  dialer-incidence-rule-disposition:
+    <<: *worker-common
+    environment:
+      <<: *worker-env
+      GEARMAN_JOBS: "add-incidence-rule-disposition|delete-incidence-rule|create-incidence-rule|update-incidence-rule"
+
+  dialer-process-contact:
     <<: *worker-common
     environment:
       <<: *worker-env
@@ -916,7 +928,7 @@ services:
     deploy:
       replicas: ${DIALER_PROCESS_CONTACT_REPLICAS:-2}
 
-  process-campaign-worker:
+  dialer-process-campaign:
     <<: *worker-common
     environment:
       <<: *worker-env
@@ -925,43 +937,7 @@ services:
     deploy:
       replicas: ${DIALER_PROCESS_CAMPAIGN_REPLICAS:-2}
 
-  create-campaign-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "create-campaign"
-
-  resume-campaign-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "resume-campaign"
-
-  edit-campaign-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "edit-campaign"
-
-  stop-campaign-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "stop-campaign"
-
-  pause-campaign-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "pause-campaign"
-
-  delete-campaign-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "delete-campaign"
-
-  process-event-worker:
+  dialer-process-event:
     <<: *worker-common
     environment:
       <<: *worker-env
@@ -969,56 +945,19 @@ services:
     deploy:
       replicas: ${DIALER_PROCESS_EVENT_REPLICAS:-2}
 
-  send-reports-worker:
+  dialer-send-reports:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "send-reports"
 
-  add-incidence-rule-disposition-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "add-incidence-rule-disposition"
-
-  change-database-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "change-database"
-
-  create-incidence-rule-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "create-incidence-rule"
-
-  delete-incidence-rule-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "delete-incidence-rule"
-
-  update-incidence-rule-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "update-incidence-rule"
-
-  schedule-agenda:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "schedule-agenda"
-      SCHEDULER_API_HOST: ${DIALER_SCHEDULER_API_HOST}
-
-  render-template:
+  dialer-render-template:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "render-template"
 
-  manage-dialer:
+  dialer-manage:
     <<: *worker-common
     environment:
       <<: *worker-env

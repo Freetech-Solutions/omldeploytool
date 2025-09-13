@@ -133,15 +133,19 @@ all:
   #####################################################################################################
   vars:
     # --- ansible user auth connection
-    ansible_user: root
     ansible_ssh_port: 22
-
+    ansible_user: root
+    # --- If you user other ssh user than root, uncomment the following lines
+    # ansible_become: true
+    # ansible_become_method: sudo
+    # ansible_become_user: root
     ###################################################################################################
     #                                       GRAL ENVIRONMENT                                          #
     ###################################################################################################
 
     # --- Asterisk & RTPengine scenary for SIP & RTP
     # --- "cloud" instance (access through public IP)
+    # --- "custom" instance (you can set your own PJSIP Asterisk contact address and RTPengine interface)
     # --- "lan" instance (access through private IP)
     # --- "nat" instance (access through Public NAT IP)
     # --- "hybrid" instance (agent WebRTC through Public NAT IP, but PSTN acces through LAN VoIP GW)
@@ -194,6 +198,10 @@ all:
     # email_use_ssl:
     # email_use_tls:    
 
+    #####################################################################################################
+    #                                      UWSGI App Server                                             #
+    #####################################################################################################
+
     # If you set scale_uwsgi to true, then you must assign values to 
     # processes, threads, listen_queue_size, and worker_reload_mercy.
     # https://uwsgi-docs.readthedocs.io/en/latest/index.html
@@ -222,15 +230,6 @@ all:
     # --- Read Only connection host address (in case of RW/RO postgres cluster):
     # postgres_ro_vip: 
 
-    # --- set postgres_host if you have your own postgres (standalone host or cloud service)
-    # --- otherwise leave commented to deploy PostgreSQL on Application Host instance
-    # postgres_host:
-    # --- if you have your own bucket (standalone host or cloud service) put here the URL
-    # --- example VULTR: https://ewr1.vultrobjects.com
-    # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
-    # --- example onpremise: https://192.168.100.10
-    # --- if you want to deploy MinIO objects storage on application_host, you must to put '#' before
-
     # Postgres performance tuning
     # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
     # scale_postgres: True
@@ -244,6 +243,10 @@ all:
     # postgres_work_mem:  12MB # Increase the working memory to allow for more complex query operations
     # postgres_maintenance_work_mem: 128MB # Increase the maintenance memory to speed up vacuum and index creation operations
 
+    # --- set postgres_host if you have your own postgres (standalone host or cloud service)
+    # --- otherwise leave commented to deploy PostgreSQL on Application Host instance
+    # postgres_host:
+
     #####################################################################################################
     #                                Object Storage BUCKET config                                       #
     #####################################################################################################
@@ -254,15 +257,19 @@ all:
     bucket_access_key: Hghjkdghjkdhasjdasdsada
     bucket_secret_key: jknkjhkjh4523kjhcksjdhkjfdhKJHHKJGKJh786876876NBVJHB
     bucket_name: omnileads
-    #bucket_ssl_selfsigned: true
+    # bucket_ssl_selfsigned: true
     # --- if your bucket doesn't need region, leave this value (us-east-1)
     bucket_region: us-east-1
-    # if you have your own bucket (standalone host or cloud service) put here the URL, otherwise leave commented
+
+    # --- if you have your own bucket (standalone host or cloud service) put here the URL
     # --- example VULTR: https://ewr1.vultrobjects.com
+    # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
+    # --- example onpremise: https://192.168.100.10
+
     # bucket_url: https://sfo3.digitaloceanspaces.com
 
     #####################################################################################################
-    #                                       ACD                                                         #
+    #                              ACD (Automatic Call Distribution)                                    #
     #####################################################################################################
     # --- Asterisk AMI params
     ami_user: omnileads
@@ -278,6 +285,13 @@ all:
     # --- Log level for ACD
     # --- 0 ERROR, 1 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG
     acd_log_level: 3
+
+    # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip  & port
+    acd_pjsip_transport_dialer: 127.0.0.1:5260
+    acd_pjsip_transport_agent: 127.0.0.1:5160
+    acd_pjsip_transport_trunk: 127.0.0.1:5060
+    acd_api_listen_ip: 127.0.0.1
+
     # If you set scale_asterisk to true, then you must assign values to
     # asterisk_mem_limit, pjsip_threadpool_idle_timeout & pjsip_threadpool_max_size
     # https://docs.asterisk.org/Deployment/Performance-Tuning/ 
@@ -305,6 +319,11 @@ all:
     # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
     rtpengine_log_level: 1
 
+    # --- Only if VOIP_ENV=custom, you can set custom RTPENGINE_RTP_ADDR
+    # --- you can change ${RTPENGINE_HOSTNAME} and ${PUBLIC_IP}
+    # (https://rtpengine.readthedocs.io/en/latest/rtpengine.html)
+    rtpengine_rtp_addr: "internal/${RTPENGINE_HOSTNAME};external/${PUBLIC_IP}"
+
     # if you have your own instances put here the IP or hostname, otherwise leave commented
     # rtpengine_host: 
 
@@ -312,7 +331,6 @@ all:
     # rtpengine_timeout, rtpengine_offer-timeout, rtpengine_silent-timeout & rtpengine_final-timeout
     # https://rtpengine.readthedocs.io/en/latest/rtpengine.html
     
-    # scale_rtpengine: true
     # rtpengine_timeout: 15
     # rtpengine_offer_timeout: 15
     # rtpengine_silent_timeout: 120
@@ -352,30 +370,25 @@ all:
 
     # --- The Dialer Engine: omnidialer or wombat.
     dialer_engine: omnidialer
+    # --- Call attempts per second
     dialer_caps: 1
+    # --- Number of dialer container replicas
     dialer_process_campaign_replicas: 10
-    dialer_process_event_replicas: 1
     dialer_process_contact_replicas: 1
-    # --- Log level for Dialer
-    # --- 0: Error, 1: Warning, 2: Debug
+    dialer_process_event_replicas: 1
+    # --- Log level for Dialer, 0: Error, 1: Warning, 2: Debug
     dialer_log_level: 1
-    # - Uncomment to enable PSTN passthrough mode from the dialer ACD
-    # dialer_passthrough_dial_out: true
-    # dialer_trunk_hostname: trunk_hostname
-    # - Uncomment if each INVITE generated from the dialer to the PSTN needs to be authenticated
-    # dialer_trunk_auth_enable: true
-    # dialer_trunk_username: sip_username
-    # dialer_trunk_password: sip_password
     # --- Dialer API user & password
-    dialer_user: demoadmin
     dialer_password: demo
-    dialer_port: 10040
+    # --- if you have your OMniDialer (standalone host) uncomment & put here the IP or hostname
     # dialer_host: dialer.example.com    
-
+    # dialer_port: 10040
+    
+    # --- dialer_user (only if you have your Wombat dialer)
+    dialer_user: demoadmin
     #####################################################################################################
     #                                       INTEGRATIONS                                                #
     #####################################################################################################
-
 
     #------------------------------------- Web Proxy setting ----------------------------------
     # --- Web Proxy setting
@@ -441,9 +454,9 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20250825-4ea39ba5
-    asterisk_img: docker.io/omnileads/asterisk:20250825-b9ebd5e4
-    
+    omnileads_img: docker.io/omnileads/omlapp:20250912-43ca245d
+    asterisk_img: docker.io/omnileads/asterisk:20250911-118ac5b2
+
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
 ## here you can control which host the action deployed by the deploy.sh script will be applied to        #
