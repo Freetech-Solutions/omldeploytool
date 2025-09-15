@@ -20,11 +20,11 @@ callrec_transcriber_img: docker.io/omnileads/callrec_transcriber:20250825-802afa
 # docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
 
 # --- OMnidialer components images
-dialer_api_img: docker.io/omnileads/dialer_api:20250923-5c9fbd11
-dialer_listener_img: docker.io/omnileads/dialer_listener:20250923-5c9fbd11
-dialer_worker_img: docker.io/omnileads/dialer_worker:20250923-5c9fbd11
-dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20250923-5c9fbd11
-dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20250923-5c9fbd11
+dialer_api_img: docker.io/omnileads/dialer_api:20251013-6fed77c1
+dialer_listener_img: docker.io/omnileads/dialer_listener:20251013-6fed77c1
+dialer_worker_img: docker.io/omnileads/dialer_worker:20251013-6fed77c1
+dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20251013-6fed77c1
+dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20251013-6fed77c1
 
 # --- Backend components images
 redis_img: docker.io/omnileads/redis:231125.01

@@ -114,7 +114,7 @@
       - install
       - upgrade
     when:       
-      - omnileads_ha is not defined  
+      - omnileads_ha is not defined
       
   - name: DJANGO reset admin pass
     shell: "podman run --network=host --env-file /etc/default/django.env --rm {{ omnileads_img }} python /opt/omnileads/ominicontacto/manage.py cambiar_admin_password"

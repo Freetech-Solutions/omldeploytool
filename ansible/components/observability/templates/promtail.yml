@@ -90,13 +90,9 @@ clients:
 {{ dialer_worker_type_config('contact', node_type) | indent(2, true) }}
 {{ dialer_worker_type_config('event', node_type) | indent(2, true) }}
 {% set all_dialer_services = [
-  'dialer_add_incidence_rule', 'dialer_asterisk', 'dialer_change_database',
-  'dialer_create_campaign', 'dialer_create_incidence_rule', 'dialer_delete_campaign',
-  'dialer_delete_incidence_rule', 'dialer_dialplan', 'dialer_edit_campaign',
-  'dialer_flask', 'dialer_listener', 'dialer_pause_campaign', 'dialer_postgresql',
-  'dialer_render_template', 'dialer_resume_campaign', 'dialer_schedule_agenda',
-  'dialer_scheduler', 'dialer_send_reports', 'dialer_start_campaign',
-  'dialer_stop_campaign', 'dialer_update_incidence_rule'] %}
+  'dialer_incidence_rules', 'dialer_asterisk', 'dialer_manaege_campaign',
+  'dialer_dialplan', 'dialer_flask', 'dialer_listener', 'dialer_postgresql',
+  'dialer_render_template', 'dialer_scheduler', 'dialer_send_reports',] %}
 {{ dialer_services_config(node_type, all_dialer_services) | indent(2, true) }}
 {%- endmacro -%}
 

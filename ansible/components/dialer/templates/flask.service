@@ -5,11 +5,13 @@ Wants=network-online.target
 After=network.target 
 Requires=network.target
 RequiresMountsFor=%t/containers
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
-Restart=on-failure
-TimeoutStopSec=70
+Restart=always
+RestartSec=10
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
   --cidfile=%t/%n.ctr-id \

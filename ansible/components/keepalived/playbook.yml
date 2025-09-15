@@ -42,6 +42,10 @@
     with_items:
       - keepalived
     when: ansible_os_family == "Debian"
+    register: apt_install_result
+    until: apt_install_result is success
+    retries: 10
+    delay: 30
 
   - name: KEEPALIVED Keepalived AIO config provissioning
     template: 
@@ -55,7 +59,7 @@
     template: 
       src: "{{ keepalived_repo_path }}templates/check_ha_aio.j2"
       dest: /usr/bin/check_ha.sh
-      mode: 755
+      mode: 700
     tags:
       - upgrade
       - update
@@ -64,7 +68,7 @@
     template: 
       src: "{{ keepalived_repo_path }}templates/aio_transition.sh"
       dest: /usr/bin/oml_cluster_transition.sh
-      mode: 755
+      mode: 700
     tags:
       - upgrade
       - update
