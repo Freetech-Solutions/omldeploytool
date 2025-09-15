@@ -385,6 +385,7 @@
   when:
     - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']
     - postgresql_host_ha is not defined
+    - not (postgres_out | default(false) | bool)
 
 - name: OS_CONF rm Django static_files
   become: yes

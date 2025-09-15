@@ -60,8 +60,7 @@
       - { src: "{{ dialer_repo_path }}templates/process_campaign.service", dest: "/etc/systemd/system/dialer_process_campaign@.service" }
       - { src: "{{ dialer_repo_path }}templates/process_event.service", dest: "/etc/systemd/system/dialer_process_event@.service" }
       - { src: "{{ dialer_repo_path }}templates/process_contact.service", dest: "/etc/systemd/system/dialer_process_contact@.service" }
-      - { src: "{{ dialer_repo_path }}templates/schedule_agenda.service", dest: "/etc/systemd/system/dialer_schedule_agenda.service" }
-      - { src: "{{ dialer_repo_path }}templates/scheduler.service", dest: "/etc/systemd/system/dialer_scheduler.service" }
+      - { src: "{{ dialer_repo_path }}templates/schedule_agenda.service", dest: "/etc/systemd/system/dialer_scheduler.service" }
       - { src: "{{ dialer_repo_path }}templates/send_reports.service", dest: "/etc/systemd/system/dialer_send_reports.service" }
       - { src: "{{ dialer_repo_path }}templates/render_template.service", dest: "/etc/systemd/system/dialer_render_template.service" }
       - { src: "{{ dialer_repo_path }}templates/omnidialer.sql", dest: "/etc/default/omnidialer.sql" }
@@ -82,7 +81,6 @@
       - image: "{{ dialer_listener_img }}"
       - image: "{{ dialer_asterisk_img }}"
       - image: "{{ dialer_dialplan_img }}"
-      - image: "{{ dialer_scheduler_img }}"
     tags:
       - install
       - upgrade
@@ -107,11 +105,12 @@
       - { name: 'dialer_start_campaign.service' }
       - { name: 'dialer_stop_campaign.service' }
       - { name: 'dialer_update_incidence_rule.service' }
+      - { name: 'dialer_schedule_agenda.service' }
     tags:
       - install
       - upgrade
       - restart
-    when: upgrade_from_dialer_2.5 is defined and upgrade_from_dialer_2.5
+    ignore_errors: yes
 
   - name: DIALER Enable y Restart systemd services individuales
     systemd:
@@ -124,7 +123,6 @@
       - { name: 'dialer_asterisk.service' }
       - { name: 'dialer_dialplan.service' }
       - { name: 'dialer_flask.service' }
-      - { name: 'dialer_schedule_agenda.service' }
       - { name: 'dialer_scheduler.service' }
       - { name: 'dialer_send_reports.service' }
       - { name: 'dialer_render_template.service' }

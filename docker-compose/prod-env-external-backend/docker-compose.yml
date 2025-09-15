@@ -37,7 +37,7 @@ services:
       - DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
       - KAMAILIO_HOSTNAME=${KAMAILIO_WEBRTC_HOSTNAME}
       - KAMAILIO_PORT=${KAMAILIO_WEBRTC_SIP_PORT}
-    image: ${OMLAPP_IMG}
+    image: ${OML_APP_IMG}
     command: /opt/omnileads/bin/init_uwsgi.sh
     networks:
       - omnileads
@@ -64,7 +64,7 @@ services:
         required: true      
     dns: 8.8.8.8
     env_file: .env
-    image: ${OMLAPP_IMG}
+    image: ${OML_APP_IMG}
     command: /opt/omnileads/bin/django_commands.sh
     networks:
       - omnileads
@@ -88,7 +88,7 @@ services:
       - DAPHNE_ENABLE=True
       - DJANGO_HOSTNAME=${DAPHNE_HOSTNAME:-daphne}
       - DAPHNE_PORT=${DAPHNE_PORT:-8098}
-    image: ${OMLAPP_IMG}
+    image: ${OML_APP_IMG}
     command: /opt/omnileads/bin/init_daphne.sh
     networks:
       - omnileads 
@@ -118,7 +118,7 @@ services:
     environment:
       - UWSGI_PORT=8097
       - DJANGO_HOSTNAME=omlcron
-    image: ${OMLAPP_IMG}
+    image: ${OML_APP_IMG}
     command: /opt/omnileads/bin/docker-entrypoint.sh
     networks:
       - omnileads
@@ -130,7 +130,7 @@ services:
     working_dir: /opt/omnileads
 
   background-callrec-tasks:
-    image: ${OMLAPP_IMG}
+    image: ${OML_APP_IMG}
     depends_on:
       redis:
         condition: service_healthy
@@ -148,7 +148,7 @@ services:
     working_dir: /opt/omnileads/ominicontacto
 
   background-dialer-tasks:
-    image: ${OMLAPP_IMG}
+    image: ${OML_APP_IMG}
     depends_on:
       redis:
         condition: service_healthy
@@ -166,7 +166,7 @@ services:
     working_dir: /opt/omnileads/ominicontacto
 
   nginx:
-    image: ${OMLNGINX_IMG}
+    image: ${OML_NGINX_IMG}
     depends_on:
       uwsgi:
         condition: service_healthy
@@ -212,7 +212,7 @@ services:
       redis:
         condition: service_healthy
         required: true      
-    image: ${OMLFASTAGI_IMG}
+    image: ${OML_FASTAGI_IMG}
     command: python /app/fastagi.py
     environment:
       - DIALER_AMD_ENDPOINT=${DIALER_API_HOST}
@@ -238,7 +238,7 @@ services:
       - ${FASTAGI_EXT_BIND_IP:-0.0.0.0}:${FASTAGI_EXT_PORT:-4573}:4573/tcp
 
   ami:
-    image: ${OMLAMI_IMG}
+    image: ${OML_AMI_IMG}
     depends_on:
       acd:
         condition: service_healthy
@@ -257,7 +257,7 @@ services:
       - omnileads
 
   acd-config-generator:
-    image: ${OMLACD_RETRIEVE_CONF_IMG}
+    image: ${OML_ACD_CONF_IMG}
     depends_on:
       websockets:
         condition: service_started
@@ -280,7 +280,7 @@ services:
       - asterisk_sounds:/home/omnileads/sounds
 
   acd:
-    image: ${OMLACD_IMG}
+    image: ${OML_ACD_IMG}
     depends_on:
       fastagi:
         condition: service_started
@@ -348,7 +348,7 @@ services:
       - asterisk_callrec:/var/spool/asterisk/monitor/
   
   call-logger:
-    image: ${OMLCHAN_TEL_LOGGER_IMG}
+    image: ${OML_ACD_CALL_LOGGER_IMG}
     depends_on:
       gearman:
         condition: service_healthy
@@ -372,7 +372,7 @@ services:
     command: python /app/app.py
 
   kamailio-webrtc:
-    image: ${OMLKAM_IMG}
+    image: ${OML_KAM_IMG}
     depends_on:
       redis:
         condition: service_healthy
@@ -400,7 +400,7 @@ services:
     stop_grace_period: 10s
 
   rtpengine:
-    image: ${OMLRTPENGINE_IMG}
+    image: ${OML_RTPENGINE_IMG}
     network_mode: host
     environment:
       - ENV=docker
@@ -419,7 +419,7 @@ services:
 
   websockets:
     tty: true
-    image: ${OMLWS_IMG}
+    image: ${OML_WS_IMG}
     depends_on:
       - redis
     environment:
@@ -473,7 +473,7 @@ services:
     build:
       target: run
       context: ./interface/src
-    image: ${API_IMG}
+    image: ${DIALER_API_IMG}
     ports:
       - ${DIALER_API_EXT_BIND_IP:-0.0.0.0}:${DIALER_API_EXT_PORT:-1440}:1440/tcp
     networks:
@@ -507,7 +507,7 @@ services:
   listener:
     build:
       context: ./websocket_ari/src
-    image: ${LISTENER_IMG}
+    image: ${DIALER_ACD_LISTENER_IMG}
     networks:
       - omnileads
     tty: true
@@ -527,7 +527,7 @@ services:
   start-campaign:
     build:
       context: ./workers/handle-campaign/src
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     networks:
       - omnileads
     tty: true
@@ -560,7 +560,7 @@ services:
       - dialer-postgresql
 
   process-contact-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     deploy:
       replicas: ${DIALER_PROCESS_CONTACT_REPLICAS}
     stop_signal: SIGINT
@@ -596,7 +596,7 @@ services:
       - omnileads
 
   process-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     deploy:
@@ -632,7 +632,7 @@ services:
       - omnileads
 
   create-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     stop_signal: SIGINT
     tty: true
     stdin_open: true
@@ -666,7 +666,7 @@ services:
       - omnileads
 
   resume-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -697,7 +697,7 @@ services:
       - omnileads
 
   edit-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -728,7 +728,7 @@ services:
       - omnileads
 
   stop-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -759,7 +759,7 @@ services:
       - omnileads
 
   pause-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -790,7 +790,7 @@ services:
       - omnileads
 
   delete-campaign-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -821,7 +821,7 @@ services:
       - omnileads
 
   process-event-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     deploy: 
@@ -857,7 +857,7 @@ services:
       - omnileads
 
   schedule-contact-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -888,7 +888,7 @@ services:
       - omnileads
 
   send-reports-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -919,7 +919,7 @@ services:
       - omnileads
 
   add-incidence-rule-disposition-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     tty: true
     stdin_open: true
     depends_on:
@@ -952,7 +952,7 @@ services:
       - omnileads
 
   change-database-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -983,7 +983,7 @@ services:
       - omnileads
 
   create-incidence-rule-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -1014,7 +1014,7 @@ services:
       - omnileads
 
   delete-incidence-rule-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -1045,7 +1045,7 @@ services:
       - omnileads
 
   update-incidence-rule-worker:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -1076,7 +1076,7 @@ services:
       - omnileads
 
   schedule-agenda:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     depends_on:
       - dialer-postgresql
     environment:
@@ -1107,7 +1107,7 @@ services:
       - omnileads
 
   render-template:
-    image: ${WORKER_IMG}
+    image: ${DIALER_WORKER_IMG}
     env_file: .env
     stop_signal: SIGINT
     tty: true
@@ -1142,7 +1142,7 @@ services:
       - omnileads
 
   manage-dialer:
-    image: ${WORKER_IMG}    
+    image: ${DIALER_WORKER_IMG}    
     stop_signal: SIGINT
     tty: true
     stdin_open: true
@@ -1178,7 +1178,7 @@ services:
   dialer-acd:
     build:
       context: ./asterisk/
-    image: ${ASTERISK_IMG}
+    image: ${DIALER_ACD_IMG}
     environment:
       - ASTERISK_HOST=${DIALER_ASTERISK_HOSTNAME}
       - ASTERISK_PORT=${DIALER_ASTERISK_ARI_PORT}
@@ -1201,7 +1201,7 @@ services:
     build:
       target: run
       context: ./dialplan/
-    image: ${DIALPLAN_IMG}
+    image: ${DIALER_ACD_DIALPLAN_IMG}
     depends_on:
       - dialer-acd
     environment:
