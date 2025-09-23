@@ -1,26 +1,22 @@
-# Release Notes - OMniLeads 2.5.1
-[2025-09-11]
+# Release Notes - OMniLeads 2.5.2
+[2025-09-23]
 
 ## Added
 
-* oml-3000 Add Agent Group setting to restrict password update.
-* oml-3002 User bulk remove.
-* oml-3115 Add Campaign setting to allow showing callid in disposition form.
-* oml-3116 DTMF input form for agent's softphone (allowing copying long DTMF codes).
+* [OMLApp] oml-3120 Whatsapp Automatic closing message.
 
 ## Changed
 
-* oml-2996 Disposition form is always displayed for Inbound calls.
-* oml-3136 A fallback routine is now in place to handle scenarios where an audio file for the telephony channel cannot be located.
+* [OMniDialer] oml-3045-dev-optimize-scheduler.
+* [Ansible][Docker] oml-3045-optimize-scheduler 
+* [OMniDialer] oml-3086-fix-add-priority-calls-campaigns.
+* [OMniDialer] oml-3151-dev-ensure-locks-deletion.
+* [Docker] image names & dialer workers containers
 
 ## Fixed
 
-* oml-2999 Fix phone validation regex.
-* oml-3037 Fix recording search tests.
-* oml-3028 Fix recording search pagination buttons.
-* oml-3048 Fix Respect call autoattend configuration for transfers to campaigns (OOS).
-* oml-3135 Eliminated the sending of redundant jobs that activate the process-campaign.
-* oml-3132 Management of a Postgres connection pool, a delay configurable between each contact search iteration, implementation of various caches.
+* [Ansible] postgres stop Task with external postgres.
+* [Docker] fix build context "dialer" for test-env.
 
 ## Removed
 
@@ -28,4 +24,4 @@ No removals in this release.
 
 ## PostgreSQL Migrations
 
-ominicontacto_app: 0112, 0113
+* configuracion_telefonia_app: 0023

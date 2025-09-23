@@ -28,7 +28,7 @@ x-django-common: &django-common
   build: 
       context: ./$REPO_PATH/django/
       dockerfile: Dockerfile
-  image: ${OMLAPP_IMG}
+  image: ${OML_APP_IMG}
   dns: 8.8.8.8
   networks:
     - omnileads
@@ -58,9 +58,9 @@ x-django-common: &django-common
     KAMAILIO_PORT: ${KAMAILIO_WEBRTC_SIP_PORT}
     LOGIN_FAILURE_LIMIT: ${LOGIN_FAILURE_LIMIT}    
     MONITORFORMAT: "mp3"  
-    OML_BRANCH: ${OMLAPP_IMG}
-    OML_COMMIT: ${OMLAPP_IMG}
-    OML_BUILD_DATE: ${OMLAPP_IMG}
+    OML_BRANCH: ${OML_APP_IMG}
+    OML_COMMIT: ${OML_APP_IMG}
+    OML_BUILD_DATE: ${OML_APP_IMG}
     OML_LOGGING_SLOWSQL_ENABLED: ""
     OML_LOGGING_SLOWSQL_OUTPUT: "-"
     OML_LOGGING_SLOWSQL_DURATION: 1
@@ -108,7 +108,7 @@ x-django-web-common: &django-web-common
 x-worker-common: &worker-common
   build:
     context: ./$REPO_PATH/dialer/workers/handle-campaign/src
-  image: ${WORKER_IMG}
+  image: ${DIALER_WORKER_IMG}
   networks:
     - omnileads
   restart: on-failure
@@ -333,7 +333,7 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
-      - ${REPO_PATH}/django/:/opt/omnileads/ominicontacto/      
+      - ${REPO_PATH}/django/:/opt/omnileads/ominicontacto/
   
   whatsapp:
     <<: *django-common
@@ -412,7 +412,7 @@ services:
       context: ./$REPO_PATH/websocket-server/
       target: run
       dockerfile: ./$REPO_PATH/websocket-server/etc/fts/oml/services/websockets/dockerfile
-    image: ${OMLWS_IMG}
+    image: ${OML_WS_IMG}
     depends_on:
       - redis
     environment:
@@ -434,7 +434,7 @@ services:
     build:
       context: ./$REPO_PATH/nginx/
       dockerfile: Dockerfile
-    image: ${OMLNGINX_IMG}
+    image: ${OML_NGINX_IMG}
     depends_on:
       django-app:
         condition: service_healthy
@@ -482,7 +482,7 @@ services:
     build: 
       context: ./$REPO_PATH/acd/
       dockerfile: Dockerfile
-    image: ${OMLACD_IMG}
+    image: ${OML_ACD_IMG}
     depends_on:
       fastagi:
         condition: service_started
@@ -539,7 +539,7 @@ services:
     build: 
       context: ./$REPO_PATH/fastagi/
       dockerfile: Dockerfile
-    image: ${OMLFASTAGI_IMG}
+    image: ${OML_FASTAGI_IMG}
     depends_on:
       postgresql:
         condition: service_healthy
@@ -568,7 +568,7 @@ services:
     build: 
       context: ./$REPO_PATH/ami/
       dockerfile: Dockerfile
-    image: ${OMLAMI_IMG}
+    image: ${OML_AMI_IMG}
     depends_on:
       redis:
         condition: service_healthy
@@ -589,7 +589,7 @@ services:
     build: 
       context: ./$REPO_PATH/acd_configurator/
       dockerfile: Dockerfile
-    image: ${OMLACD_RETRIEVE_CONF_IMG}
+    image: ${OML_ACD_CONF_IMG}
     depends_on:
       nginx:
         condition: service_healthy
@@ -614,7 +614,7 @@ services:
     build: 
       context: ./$REPO_PATH/kamailio-webrtc/
       dockerfile: Dockerfile
-    image: ${OMLKAM_IMG}
+    image: ${OML_KAM_IMG}
     depends_on:
       redis:
         condition: service_healthy
@@ -644,7 +644,7 @@ services:
     build: 
       context: ./$REPO_PATH/rtpengine/
       dockerfile: Dockerfile
-    image: ${OMLRTPENGINE_IMG}
+    image: ${OML_RTPENGINE_IMG}
     environment:
       ENV: ${VOIP_ENV}
       NG_BIND_UDP_PORT: ${RTPENGINE_BIND_UDP_PORT}
@@ -672,7 +672,7 @@ services:
     build: 
       context: ./$REPO_PATH/postcall_actions/callrec_compressor/
       dockerfile: Dockerfile
-    image: ${CALLREC_COMPRESSOR_IMG}
+    image: ${OML_CALLREC_COMPRESSOR_IMG}
     depends_on:
       minio:
         condition: service_healthy
@@ -701,7 +701,7 @@ services:
       context: ./$REPO_PATH/postcall_actions/callrec_transcriber/
       dockerfile: Dockerfile
       target: saas
-    image: ${CALLREC_TRANSCRIBER_IMG}
+    image: ${OML_CALLREC_TRANSCRIBER_IMG}
     depends_on:
       minio:
         condition: service_healthy
@@ -731,7 +731,7 @@ services:
     build: 
       context: ./$REPO_PATH/call_logger/
       dockerfile: Dockerfile  
-    image: ${OMLCHAN_TEL_LOGGER_IMG}
+    image: ${OML_ACD_CALL_LOGGER_IMG}
     depends_on:
       gearman:
         condition: service_healthy
@@ -783,7 +783,7 @@ services:
       - ../omnidialer.sql:/docker-entrypoint-initdb.d/init.sql
 
   dialer-api:
-    image: ${API_IMG}
+    image: ${DIALER_API_IMG}
     build:
       target: run
       context: ./$REPO_PATH/dialer/interface/src
@@ -804,27 +804,8 @@ services:
       WEBSOCKET_SERVER: ${DIALER_DCHANNELS_URL}
       TZ: ${TZ}
 
-  scheduler-api:
-    image: ${SCHEDULER_IMG}
-    build:
-      context: ./$REPO_PATH/dialer/scheduler/src
-    ports:
-      - ${DIALER_SCHEDULER_EXT_BIND_IP:-0.0.0.0}:${DIALER_SCHEDULER_EXT_PORT:-1441}:1441/tcp
-    networks:
-      - omnileads
-    stop_signal: SIGINT
-    restart: on-failure
-    logging: *default-logging
-    tty: true
-    stdin_open: true
-    environment:
-      GEARMAN_JOB_SERVERS: ${GEARMAN_JOB_SERVERS}
-      REDIS_DIALER_SERVER: ${DIALER_REDIS_SERVER}
-      REDIS_DIALER_PORT: ${DIALER_REDIS_PORT}
-      TZ: ${TZ}
-
-  listener:
-    image: ${LISTENER_IMG}
+  dialer-acd-listener:
+    image: ${DIALER_ACD_LISTENER_IMG}
     build:
       context: ./$REPO_PATH/dialer/websocket_ari/src
     networks:
@@ -845,11 +826,11 @@ services:
     depends_on:
       dialer-postgresql:
         condition: service_healthy
-      start-campaign:
+      dialer-start-camp:
         condition: service_started
 
   dialer-acd:
-    image: ${ASTERISK_IMG}
+    image: ${DIALER_ACD_IMG}
     build:
       context: ./$REPO_PATH/dialer/asterisk/
     environment:
@@ -874,9 +855,8 @@ services:
       omnileads:
         ipv4_address: ${DIALER_ASTERISK_IPV4} 
 
-
-  dialer-dialplan:
-    image: ${DIALPLAN_IMG}
+  dialer-acd-dialplan:
+    image: ${DIALER_ACD_DIALPLAN_IMG}
     build:
       target: run
       context: ./$REPO_PATH/dialer/dialplan/
@@ -897,69 +877,78 @@ services:
     networks:
       - omnileads
 
-  # ----------------------------------------------------------------------------
-  # DIALER WORKERS
-  # ----------------------------------------------------------------------------
-  start-campaign:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "start-campaign"
-
-  process-contact-worker:
+  dialer-process-contact:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "process-contact"
     deploy:
-      replicas: ${PROCESS_CONTACT_REPLICAS:-2}
+      replicas: ${DIALER_PROCESS_CONTACT_REPLICAS:-2}
 
-  process-campaign-worker:
+  dialer-process-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "process-campaign"
       SCHEDULER_API_HOST: ${DIALER_SCHEDULER_API_HOST} 
     deploy:
-      replicas: ${PROCESS_CAMPAIGN_REPLICAS:-2}
+      replicas: ${DIALER_PROCESS_CAMPAIGN_REPLICAS:-2}
 
-  create-campaign-worker:
+  dialer-scheduler:
+    <<: *worker-common
+    environment:
+      <<: *worker-env
+      GEARMAN_JOBS: "schedule-agenda"
+
+  dialer-start-camp:
+    <<: *worker-common
+    environment:
+      <<: *worker-env
+      GEARMAN_JOBS: "start-campaign"
+
+  dialer-create-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "create-campaign"
 
-  resume-campaign-worker:
+  dialer-resume-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "resume-campaign"
 
-  edit-campaign-worker:
+  dialer-edit-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "edit-campaign"
 
-  stop-campaign-worker:
+  dialer-stop-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "stop-campaign"
 
-  pause-campaign-worker:
+  dialer-pause-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "pause-campaign"
 
-  delete-campaign-worker:
+  dialer-delete-camp:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "delete-campaign"
 
-  process-event-worker:
+  dialer-change-database-camp:
+    <<: *worker-common
+    environment:
+      <<: *worker-env
+      GEARMAN_JOBS: "change-database"
+
+  dialer-process-event:
     <<: *worker-common
     environment:
       <<: *worker-env
@@ -967,56 +956,43 @@ services:
     deploy:
       replicas: ${PROCESS_EVENT_REPLICAS:-2}
 
-  send-reports-worker:
+  dialer-send-reports:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "send-reports"
 
-  add-incidence-rule-disposition-worker:
+  dialer-add-incidence-rule:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "add-incidence-rule-disposition"
 
-  change-database-worker:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "change-database"
-
-  create-incidence-rule-worker:
+  dialer-create-incidence-rule:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "create-incidence-rule"
 
-  delete-incidence-rule-worker:
+  dialer-delete-incidence-rule:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "delete-incidence-rule"
 
-  update-incidence-rule-worker:
+  dialer-update-incidence-rule:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "update-incidence-rule"
 
-  schedule-agenda:
-    <<: *worker-common
-    environment:
-      <<: *worker-env
-      GEARMAN_JOBS: "schedule-agenda"
-      SCHEDULER_API_HOST: ${DIALER_SCHEDULER_API_HOST}
-
-  render-template:
+  dialer-render-template:
     <<: *worker-common
     environment:
       <<: *worker-env
       GEARMAN_JOBS: "render-template"
 
-  manage-dialer:
+  dialer-manage-dialer:
     <<: *worker-common
     environment:
       <<: *worker-env

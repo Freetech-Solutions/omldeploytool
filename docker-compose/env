@@ -27,42 +27,41 @@ GATEWAY=10.22.22.254
 #                              versions of each image to deploy                                   #
 ###################################################################################################
 
-# --- OMniLeads core application images
-OMLAPP_IMG=docker.io/omnileads/omlapp:20250912-43ca245d
-OMLNGINX_IMG=docker.io/omnileads/nginx:20250825-8b1ac6ba
-OMLWS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
+# --- OMniLeads images WEB
+OML_APP_IMG=docker.io/omnileads/omlapp:20250918-f85a9787
+OML_NGINX_IMG=docker.io/omnileads/nginx:20250825-8b1ac6ba
+OML_WS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
 
-OMLACD_IMG=docker.io/omnileads/asterisk:20250911-118ac5b2
-OMLACD_RETRIEVE_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
-OMLFASTAGI_IMG=docker.io/omnileads/fastagi:20250825-2e557c10
-OMLAMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
-OMLKAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
-OMLRTPENGINE_IMG=docker.io/omnileads/rtpengine:20250911-0d2c9b76
-OMLCHAN_TEL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
-CALLREC_COMPRESSOR_IMG=docker.io/omnileads/callrec_compressor:20250825-802afa6c
+# --- OMniLeads images TEL
+OML_ACD_IMG=docker.io/omnileads/asterisk:20250923-57a73a82
+OML_ACD_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
+OML_FASTAGI_IMG=docker.io/omnileads/fastagi:20250825-2e557c10
+OML_AMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
+OML_KAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
+OML_RTPENGINE_IMG=docker.io/omnileads/rtpengine:20250911-0d2c9b76
+OML_ACD_CALL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
+OML_CALLREC_COMPRESSOR_IMG=docker.io/omnileads/callrec_compressor:20250825-802afa6c
 # if you want to run Speech to text onpremise change de suffix tag from "-saas" to "-local"
-CALLREC_TRANSCRIBER_IMG=docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
+OML_CALLREC_TRANSCRIBER_IMG=docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
 
-# --- OMniDialer images
-API_IMG=docker.io/omnileads/dialer_api:20250910-9dc6ff44
-LISTENER_IMG=docker.io/omnileads/dialer_listener:20250910-9dc6ff44
-WORKER_IMG=docker.io/omnileads/dialer_worker:20250910-9dc6ff44
-SCHEDULER_IMG=docker.io/omnileads/dialer_scheduler:20250910-9dc6ff44
-DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20250910-9dc6ff44
-ASTERISK_IMG=docker.io/omnileads/dialer_asterisk:20250910-9dc6ff44
+# --- OMniLeads images DIALER
+DIALER_API_IMG=docker.io/omnileads/dialer_api:20250923-5c9fbd11
+DIALER_ACD_IMG=docker.io/omnileads/dialer_asterisk:20250923-5c9fbd11
+DIALER_ACD_LISTENER_IMG=docker.io/omnileads/dialer_listener:20250923-5c9fbd11
+DIALER_ACD_DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20250923-5c9fbd11
+DIALER_WORKER_IMG=docker.io/omnileads/dialer_worker:20250923-5c9fbd11
 
-# --- Backend services images
+# --- Backend services common images
 REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
 POSTGRES_IMG=docker.io/library/postgres:14.9-bullseye
 MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
-PROMETHEUS_IMG=docker.io/prom/prometheus:v2.55.1
 
 # --- Images for testing and development
-OMLPSTNEMULATOR_IMG=docker.io/omnileads/pstn_emulator:241209.01
-OMLVIDEOCALLS_WIDGET_IMG=docker.io/omnileads/videocalls_widget:230905.01
-OMLVUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
-OMLNGINXQA_IMG=docker.io/omnileads/nginxqa:latest
+PSTNEMULATOR_IMG=docker.io/omnileads/pstn_emulator:241209.01
+OML_VIDEOCALLS_WIDGET_IMG=docker.io/omnileads/videocalls_widget:230905.01
+OML_VUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
+OML_NGINXQA_IMG=docker.io/omnileads/nginxqa:latest
 
 ###################################################################################################
 #               s3-minio is the default option and use the stack bucket                           #
@@ -324,13 +323,10 @@ DIALER_SIP_ADDR=127.0.0.1
 # When omnidialer run in other host, you must set the OMNIDIALER_HOST variable with 
 # the IP or hostname of the host
 DIALER_API_HOST=dialer-api:1440
-DIALER_SCHEDULER_API_HOST=scheduler-api:1441
 
 # --- Dialer API connection params
 DIALER_API_EXT_BIND_IP=${OML_HOSTNAME}
 DIALER_API_EXT_PORT=1440
-DIALER_SCHEDULER_EXT_BIND_IP=${OML_HOSTNAME}
-DIALER_SCHEDULER_EXT_PORT=1441
 
 # --- Asterisk dialer container params
 # --- On test-env or dev-env you must set the ASTERISK_DIALER_HOSTNAME variable with "dialer-asterisk-dev" string

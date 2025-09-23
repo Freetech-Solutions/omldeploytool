@@ -124,10 +124,10 @@ VOIP_NAT=true
 
 OMniLeads Enterprise adds advanced modules (reports, wallboards, surveys) on top of the Community edition.
 
-In your `.env`, append `-enterprise` to the `OMLAPP_IMG` tag:
+In your `.env`, append `-enterprise` to the `OML_APP_IMG` tag:
 
 ```dotenv
-OMLAPP_IMG=${REPO}/omlapp:240117.01-enterprise
+OML_APP_IMG=${REPO}/omlapp:240117.01-enterprise
 ```
 
 Then launch:
