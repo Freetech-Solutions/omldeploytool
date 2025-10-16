@@ -283,8 +283,8 @@ all:
     callrec_transcriber_api_key: 
 
     # --- Log level for ACD
-    # --- 0 ERROR, 1 WARNING, 3 NOTICE, 4 INFO, 5 DEBUG
-    acd_log_level: 3
+    # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
+    acd_log_level: 1
 
     # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip  & port
     acd_pjsip_transport_dialer: 127.0.0.1:5260
@@ -454,8 +454,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20251002-404da97c
-    asterisk_img: docker.io/omnileads/asterisk:20250923-57a73a82
+    omnileads_img: docker.io/omnileads/omlapp:20251009-a6169ffc
+    asterisk_img: docker.io/omnileads/asterisk:20251002-b75cdedd
 
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
@@ -476,8 +476,8 @@ omnileads_aio:
     #tenant_example_7_HA_1:
     #tenant_example_7_HA_2:
 
-##################### 3 Host cluster ###########################    
-##################### 3 Host cluster ###########################    
+##################### 4 Host cluster ###########################    
+##################### 4 Host cluster ###########################    
 
 omnileads_data:
   hosts:

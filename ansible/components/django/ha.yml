@@ -93,7 +93,7 @@
         - restart_core
         - restart_background_tasks
         - restart_whatsapp
-          - restart_core
+        - restart_core
       when: 
         - omnileads_ha is defined
         - ha_role == "main"

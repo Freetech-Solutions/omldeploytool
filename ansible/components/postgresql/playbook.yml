@@ -29,11 +29,14 @@
   tasks:
     - name: POSTGRESQL Set environment variables for this installation
       template:
-        src: "{{ pgsql_repo_path }}templates/postgres.env"
-        dest: /etc/default/postgres.env
+        src: '{{ item.src }}'
+        dest: '{{ item.dest }}'
         mode: '0664'
         owner: "{{ usuario }}"
         group: "{{ usuario }}"
+      loop:
+          - { src: 'templates/postgres.env', dest: '/etc/default/postgres.env' }
+          - { src: 'templates/omnidialer.sql', dest: '/etc/omnileads/omnidialer.sql' }
       tags:
         - install
         - upgrade

@@ -17,6 +17,14 @@
 #
 ---
 
+- name: DIALER Isolated deploy
+  import_playbook: ../postgresql/playbook.yml
+  when: inventory_hostname in groups['omnileads_dialer']
+
+- name: DIALER Isolated deploy
+  import_playbook: ../redis/playbook.yml
+  when: inventory_hostname in groups['omnileads_dialer']
+
 - name: DIALER installation and configuration
   hosts: 
     - omnileads_dialer
@@ -56,14 +64,12 @@
       - { src: "{{ dialer_repo_path }}templates/dialplan.service", dest: "/etc/systemd/system/dialer_dialplan.service" }
       - { src: "{{ dialer_repo_path }}templates/flask.service", dest: "/etc/systemd/system/dialer_flask.service" }
       - { src: "{{ dialer_repo_path }}templates/listener.service", dest: "/etc/systemd/system/dialer_listener.service" }
-      - { src: "{{ dialer_repo_path }}templates/postgresql.service", dest: "/etc/systemd/system/dialer_postgresql.service" }      
       - { src: "{{ dialer_repo_path }}templates/process_campaign.service", dest: "/etc/systemd/system/dialer_process_campaign@.service" }
       - { src: "{{ dialer_repo_path }}templates/process_event.service", dest: "/etc/systemd/system/dialer_process_event@.service" }
       - { src: "{{ dialer_repo_path }}templates/process_contact.service", dest: "/etc/systemd/system/dialer_process_contact@.service" }
       - { src: "{{ dialer_repo_path }}templates/schedule_agenda.service", dest: "/etc/systemd/system/dialer_scheduler.service" }
       - { src: "{{ dialer_repo_path }}templates/send_reports.service", dest: "/etc/systemd/system/dialer_send_reports.service" }
       - { src: "{{ dialer_repo_path }}templates/render_template.service", dest: "/etc/systemd/system/dialer_render_template.service" }
-      - { src: "{{ dialer_repo_path }}templates/omnidialer.sql", dest: "/etc/default/omnidialer.sql" }
       - { src: "{{ dialer_repo_path }}templates/manage_campaign.service", dest: "/etc/systemd/system/dialer_manage_campaign.service" }
       - { src: "{{ dialer_repo_path }}templates/incidence_rules.service", dest: "/etc/systemd/system/dialer_incidence_rules.service" }
     tags:
@@ -86,32 +92,6 @@
       - upgrade
       - update
 
-  - name: DIALER Disable & Stop systemd old services
-    systemd:
-      name: "{{ item.name }}"
-      state: stopped
-      enabled: no
-      daemon_reload: yes
-    loop:
-      - { name: 'dialer_add_incidence_rule.service' }
-      - { name: 'dialer_change_database.service' }
-      - { name: 'dialer_create_campaign.service' }
-      - { name: 'dialer_create_incidence_rule.service' }
-      - { name: 'dialer_delete_campaign.service' }
-      - { name: 'dialer_delete_incidence_rule.service' }
-      - { name: 'dialer_edit_campaign.service' }
-      - { name: 'dialer_pause_campaign.service' }
-      - { name: 'dialer_resume_campaign.service' }
-      - { name: 'dialer_start_campaign.service' }
-      - { name: 'dialer_stop_campaign.service' }
-      - { name: 'dialer_update_incidence_rule.service' }
-      - { name: 'dialer_schedule_agenda.service' }
-    tags:
-      - install
-      - upgrade
-      - restart
-    ignore_errors: yes
-
   - name: DIALER Enable y Restart systemd services individuales
     systemd:
       name: "{{ item.name }}"
@@ -119,7 +99,6 @@
       enabled: yes
       daemon_reload: yes
     loop:
-      - { name: 'dialer_postgresql.service' }
       - { name: 'dialer_asterisk.service' }
       - { name: 'dialer_dialplan.service' }
       - { name: 'dialer_flask.service' }
@@ -133,7 +112,6 @@
       - install
       - upgrade
       - restart
-    when: omnileads_ha is not defined
 
   - name: DIALER | Validar cantidades de réplicas
     ansible.builtin.assert:
@@ -155,7 +133,7 @@
     ansible.builtin.systemd:
       name: "dialer_process_campaign@{{ item }}"
       enabled: true
-      state: started         # usa 'restarted' sólo si querés forzar reinicio
+      state: restarted         # usa 'restarted' sólo si querés forzar reinicio
     loop: "{{ query('sequence', 'start=1 end=' ~ (dialer_process_campaign_replicas | int | string)) }}"
     tags: [install, upgrade, restart]
 
@@ -164,7 +142,7 @@
     ansible.builtin.systemd:
       name: "dialer_process_contact@{{ item }}"
       enabled: true
-      state: started
+      state: restarted
     loop: "{{ query('sequence', 'start=1 end=' ~ (dialer_process_contact_replicas | int | string)) }}"
     tags: [install, upgrade, restart]
 
@@ -173,6 +151,7 @@
     ansible.builtin.systemd:
       name: "dialer_process_event@{{ item }}"
       enabled: true
-      state: started
+      state: restarted
     loop: "{{ query('sequence', 'start=1 end=' ~ (dialer_process_event_replicas | int | string)) }}"
     tags: [install, upgrade, restart]
+

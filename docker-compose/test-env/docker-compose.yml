@@ -129,7 +129,7 @@ x-worker-common: &worker-common
     ASTERISK_PORT: ${DIALER_ASTERISK_ARI_PORT}
     ASTERISK_USER: ${ACD_AMI_USER}
     ASTERISK_PASS: ${ACD_AMI_PASSWORD}
-    ASTERISK_APP: "call_manager"
+    ASTERISK_APP: "dialer_dialplan"
     CAPS: ${DIALER_CAPS}
     DIALER_ACD_HOST: "pstn_gateway"
     POSTGRES_OML_SERVER: ${POSTGRES_HOSTNAME}

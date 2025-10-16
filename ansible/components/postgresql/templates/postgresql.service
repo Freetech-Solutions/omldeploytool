@@ -31,11 +31,14 @@ ExecStart=/usr/bin/podman run \
   --volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf \
   --volume=/etc/omnileads/pg_hba.conf:/etc/postgresql/pg_hba.conf \
   --volume=/etc/omnileads/pgpass:/var/lib/postgresql/.pgpass \
+  --volume=/etc/omnileads/omnidialer.sql:/docker-entrypoint-initdb.d/init.sql \
   {{ postgres_ha_img }} postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
 {% elif scale_postgres is defined and scale_postgres %}
   --volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf \
+  --volume=/etc/omnileads/omnidialer.sql:/docker-entrypoint-initdb.d/init.sql \
   {{ postgres_img }} postgres -c config_file=/etc/postgresql/postgresql.conf
 {% else %}
+  --volume=/etc/omnileads/omnidialer.sql:/docker-entrypoint-initdb.d/init.sql \
   {{ postgres_img }} postgres -c listen_addresses={{ postgres_host }}
 {% endif %}
 
