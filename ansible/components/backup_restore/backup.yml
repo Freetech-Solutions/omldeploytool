@@ -30,12 +30,12 @@
         file_timestamp: "{{ ansible_date_time.epoch }}"
 
     - name: BACKUP postgres DB .sql file and upload to the bucket
-      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ file_timestamp }}.sql --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_backup.py"
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ file_timestamp }}.sql --rm {{ omnileads_img }} python /opt/omnileads/bin/init_psql_backup.py"
       when:
       - omnileads_ha is not defined       
 
     - name: BACKUP postgres DB .sql file and upload to the bucket HA Scenary
-      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ file_timestamp }}.sql --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_backup.py"
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ file_timestamp }}.sql --rm {{ omnileads_img }} python /opt/omnileads/bin/init_psql_backup.py"
       when:
       - omnileads_ha is defined 
       - ha_role == "backup"  
