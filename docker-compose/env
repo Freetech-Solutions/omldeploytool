@@ -28,21 +28,20 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads images WEB
-OML_APP_IMG=docker.io/omnileads/omlapp:20251009-a6169ffc
+OML_APP_IMG=docker.io/freetechsolutions/omlapp:20251027-da49887b
 OML_NGINX_IMG=docker.io/omnileads/nginx:20250909-b9e079d4
 OML_WS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
 
 # --- OMniLeads images TEL
-OML_ACD_IMG=docker.io/omnileads/asterisk:20251002-b75cdedd
+OML_ACD_IMG=docker.io/freetechsolutions/asterisk:20251027-ec850762
 OML_ACD_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
 OML_FASTAGI_IMG=docker.io/omnileads/fastagi:20250825-2e557c10
 OML_AMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
 OML_KAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
 OML_RTPENGINE_IMG=docker.io/omnileads/rtpengine:20250911-0d2c9b76
 OML_ACD_CALL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
-OML_CALLREC_COMPRESSOR_IMG=docker.io/omnileads/callrec_compressor:20250825-802afa6c
-# if you want to run Speech to text onpremise change de suffix tag from "-saas" to "-local"
-OML_CALLREC_TRANSCRIBER_IMG=docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
+OML_CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20251027-ab73565a
+OML_CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20251027-ab73565a
 
 # --- OMniLeads images DIALER
 DIALER_API_IMG=docker.io/omnileads/dialer_api:20251013-6fed77c1
@@ -140,13 +139,6 @@ ACD_PJSIP_TRANSPORT_AGENT=${ACD_HOSTNAME}
 ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
 ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
-# --- In case o SaaS STT put here the STT API key
-# for Gemini STT use the API key from the Google Cloud project
-# for OpenAI STT use the API key from the OpenAI account
-STT_API_KEY=your_stt_api_key
-# Set the Speech to Text engine: openai, gemini or local
-STT_ENGINE=openai
-
 # --- Asterisk scale parameters
 # Scale var "True" or "False"
 ACD_SCALE=False
@@ -163,11 +155,24 @@ ACD_SCALE=False
 # ACD_TIMER_T1=
 # ACD_TIMER_B=
 
-
 # API_BIND_IP=${OML_HOSTNAME}
 # SIP_AGENT_IP=${OML_HOSTNAME}
 # SIP_TRUNK_IP=${PUBLIC_IP}
 # SIP_DIALER_TRUNK_IP=${OML_HOSTNAME}
+
+#####################################################################################################
+#                                       CALL TRANSCRIPTIONS                                         #
+#####################################################################################################
+
+# Set the Speech to Text engine: openai, gemini or local
+STT_ENGINE=openai
+
+# --- In case o SaaS STT put here the STT API key
+# for Gemini STT use the API key from the Google Cloud project
+# for OpenAI STT use the API key from the OpenAI account
+STT_API_KEY=sk-proj-blablabla-sssssh
+# for Google Cloud STT use the JSON credentials
+STT_GCP_JSON_PATH=/app/google_credentials.json
 
 #####################################################################################################
 #                                       FASTAGI                                                     #

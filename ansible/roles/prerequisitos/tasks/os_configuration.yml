@@ -85,14 +85,14 @@
 
 - name: OS_CONF Copy google speech credentials json
   copy:
-    src: "../../../instances/{{ tenant_folder }}/google_credential.json"
+    src: "../../../instances/{{ tenant_folder }}/google_credentials.json"
     dest: /etc/omnileads/google_credential.json
   tags:
     - install
     - upgrade
     - update
   when:
-    - tts_external_engine is defined and tts_external_engine == "gcp"
+    - callrec_transcriptions_engine is defined and callrec_transcriptions_engine == "gcp"
 
 - name: OS_CONF Creates /etc/omnileads/certs directory
   file:
