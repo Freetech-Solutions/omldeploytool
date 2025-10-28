@@ -434,7 +434,7 @@ all:
 
     # backup_bucket_url: https://sfo3.digitaloceanspaces.com
     # backup_bucket_name: your-tenants-backup-bucket
-    # backup_bucket_key_id: lfkdhsfjkldhsjkh54jkh5jk3h4jk5h34
+    # backup_bucket_access_key: lfkdhsfjkldhsjkh54jkh5jk3h4jk5h34
     # backup_bucket_secret_key: KkjhjkKJHJKH78678hjghjgHJGHJjhghjgjhjg67567
 
     # Time format from 00:00 to 23:59
