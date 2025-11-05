@@ -387,6 +387,27 @@ WOMBAT_USER=demoadmin
 WOMBAT_PASSWORD=demo
 
 #########################################################################################################
+#                                          BACKUP / RESTORE                                             #
+#########################################################################################################
+# Here you can set the variables for the backup and restore service
+
+# --- PostgreSQL variables ---
+SQL_HOST=${POSTGRES_HOSTNAME}
+SQL_PORT=${POSTGRES_PORT}
+SQL_USER=${POSTGRES_USER}
+SQL_PASSWORD=${POSTGRES_PASSWORD}
+SQL_DATABASE=${POSTGRES_DB}
+# --- S3 parameters ---
+# --- Here you can set the variables for connect to centrared object storage service
+# --- or use the Bucket service included in the docker-compose stack
+S3_BUCKET_NAME=backup_bucket_name # ${BUCKET_NAME}
+S3_ENDPOINT=backup_bucket_url #${BUCKET_ENDPOINT_MINIO}
+S3_ACCESS_KEY_ID=backup_bucket_access_key #${BUCKET_ACCESS_KEY_ID}
+S3_SECRET_ACCESS_KEY=backup_bucket_secret_access_key #${BUCKET_SECRET_ACCESS_KEY}
+S3_REGION=backup_bucket_region #${BUCKET_DEFAULT_REGION}
+S3_DONT_VERIFY_SSL=False
+
+#########################################################################################################
 #                                          Monitoring                                                   #
 #########################################################################################################
 
