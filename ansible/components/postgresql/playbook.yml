@@ -84,6 +84,21 @@
         - update
       when: omnileads_ha is not defined
 
+    - name: POSTGRESQL RESTORE generate file_timestamp
+      set_fact:
+        file_timestamp: "{{ ansible_date_time.epoch }}"
+      tags:
+        - install
+      when:
+        - backup_filename is defined
+
+    - name: POSTGRESQL RESTORE postgres DB pg_restore
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
+      tags:
+        - install
+      when:
+        - backup_filename is defined
+
 - name: POSTGRESQL Include High Availability playbook
   import_playbook: ha.yml
   when: omnileads_ha is defined

@@ -39,7 +39,8 @@ postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
 redis_prometheus_img: docker.io/oliver006/redis_exporter:latest
 promtail_img: docker.io/grafana/promtail:latest
 
-# --- Testing components images
+# --- Other components images
+backup_restore_img: docker.io/omnileads/backup_restore:20251105-f437faca
 nginxcgi_img: docker.io/omnileads/nginxqa:latest
 pstn_emulator_img: docker.io/omnileads/pstn_emulator:241209.01
 wombat_img: docker.io/freetechsolutions/wombat:21.06.4-9

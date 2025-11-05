@@ -123,6 +123,7 @@
     when:
       - upgrade_from_oml_1 is not defined
       - omnileads_ha is not defined
+      - backup_filename is not defined
     
   - name: DJANGO Restart systemd services
     systemd:

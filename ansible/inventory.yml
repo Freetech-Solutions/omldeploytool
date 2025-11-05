@@ -257,10 +257,12 @@ all:
     bucket_access_key: Hghjkdghjkdhasjdasdsada
     bucket_secret_key: jknkjhkjh4523kjhcksjdhkjfdhKJHHKJGKJh786876876NBVJHB
     bucket_name: omnileads
-    # bucket_ssl_selfsigned: true
     # --- if your bucket doesn't need region, leave this value (us-east-1)
     bucket_region: us-east-1
 
+    # --- if your bucket use a selfsigned SSL cert, uncomment and put this value to true
+    # bucket_ssl_selfsigned: True
+    
     # --- if you have your own bucket (standalone host or cloud service) put here the URL
     # --- example VULTR: https://ewr1.vultrobjects.com
     # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
@@ -437,10 +439,15 @@ all:
     # backup_bucket_access_key: lfkdhsfjkldhsjkh54jkh5jk3h4jk5h34
     # backup_bucket_secret_key: KkjhjkKJHJKH78678hjghjgHJGHJjhghjgjhjg67567
 
+    # --- if your bucket use a selfsigned SSL cert, uncomment and put this value to true
+    # backup_bucket_dont_verify_ssl: False
+
     # Time format from 00:00 to 23:59
     # cron_backup_mm: 00
     # cron_backup_hh: 01 
 
+    # For restore from backup, uncomment and put here the backup filename
+    # backup_filename: backup/tenant_name/psql-filename.sql
     #####################################################################################################
     #                                       UPGRADE FROM OML 1.X                                        #
     #####################################################################################################
