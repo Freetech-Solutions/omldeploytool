@@ -89,8 +89,6 @@
         file_timestamp: "{{ ansible_date_time.epoch }}"
       tags:
         - install
-        - upgrade
-        - update
       when:
         - backup_filename is defined
 
@@ -98,8 +96,6 @@
       shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
       tags:
         - install
-        - upgrade
-        - update
       when:
         - backup_filename is defined
 
