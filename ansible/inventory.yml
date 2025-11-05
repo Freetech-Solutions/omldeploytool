@@ -151,6 +151,7 @@ all:
     # --- "hybrid" instance (agent WebRTC through Public NAT IP, but PSTN acces through LAN VoIP GW)
     # --- or "all" in order to access through all NICs
     infra_env: cloud
+    # --- if you want to deploy behind NAT, you must to uncomment and set this IPADDR
     # nat_ip_addr: X.X.X.X
 
     # --- If you have an DNS FQDN resolution, you must to uncomment and set this param
@@ -384,15 +385,11 @@ all:
     dialer_caps: 1
     # --- Number of dialer container replicas
     dialer_process_campaign_replicas: 10
-    dialer_process_contact_replicas: 1
     dialer_process_event_replicas: 1
     # --- Log level for Dialer, 0: Error, 1: Warning, 2: Debug
     dialer_log_level: 1
     # --- Dialer API user & password
     dialer_password: demo
-    # --- if you have your OMniDialer (standalone host) uncomment & put here the IP or hostname
-    # dialer_host: dialer.example.com    
-    # dialer_port: 10040
     
     # --- dialer_user (only if you have your Wombat dialer)
     dialer_user: demoadmin
@@ -469,7 +466,7 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20251009-a6169ffc
+    omnileads_img: docker.io/omnileads/omlapp:20251106-ae3fd398
     asterisk_img: docker.io/omnileads/asterisk:20251002-b75cdedd
 
 ##########################################################################################################
