@@ -1,5 +1,5 @@
 [Unit]
-Description=Podman oml-prometheus-postgres.service
+Description=Podman prometheus-postgres.service
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
 After=network-online.target
@@ -17,10 +17,9 @@ ExecStart=/usr/bin/podman run \
   --replace \
   --detach \
   --network=host \
-  --env-file=/etc/default/prometheus_postgres.env \
-  --name=oml-prometheus-postgres \
-  --rm  \
-  {{ postgres_prometheus_img }}
+  --env-file=/etc/default/prometheus_redis.env \
+  --name=obs-prometheus-redis \
+ {{ prometheus_redis_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

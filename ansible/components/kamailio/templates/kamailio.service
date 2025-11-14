@@ -13,13 +13,13 @@ ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
 --cidfile=%t/%n.ctr-id \
 --cgroups=no-conmon \
---rm \
 --sdnotify=conmon \
 --detach \
 --replace \
 --env-file=/etc/default/kamailio.env \
 -v /etc/omnileads/certs:/etc/omnileads/certs \
 --name=oml-kamailio-server \
+--label tier=telephony \
 --network=host \
 {{ kamailio_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id

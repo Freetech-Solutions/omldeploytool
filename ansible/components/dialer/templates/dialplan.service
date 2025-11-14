@@ -23,7 +23,7 @@ ExecStart=/usr/bin/podman run \
 --log-driver=journald \
 --env-file=/etc/default/dialer.env \
 --name=dialer-dialplan \
---rm  \
+--label tier=dialer \
 {{ dialer_dialplan_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

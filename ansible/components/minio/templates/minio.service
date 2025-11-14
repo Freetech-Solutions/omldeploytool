@@ -20,7 +20,7 @@ ExecStart=/usr/bin/podman run \
   --env-file=/etc/default/minio.env \
   --name=oml-minio-server \
   --volume=oml_minio:/data \
-  --rm  \
+  --label tier=backend \
   {% if inventory_hostname in groups['omnileads_aio'] %}
   {% if infra_env == "cloud" %}
   {{ minio_img }} server /data --console-address "{{ omni_ip_wan }}:9001"

@@ -13,37 +13,37 @@ TimeoutStopSec=70
 MemoryMax={{ asterisk_mem_limit | default("1G", true) }}
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
-  --cidfile=%t/%n.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  --replace \
-  --detach \
-  --network=host \
-  --log-driver=journald \
-  --env-file=/etc/default/asterisk.env \
-  --name=oml-asterisk-server \
-  --rm  \
-  --volume=asterisk_callrec:/var/spool/asterisk/monitor \
-  --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
-  --volume=asterisk_sounds:/var/lib/asterisk/sounds \
+--cidfile=%t/%n.ctr-id \
+--cgroups=no-conmon \
+--sdnotify=conmon \
+--replace \
+--detach \
+--network=host \
+--log-driver=journald \
+--env-file=/etc/default/asterisk.env \
+--name=oml-asterisk-server \
+--label tier=telephony \
+--volume=asterisk_callrec:/var/spool/asterisk/monitor \
+--volume=asterisk_conf:/etc/asterisk/retrieve_conf \
+--volume=asterisk_sounds:/var/lib/asterisk/sounds \
   {{ asterisk_img }}
 {% else %}
 MemoryMax=
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
-  --cidfile=%t/%n.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  --replace \
-  --detach \
-  --network=host \
-  --log-driver=journald \
-  --env-file=/etc/default/asterisk.env \
-  --name=oml-asterisk-server \
-  --rm  \
-  --volume=asterisk_callrec:/var/spool/asterisk/monitor \
-  --volume=asterisk_conf:/etc/asterisk/retrieve_conf \
-  --volume=asterisk_sounds:/var/lib/asterisk/sounds \
+--cidfile=%t/%n.ctr-id \
+--cgroups=no-conmon \
+--sdnotify=conmon \
+--replace \
+--detach \
+--network=host \
+--log-driver=journald \
+--env-file=/etc/default/asterisk.env \
+--name=oml-asterisk-server \
+--label tier=telephony \
+--volume=asterisk_callrec:/var/spool/asterisk/monitor \
+--volume=asterisk_conf:/etc/asterisk/retrieve_conf \
+--volume=asterisk_sounds:/var/lib/asterisk/sounds \
   {{ asterisk_img }}
 
 {% endif %}

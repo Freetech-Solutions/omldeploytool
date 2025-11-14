@@ -24,7 +24,7 @@ ExecStart=/usr/bin/podman run \
 -e GEARMAN_JOBS=add-incidence-rule-disposition|delete-incidence-rule|create-incidence-rule|update-incidence-rule \
 --env-file=/etc/default/dialer.env \
 --name=dialer-incidence-rules \
---rm  \
+--label tier=dialer \
 {{ dialer_worker_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

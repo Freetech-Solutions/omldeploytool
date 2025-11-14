@@ -24,7 +24,7 @@ ExecStart=/usr/bin/podman run \
   --name=oml-callrec-transcriber-server \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
   --volume=/etc/omnileads/google_credential.json:/tmp/google_credential.json \
-  --rm  \
+  --label tier=omlapp \
 {{ callrec_transcriber_img }}
 {% elif callrec_transcriptions_engine == "local" %}
 ExecStart=/usr/bin/podman run \
@@ -39,7 +39,7 @@ ExecStart=/usr/bin/podman run \
   --name=oml-callrec-transcriber-server \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
   --volume=faster_whisper_cache:/opt/models \
-  --rm  \
+  --label tier=omlapp \
 {{ callrec_transcriber_img }}
 {% else %}
 ExecStart=/usr/bin/podman run \
@@ -53,7 +53,7 @@ ExecStart=/usr/bin/podman run \
   --env-file=/etc/default/interaction_processor.env \
   --name=oml-callrec-transcriber-server \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
-  --rm  \
+  --label tier=omlapp \
 {{ callrec_transcriber_img }}
 {% endif %}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id

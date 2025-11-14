@@ -22,7 +22,7 @@ ExecStart=/usr/bin/podman run \
 --network=omnidialer \
 --log-driver=journald \
 --env-file=/etc/default/dialer.env \
---rm \
+--label tier=dialer \
 --name=dialer-listener \
 {{ dialer_listener_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id

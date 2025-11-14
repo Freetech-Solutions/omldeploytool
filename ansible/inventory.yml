@@ -443,8 +443,10 @@ all:
     # cron_backup_mm: 00
     # cron_backup_hh: 01 
 
-    # For restore from backup, uncomment and put here the backup filename
+    # For restore OMniLeads DB from backup, uncomment and put here the backup filename
     # backup_filename: backup/tenant_name/psql-filename.sql
+    # For restore OMniDialer DB from backup, uncomment and put here the backup filename
+    # backup_filename_OMD: backup/tenant_name/psql-filename-OMD.sql
     #####################################################################################################
     #                                       UPGRADE FROM OML 1.X                                        #
     #####################################################################################################
@@ -466,8 +468,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/freetechsolutions/omlapp:20251125-0dbfd404
-    asterisk_img: docker.io/omnileads/asterisk:20251002-b75cdedd
+    omnileads_img: docker.io/freetechsolutions/omlapp:20251203-c6f1cb35
+    asterisk_img: docker.io/omnileads/asterisk:20251203-d895bbdb
 
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #

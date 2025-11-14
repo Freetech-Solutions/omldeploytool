@@ -20,7 +20,7 @@ ExecStart=/usr/bin/podman run \
   --network=host \
   --env-file=/etc/default/fastagi.env \
   --name=oml-survey_worker-server \
-  --rm  \
+  --label tier=addon \
   {{ survey_worker_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

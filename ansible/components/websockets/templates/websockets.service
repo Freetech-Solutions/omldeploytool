@@ -14,12 +14,12 @@ ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
 --cidfile=%t/%n.ctr-id \
 --cgroups=no-conmon \
---rm \
 --sdnotify=conmon \
 --detach \
 --replace \
 --env-file=/etc/default/websockets.env \
 --name=oml-websockets-server \
+--label tier=omlapp \
 --network=host \
 --log-driver=journald \
 {{ websockets_img }}

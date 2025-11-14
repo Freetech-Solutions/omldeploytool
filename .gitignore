@@ -7,3 +7,4 @@ docker-compose/dev-env/oml_manage.sh
 docker-compose/dev-env/.env
 docker-compose/prod-env/.env
 docker-compose/test-env/.env
+docker-compose/observability/.env

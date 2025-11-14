@@ -22,7 +22,7 @@ ExecStart=/usr/bin/podman run \
 --env-file=/etc/default/django.env \
 -e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
 --name=oml-bulk-messages-worker \
---rm  \
+--label tier=addon \
 {{ omnileads_img }} python /opt/omnileads/ominicontacto/manage.py ejecutar_ordenes_de_envio
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

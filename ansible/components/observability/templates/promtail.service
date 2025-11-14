@@ -29,7 +29,7 @@ ExecStart=/usr/bin/podman run \
   --detach \
   --network=host \
   --log-driver=journald \
-  --name=promtail-server \
+  --name=obs-promtail-server \
   --rm \
   --volume=/etc/default/promtail.yml:/etc/promtail/config.yml:ro \
   --volume=promtail_data:/tmp \

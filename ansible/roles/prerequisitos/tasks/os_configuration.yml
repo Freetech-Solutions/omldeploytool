@@ -57,17 +57,6 @@
   when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"  or ansible_facts['distribution'] == "CentOS"
   ignore_errors: true
 
-- name: OS_CONF Enable and start systemd Prometheus Node Exporter service
-  systemd:
-    name: podman.socket
-    state: started
-    enabled: yes
-    daemon_reload: yes
-  tags:
-    - install
-    - upgrade
-  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"
-
 - name: OS_CONF Ensure group {{ usuario }} exists
   group:
     name: "{{ usuario }}"
@@ -270,72 +259,6 @@
     - install
     - upgrade
 
-- name: OS_CONF Copy Prometheus Node Exporter service
-  template:
-    src: "templates/prometheus_node_exporter.service"
-    dest: /etc/systemd/system/
-    mode: 0600
-  tags:
-    - install
-    - upgrade
-  #when:
-  #  - inventory_hostname not in groups['ha_omnileads_sql']
-
-- name: OS_CONF Copy Prometheus Podman Exporter service
-  template:
-    src: "templates/prometheus_podman_exporter.service"
-    dest: /etc/systemd/system/
-    mode: 0600
-  tags:
-    - install
-    - upgrade
-  #when:
-  #  - inventory_hostname not in groups['ha_omnileads_sql']
-
-# - name: OS_CONF Copy Prometheus CENTOS7 Node Exporter service
-#   template:
-#     src: "templates/prometheus_node_exporter_centos7.service"
-#     dest: /etc/systemd/system/prometheus_node_exporter.service
-#     mode: 0600
-#   tags:
-#     - install
-#     - upgrade
-#   when:
-#     - inventory_hostname in groups['ha_omnileads_sql']
-
-- name: OS_CONF Copy Prometheus Node Exporter env
-  template:
-    src: "templates/prometheus_node_exporter.env"
-    dest: /etc/default/
-    mode: 0600
-  tags:
-    - install
-    - upgrade
-
-- name: OS_CONF Enable and start systemd Prometheus Node Exporter service
-  systemd:
-    name: prometheus_node_exporter
-    state: restarted
-    enabled: yes
-    daemon_reload: yes
-  tags:
-    - install
-    - upgrade
-#  when:
-#     - redis_host_ha is not defined
-#     - inventory_hostname not in groups['ha_omnileads_sql']
-- name: OS_CONF Enable and start systemd Prometheus Podman Exporter service
-  systemd:
-    name: prometheus_podman_exporter
-    state: restarted
-    enabled: yes
-    daemon_reload: yes
-  tags:
-    - install
-    - upgrade
-  #when:
-  #   - redis_host_ha is not defined
-  #   - inventory_hostname not in groups['ha_omnileads_sql']
 
 - name: OS_CONF Set Storage volatile journald.conf
   lineinfile:

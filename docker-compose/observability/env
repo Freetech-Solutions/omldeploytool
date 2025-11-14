@@ -2,10 +2,7 @@
 #   Name of the project     #
 #############################
 TENANT_NAME=prod-env
-
-# OMniLeads stack network
-OMNILEADS_NETWORK_NAME=test-env_omnileads
-OMNILEADS_STACK_ENV=test-env
+OMNILEADS_NETWORK_NAME=dev-env_omnileads
 
 PROMETHEUS_IMG=prom/prometheus:v3.0.1
 PROMETHEUS_NODE_EXPORTER_IMG=prom/node-exporter:v1.7.0
@@ -16,12 +13,12 @@ PROMTAIL_IMG=grafana/promtail
 GEARMAN_EXPORTER_IMG=gearmanexporter/gearman-exporter:v0.5.0
 UWSGI_EXPORTER_IMG=timonwong/uwsgi-exporter:v1.3.0
 
-REDIS_HOSTNAME=${OMNILEADS_STACK_ENV}-redis-1
+REDIS_HOSTNAME=tes-env-redis-1
 REDIS_PORT=6379
 
-PGHOST=${OMNILEADS_STACK_ENV}-postgresql-1 
+PGHOST=test-env-postgresql-1 
 
-POSTGRES_HOSTNAME=${OMNILEADS_STACK_ENV}-postgresql-1
+POSTGRES_HOSTNAME=test-env-postgresql-1
 POSTGRES_DB=omnileads
 POSTGRES_PORT=5432
 POSTGRES_USER=omnileads

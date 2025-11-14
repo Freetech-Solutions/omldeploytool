@@ -17,10 +17,9 @@ ExecStart=/usr/bin/podman run \
   --replace \
   --detach \
   --network=host \
-  --volume=/etc/default/prometheus.yml:/etc/prometheus/prometheus.yml \
+  --volume=/etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml \
   --volume=prometheus_data:/prometheus \
-  --name=prometheus-server \
-  --rm  \
+  --name=obs-prometheus-server \
   {{ prometheus_img }} \
   --config.file=/etc/prometheus/prometheus.yml \
   --storage.tsdb.path=/prometheus \

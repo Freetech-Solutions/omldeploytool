@@ -102,8 +102,16 @@ x-django-web-common: &django-web-common
       reservations:
         memory: 512M
         cpus: '0.25'
-
-
+# Django worker common template
+x-django-worker-common: &django-worker-common
+  <<: *django-common
+  depends_on:
+    postgresql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  working_dir: /opt/omnileads/ominicontacto
+  stop_grace_period: 30s
 # Worker common template
 x-worker-common: &worker-common
   build:
@@ -347,8 +355,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      django-app:
-        condition: service_healthy  
     environment:
       <<: *django-env
     command: /opt/omnileads/bin/init_cronos.sh
@@ -370,7 +376,7 @@ services:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
     stop_grace_period: 30s
-  
+
   daphne:
     <<: *django-common
     depends_on:
@@ -388,38 +394,18 @@ services:
       - ${UWSGI_EXT_BIND_IP:-0.0.0.0}:${DAPHNE_EXT_PORT:-8098}:8098/tcp
   
   whatsapp:
-    <<: *django-common
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *django-worker-common
     command: /opt/omnileads/bin/init_whatsapp.sh
-    working_dir: /opt/omnileads/ominicontacto
-    stop_grace_period: 30s
 
   background_tasks:
-    <<: *django-common
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *django-worker-common
     command: /opt/omnileads/bin/init_worker_bgtasks.sh
-    working_dir: /opt/omnileads/ominicontacto
-    stop_grace_period: 30s
   
   background-dialer-tasks:
-    <<: *django-common
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *django-worker-common
     command: python manage.py omnidialer_events_listener
-    working_dir: /opt/omnileads/ominicontacto
-    stop_grace_period: 30s
-  
+
+
   # ----------------------------------------------------------------------------
   # WEBSOCKET & WEBSERVER SERVICES
   # ----------------------------------------------------------------------------
@@ -517,8 +503,8 @@ services:
       FASTAGI: ${FASTAGI_HOSTNAME}
       GEARMAN_HOST: ${GEARMAN_HOSTNAME}    
       HOMER_ENABLE: ${HOMER_ENABLE}
-      HOMERHOST: ${HOMER_HOSTNAME}
-      HOMERPORT: ${HOMER_PORT}
+      HOMER_HOST: ${HOMER_HOSTNAME}
+      HOMER_PORT: ${HOMER_PORT}
       LOG_LEVEL: ${ACD_LOG_LEVEL}
       RTP_ADDR: ${RTPENGINE_RTP_ADDR}
       RTP_PORT_MAX: ${ACD_RTP_PORT_MAX}
@@ -528,7 +514,8 @@ services:
       PJSIP_IP_AGENT: ${ACD_PJSIP_TRANSPORT_AGENT}
       PJSIP_IP_TRUNK: ${ACD_PJSIP_TRANSPORT_TRUNK}
       PUBLIC_IP: ${PUBLIC_IP}
-      NAT: ${VOIP_NAT}    
+      NAT: ${VOIP_NAT}
+      TENANT_ID: ${TENANT_ID} 
       TZ: ${TZ}          
     healthcheck:
       test: ["CMD-SHELL", "asterisk -rx 'core show channels' | grep -q 'active channels' || exit 1"]
@@ -573,28 +560,7 @@ services:
       - omnileads
     ports:
       - ${FASTAGI_EXT_BIND_IP:-0.0.0.0}:${FASTAGI_EXT_PORT:-4573}:4573/tcp
- 
-  acd-event-listener:
-    image: ${DIALER_ACD_LISTENER_IMG}
-    build:
-      context: ./$REPO_PATH/dialer/websocket_ari/src
-    networks:
-      - omnileads
-    restart: on-failure
-    logging: *default-logging
-    tty: true
-    stdin_open: true
-    environment:
-      ASTERISK_APP_DIALER: "acd_event_listener"
-      ASTERISK_HOST: ${ACD_HOSTNAME}
-      ASTERISK_PORT: 7088
-      ASTERISK_USER: ${ACD_AMI_USER}
-      ASTERISK_PASS: ${ACD_AMI_PASSWORD}
-    depends_on:
-      dialer-postgresql:
-        condition: service_healthy
-      dialer-manage-campaign:
-        condition: service_started
+
 
   ami:
     build: 
@@ -733,7 +699,7 @@ services:
     build: 
       context: ./$REPO_PATH/postcall_actions/callrec_transcriber/
       dockerfile: Dockerfile
-      target: saas
+      target: run
     image: ${OML_CALLREC_TRANSCRIBER_IMG}
     depends_on:
       minio:

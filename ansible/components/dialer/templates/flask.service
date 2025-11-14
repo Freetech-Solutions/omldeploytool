@@ -14,16 +14,16 @@ Restart=always
 RestartSec=10
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
-  --cidfile=%t/%n.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  --replace \
-  --detach \
-  --network=omnidialer \
-  -p 1440:1440 \
-  --env-file=/etc/default/dialer.env \
-  --name=dialer-flask-server \
-  --rm  \
+--cidfile=%t/%n.ctr-id \
+--cgroups=no-conmon \
+--sdnotify=conmon \
+--replace \
+--detach \
+--network=omnidialer \
+-p 1440:1440 \
+--env-file=/etc/default/dialer.env \
+--name=dialer-flask-server \
+--label tier=dialer \
   {{ dialer_api_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

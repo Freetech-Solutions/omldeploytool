@@ -26,7 +26,6 @@
   vars:
     img_repo: '{{ container_image_registry }}/omnileads/redis'
     img_repo_ha: '{{ container_image_registry }}/omnileads/redis'
-    img_prometheus_repo: 'docker.io/oliver006/redis_exporter'
   tasks:
 
   - name: REDIS Set Redis environment variables for this installation
@@ -79,44 +78,6 @@
   - name: REDIS Enable and start service
     systemd:
       name: redis.service
-      state: restarted
-      enabled: yes
-      daemon_reload: yes
-    tags:
-      - install
-      - upgrade
-
-############################## PROMETHEUS ###################################
-  - name: REDIS prometheus Set environment variables for this installation
-    template:
-      src: "{{ redis_repo_path }}templates/prometheus.env"
-      dest: /etc/default/prometheus_redis.env
-      mode: 664
-      owner: "{{ usuario }}"
-      group: "{{ usuario }}"
-    tags:
-      - install
-      - upgrade
-
-  - name: REDIS prometheus Copy systemd file
-    template:
-      src: "{{ redis_repo_path }}templates/prometheus.service"
-      dest: /etc/systemd/system/prometheus_redis.service
-    tags:
-      - install
-      - upgrade
-
-  - name: REDIS prometheus Pull image
-    command: podman pull --quiet {{ img_prometheus_repo }}
-    register: podman_pull
-    until: podman_pull is success
-    tags:
-      - install
-      - upgrade
-
-  - name: REDIS prometheus Enable and start service
-    systemd:
-      name: prometheus_redis.service
       state: restarted
       enabled: yes
       daemon_reload: yes

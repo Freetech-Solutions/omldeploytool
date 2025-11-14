@@ -21,7 +21,7 @@ ExecStart=/usr/bin/podman run \
 --log-driver=journald \
 --env-file=/etc/default/dialer.env \
 --name=dialer-asterisk \
---rm  \
+--label tier=dialer \
 {{ dialer_asterisk_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

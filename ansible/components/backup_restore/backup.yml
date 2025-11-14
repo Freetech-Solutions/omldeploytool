@@ -29,16 +29,27 @@
       set_fact:
         file_timestamp: "{{ ansible_date_time.epoch }}"
 
-    - name: BACKUP postgres DB .sql file and upload to the bucket
+    - name: BACKUP postgres OMniLeads DB .sql file and upload to the bucket
       shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/backup.env -e BACKUP_FILENAME=backup/{{ tenant_id }}/pgsql-backup-{{ file_timestamp }}.sql --rm {{ backup_restore_img }} python backup.py"
       when:
       - omnileads_ha is not defined       
 
-    - name: BACKUP postgres DB .sql file and upload to the bucket HA Scenary
+    - name: BACKUP postgres OMniLeads DB .sql file and upload to the bucket HA Scenary
       shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/backup.env -e BACKUP_FILENAME=backup/{{ tenant_id }}/pgsql-backup-{{ file_timestamp }}.sql --rm {{ backup_restore_img }} python backup.py"
       when:
       - omnileads_ha is defined 
       - ha_role == "backup"  
 
-            
+    - name: BACKUP postgres OMniDialer DB .sql file and upload to the bucket
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/backup.env -e SQL_DATABASE=omnidialer -e BACKUP_FILENAME=backup/{{ tenant_id }}/pgsql-backup-OMD-{{ file_timestamp }}.sql --rm {{ backup_restore_img }} python backup.py"
+      when:
+      - omnileads_ha is not defined
+      - dialer_engine == "omnidialer"
+
+    - name: BACKUP postgres OMniDialer DB .sql file and upload to the bucket HA Scenary
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --network=host --env-file /etc/default/backup.env -e SQL_DATABASE=omnidialer -e BACKUP_FILENAME=backup/{{ tenant_id }}/pgsql-backup-OMD-{{ file_timestamp }}.sql --rm {{ backup_restore_img }} python backup.py"
+      when:
+      - omnileads_ha is defined 
+      - ha_role == "backup"  
+      - dialer_engine == "omnidialer"
     

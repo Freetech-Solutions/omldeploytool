@@ -32,7 +32,6 @@
   vars:
     img_repo: '{{ img_registry_core_url }}/{{ img_registry_core_repo }}/redis'
     img_repo_ha: '{{ img_registry_core_url }}/{{ img_registry_core_repo }}/redis'
-    img_prometheus_repo: 'docker.io/oliver006/redis_exporter'
   tasks:
 
   - name: REDIS sentinel copy systemd service
