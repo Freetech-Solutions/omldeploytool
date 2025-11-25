@@ -151,6 +151,7 @@ all:
     # --- "hybrid" instance (agent WebRTC through Public NAT IP, but PSTN acces through LAN VoIP GW)
     # --- or "all" in order to access through all NICs
     infra_env: cloud
+    # --- if you want to deploy behind NAT, you must to uncomment and set this IPADDR
     # nat_ip_addr: X.X.X.X
 
     # --- If you have an DNS FQDN resolution, you must to uncomment and set this param
@@ -257,16 +258,31 @@ all:
     bucket_access_key: Hghjkdghjkdhasjdasdsada
     bucket_secret_key: jknkjhkjh4523kjhcksjdhkjfdhKJHHKJGKJh786876876NBVJHB
     bucket_name: omnileads
-    # bucket_ssl_selfsigned: true
     # --- if your bucket doesn't need region, leave this value (us-east-1)
     bucket_region: us-east-1
 
+    # --- if your bucket use a selfsigned SSL cert, uncomment and put this value to true
+    # bucket_ssl_selfsigned: True
+    
     # --- if you have your own bucket (standalone host or cloud service) put here the URL
     # --- example VULTR: https://ewr1.vultrobjects.com
     # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
     # --- example onpremise: https://192.168.100.10
 
     # bucket_url: https://sfo3.digitaloceanspaces.com
+
+    #####################################################################################################
+    #                                       Call transcriptions                                         #
+    #####################################################################################################
+    # --- Call transcriptions, put true if you want to enable it
+    callrec_transcriptions: false
+    # openai, gemini, gcp (google cloud STT) or local (faster-whisper)
+    callrec_transcriptions_engine: local
+    # for Gemini STT use the API key from the Google Cloud project
+    # for OpenAI STT use the API key from the OpenAI account
+    callrec_transcriber_api_key: sk-proj-blablabla-sssssh
+    # for GCP (google clou platform speach to text) you have to provide the google credentials json file
+    # you must place them inside instances/tenant_name_folder/ with the name: google_credentials.json.
 
     #####################################################################################################
     #                              ACD (Automatic Call Distribution)                                    #
@@ -276,11 +292,6 @@ all:
     ami_password: C12H17N2O4P_o98o98
     acd_rtp_port_min: 40000
     acd_rtp_port_max: 50000
-    # --- Call transcriptions, put true if you want to enable it
-    callrec_transcriptions: false
-    # openai, google or local
-    callrec_transcriptions_engine: local    
-    callrec_transcriber_api_key: 
 
     # --- Log level for ACD
     # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
@@ -374,15 +385,11 @@ all:
     dialer_caps: 1
     # --- Number of dialer container replicas
     dialer_process_campaign_replicas: 10
-    dialer_process_contact_replicas: 1
     dialer_process_event_replicas: 1
     # --- Log level for Dialer, 0: Error, 1: Warning, 2: Debug
     dialer_log_level: 1
     # --- Dialer API user & password
     dialer_password: demo
-    # --- if you have your OMniDialer (standalone host) uncomment & put here the IP or hostname
-    # dialer_host: dialer.example.com    
-    # dialer_port: 10040
     
     # --- dialer_user (only if you have your Wombat dialer)
     dialer_user: demoadmin
@@ -426,13 +433,18 @@ all:
 
     # backup_bucket_url: https://sfo3.digitaloceanspaces.com
     # backup_bucket_name: your-tenants-backup-bucket
-    # backup_bucket_key_id: lfkdhsfjkldhsjkh54jkh5jk3h4jk5h34
+    # backup_bucket_access_key: lfkdhsfjkldhsjkh54jkh5jk3h4jk5h34
     # backup_bucket_secret_key: KkjhjkKJHJKH78678hjghjgHJGHJjhghjgjhjg67567
+
+    # --- if your bucket use a selfsigned SSL cert, uncomment and put this value to true
+    # backup_bucket_dont_verify_ssl: False
 
     # Time format from 00:00 to 23:59
     # cron_backup_mm: 00
     # cron_backup_hh: 01 
 
+    # For restore from backup, uncomment and put here the backup filename
+    # backup_filename: backup/tenant_name/psql-filename.sql
     #####################################################################################################
     #                                       UPGRADE FROM OML 1.X                                        #
     #####################################################################################################
@@ -454,7 +466,7 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20251009-a6169ffc
+    omnileads_img: docker.io/freetechsolutions/omlapp:20251125-0dbfd404
     asterisk_img: docker.io/omnileads/asterisk:20251002-b75cdedd
 
 ##########################################################################################################

@@ -28,7 +28,7 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads images WEB
-OML_APP_IMG=docker.io/omnileads/omlapp:20251009-a6169ffc
+OML_APP_IMG=docker.io/freetechsolutions/omlapp:20251125-0dbfd404
 OML_NGINX_IMG=docker.io/omnileads/nginx:20250909-b9e079d4
 OML_WS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
 
@@ -40,16 +40,15 @@ OML_AMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
 OML_KAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
 OML_RTPENGINE_IMG=docker.io/omnileads/rtpengine:20250911-0d2c9b76
 OML_ACD_CALL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
-OML_CALLREC_COMPRESSOR_IMG=docker.io/omnileads/callrec_compressor:20250825-802afa6c
-# if you want to run Speech to text onpremise change de suffix tag from "-saas" to "-local"
-OML_CALLREC_TRANSCRIBER_IMG=docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
+OML_CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20251027-ab73565a
+OML_CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20251027-ab73565a
 
 # --- OMniLeads images DIALER
-DIALER_API_IMG=docker.io/omnileads/dialer_api:20251013-6fed77c1
-DIALER_ACD_IMG=docker.io/omnileads/dialer_asterisk:20251013-6fed77c1
-DIALER_ACD_LISTENER_IMG=docker.io/omnileads/dialer_listener:20251013-6fed77c1
-DIALER_ACD_DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20251013-6fed77c1
-DIALER_WORKER_IMG=docker.io/omnileads/dialer_worker:20251013-6fed77c1
+DIALER_API_IMG=docker.io/omnileads/dialer_api:20251125-8aef0813
+DIALER_ACD_IMG=docker.io/omnileads/dialer_asterisk:20251125-8aef0813
+DIALER_ACD_LISTENER_IMG=docker.io/omnileads/dialer_listener:20251125-8aef0813
+DIALER_ACD_DIALPLAN_IMG=docker.io/omnileads/dialer_dialplan:20251125-8aef0813
+DIALER_WORKER_IMG=docker.io/omnileads/dialer_worker:20251125-8aef0813
 
 # --- Backend services common images
 REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
@@ -140,13 +139,6 @@ ACD_PJSIP_TRANSPORT_AGENT=${ACD_HOSTNAME}
 ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
 ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
-# --- In case o SaaS STT put here the STT API key
-# for Gemini STT use the API key from the Google Cloud project
-# for OpenAI STT use the API key from the OpenAI account
-STT_API_KEY=your_stt_api_key
-# Set the Speech to Text engine: openai, gemini or local
-STT_ENGINE=openai
-
 # --- Asterisk scale parameters
 # Scale var "True" or "False"
 ACD_SCALE=False
@@ -163,11 +155,24 @@ ACD_SCALE=False
 # ACD_TIMER_T1=
 # ACD_TIMER_B=
 
-
 # API_BIND_IP=${OML_HOSTNAME}
 # SIP_AGENT_IP=${OML_HOSTNAME}
 # SIP_TRUNK_IP=${PUBLIC_IP}
 # SIP_DIALER_TRUNK_IP=${OML_HOSTNAME}
+
+#####################################################################################################
+#                                       CALL TRANSCRIPTIONS                                         #
+#####################################################################################################
+
+# Set the Speech to Text engine: openai, gemini or local
+STT_ENGINE=openai
+
+# --- In case o SaaS STT put here the STT API key
+# for Gemini STT use the API key from the Google Cloud project
+# for OpenAI STT use the API key from the OpenAI account
+STT_API_KEY=sk-proj-blablabla-sssssh
+# for Google Cloud STT use the JSON credentials
+STT_GCP_JSON_PATH=/app/google_credentials.json
 
 #####################################################################################################
 #                                       FASTAGI                                                     #
@@ -362,7 +367,6 @@ DIALER_TIME_BETWEEN_CALLS=1
 
 # --- Workers replicas
 DIALER_PROCESS_CAMPAIGN_REPLICAS=5
-DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
 
 # --- Dial through PSTN Gateway settings
@@ -380,6 +384,27 @@ DIALER_PSTNGW_HOSTNAME=pbxemulator:5070
 WOMBAT_HOSTNAME=wombat
 WOMBAT_USER=demoadmin
 WOMBAT_PASSWORD=demo
+
+#########################################################################################################
+#                                          BACKUP / RESTORE                                             #
+#########################################################################################################
+# Here you can set the variables for the backup and restore service
+
+# --- PostgreSQL variables ---
+SQL_HOST=${POSTGRES_HOSTNAME}
+SQL_PORT=${POSTGRES_PORT}
+SQL_USER=${POSTGRES_USER}
+SQL_PASSWORD=${POSTGRES_PASSWORD}
+SQL_DATABASE=${POSTGRES_DB}
+# --- S3 parameters ---
+# --- Here you can set the variables for connect to centrared object storage service
+# --- or use the Bucket service included in the docker-compose stack
+S3_BUCKET_NAME=backup_bucket_name # ${BUCKET_NAME}
+S3_ENDPOINT=backup_bucket_url #${BUCKET_ENDPOINT_MINIO}
+S3_ACCESS_KEY_ID=backup_bucket_access_key #${BUCKET_ACCESS_KEY_ID}
+S3_SECRET_ACCESS_KEY=backup_bucket_secret_access_key #${BUCKET_SECRET_ACCESS_KEY}
+S3_REGION=backup_bucket_region #${BUCKET_DEFAULT_REGION}
+S3_DONT_VERIFY_SSL=False
 
 #########################################################################################################
 #                                          Monitoring                                                   #

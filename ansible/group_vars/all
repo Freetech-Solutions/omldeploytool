@@ -13,18 +13,14 @@ kamailio_img: docker.io/omnileads/kamailio:20250825-6b854038
 rtpengine_img: docker.io/omnileads/rtpengine:20250911-0d2c9b76
 call_logger_img: docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
 callrec_compressor_img: docker.io/omnileads/callrec_compressor:20250825-802afa6c
-
-# --- To use the call transcription with a Cloud SaaS like Google Gemini 
-# or Open AI (Whisper), just simply change the "-local" suffix to "-saas".
-callrec_transcriber_img: docker.io/omnileads/callrec_transcriber:20250825-802afa6c-local
-# docker.io/omnileads/callrec_transcriber:20250825-802afa6c-saas
+callrec_transcriber_img: docker.io/freetechsolutions/callrec_transcriber:20251027-ab73565a
 
 # --- OMnidialer components images
-dialer_api_img: docker.io/omnileads/dialer_api:20251013-6fed77c1
-dialer_listener_img: docker.io/omnileads/dialer_listener:20251013-6fed77c1
-dialer_worker_img: docker.io/omnileads/dialer_worker:20251013-6fed77c1
-dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20251013-6fed77c1
-dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20251013-6fed77c1
+dialer_api_img: docker.io/omnileads/dialer_api:20251125-8aef0813
+dialer_listener_img: docker.io/omnileads/dialer_listener:20251125-8aef0813
+dialer_worker_img: docker.io/omnileads/dialer_worker:20251125-8aef0813
+dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20251125-8aef0813
+dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20251125-8aef0813
 
 # --- Backend components images
 redis_img: docker.io/omnileads/redis:231125.01
@@ -43,7 +39,8 @@ postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
 redis_prometheus_img: docker.io/oliver006/redis_exporter:latest
 promtail_img: docker.io/grafana/promtail:latest
 
-# --- Testing components images
+# --- Other components images
+backup_restore_img: docker.io/omnileads/backup_restore:20251105-f437faca
 nginxcgi_img: docker.io/omnileads/nginxqa:latest
 pstn_emulator_img: docker.io/omnileads/pstn_emulator:241209.01
 wombat_img: docker.io/freetechsolutions/wombat:21.06.4-9

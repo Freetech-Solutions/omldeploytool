@@ -81,9 +81,9 @@
     when:       
       - inventory_hostname in groups['omnileads_voice'] or inventory_hostname in groups['omnileads_aio']  
 
-- name: INTERACTION_PROCESSOR Include callrec transcriptions
-  import_playbook: callrec_transcriber.yml
-  when: callrec_transcriptions is defined and callrec_transcriptions == true
-  tags:
-    - install
-    - upgrade
+# - name: INTERACTION_PROCESSOR Include callrec transcriptions
+#   import_playbook: callrec_transcriber.yml
+#   when: callrec_transcriptions is defined and callrec_transcriptions == true
+#   tags:
+#     - install
+#     - upgrade

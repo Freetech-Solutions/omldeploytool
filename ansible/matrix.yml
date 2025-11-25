@@ -129,6 +129,12 @@
     - loki_host is defined
 
 
+- import_playbook: components/addons/playbook.yml
+  when: 
+    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+
+
 - import_playbook: components/qa/playbook.yml
   when: 
     - qa_env is defined
+

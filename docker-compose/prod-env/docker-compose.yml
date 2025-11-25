@@ -171,8 +171,9 @@ volumes:
   asterisk_sounds:
   asterisk_conf:
   dialer-postgresql:
-  redis_redisinsight:
-
+  redis_redisinsight: 
+  faster_whisper_cache:
+  
 # ============================================================================
 # SERVICES
 # ============================================================================
@@ -462,13 +463,13 @@ services:
     environment:
       ASGI_PORT: ${DAPHNE_PORT}
       CALLREC_DEVICE: ${CALLREC_DEVICE}
-      DJANGO_HOSTNAME: ${DJANGO_HOSTNAME}
-      DAPHNE_HOSTNAME: ${DAPHNE_HOSTNAME}
+      DJANGO_HOSTNAME: ${OML_HOSTNAME}
+      DAPHNE_HOSTNAME: ${OML_HOSTNAME}
       KAMAILIO_HOSTNAME: ${KAMAILIO_WEBRTC_HOSTNAME}
       KAMAILIO_PORT: ${KAMAILIO_HTTPS_PORT}
       S3_ENDPOINT: ${BUCKET_ENDPOINT_MINIO}
       TZ: ${TZ}
-      WEBSOCKETS_HOSTNAME: ${WEBSOCKET_HOSTNAME}
+      WEBSOCKETS_HOSTNAME: ${OML_HOSTNAME}
       WEBSOCKETS_PORT: ${WEBSOCKET_PORT}
       WEBUI_MODE: ${NGINX_WEBUI_MODE}
       WALLBOARD_WEBUI_PATH: ${NGINX_WALLBOARD_WEBUI_PATH}
@@ -718,6 +719,7 @@ services:
       AWS_DEFAULT_REGION: ${BUCKET_DEFAULT_REGION}
       CALLREC_DEVICE: ${CALLREC_DEVICE}
       GEARMAN_HOST: ${GEARMAN_HOSTNAME}
+      GOOGLE_APPLICATION_CREDENTIALS: ${STT_GCP_JSON_PATH}
       S3_BUCKET_NAME: ${BUCKET_NAME}
       S3_ENDPOINT: ${BUCKET_ENDPOINT_MINIO}
       STT_ENGINE: ${STT_ENGINE}
@@ -730,6 +732,8 @@ services:
     stop_grace_period: 10s
     volumes:
       - asterisk_callrec:/var/spool/asterisk/monitor/
+      - faster_whisper_cache:/opt/models
+      # - ../.custom_conf/google_credentials.json:/${STT_GCP_JSON_PATH}:ro
 
   call-logger:
     build: 

@@ -8,20 +8,18 @@ deploy-aio-cloud-docker:
     - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
     - rm -rf ~/omldeploytool
     - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cp ~/omldeploytool/docker-compose/env ~/omldeploytool/docker-compose/prod-env/.env
     - cd ~/omldeploytool/docker-compose/prod-env
     - |
       if [ -n "${OMLOSS_BRANCH}" ]; then
         echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
         git checkout ${OMLOSS_BRANCH}
+        sed -i "s/branch=main/branch=${OMLOSS_BRANCH}/g" ./deploy.sh
       fi
-    - sed -i "s/\${NIC}/eth0/g" ./deploy.sh
-    - sed -i "s/\BRANCH/$CI_COMMIT_REF_NAME/g" ./deploy.sh
     - |
-      if [ -n "${OMLAPP_IMG}" ]; then
-        echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./deploy.sh
-      fi    
+      if [ -n "${NIC}" ]; then
+        echo "NIC is defined: ${NIC}"
+        sed -i "s/oml_nic=eth0/oml_nic=${NIC}/g" ./deploy.sh
+      fi
     - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
     - sleep 60
     - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
@@ -293,7 +291,6 @@ deploy-aio-cloud-docker-norm:
     - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
     - rm -rf ~/omldeploytool
     - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cp ~/omldeploytool/docker-compose/env ~/omldeploytool/docker-compose/prod-env/.env
     - cd ~/omldeploytool/docker-compose/prod-env
     - |
       if [ -n "${OMLOSS_BRANCH}" ]; then

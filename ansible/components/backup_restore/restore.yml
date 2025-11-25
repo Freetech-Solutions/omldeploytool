@@ -63,8 +63,8 @@
 
     - name: RESTORE wait for PostgreSQL to be available AIO
       wait_for:
-        host: 127.0.0.1
-        port: "{{ postgres_port}}"
+        host: "{{ omni_ip_lan }}"
+        port: "{{ postgres_port }}"
         state: started
         timeout: 120
       when:
@@ -88,14 +88,18 @@
       when:
         - inventory_hostname in groups['omnileads_app']
 
+    - name: RESTORE generate file_timestamp
+      set_fact:
+        file_timestamp: "{{ ansible_date_time.epoch }}"
+
     - name: RESTORE postgres DB pg_restore
-      shell: "podman run --name pgsql_bk_{{ restore_file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ restore_file_timestamp }}.sql --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_restore.sh"
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
       when:
         - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is not defined      
     
     - name: DJANGO run migrations 
-      shell: "podman run --network=host --env-file /etc/default/django.env --rm {{ omnileads_img }} /opt/omnileads/bin/django_migrations.sh"
+      shell: "podman run --env-file /etc/default/django.env --rm {{ omnileads_img }} /opt/omnileads/bin/django_migrations.sh"
       tags:  
         - install
         - upgrade
@@ -127,7 +131,7 @@
         - omnileads_ha is defined
 
     - name: RESTORE postgres DB pg_restore HA scenary
-      shell: "podman run --name pgsql_bk_{{ restore_file_timestamp }} --network=host --env-file /etc/default/django.env -e BACKUP_FILENAME=pgsql-backup-{{ restore_file_timestamp }}.sql -e PGHOST={{ aio_1 }} --rm {{ omnileads_img }} bash -x /opt/omnileads/bin/init_pgsql_restore.sh"
+      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
       when:
         - inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is defined     

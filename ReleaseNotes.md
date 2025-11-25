@@ -1,29 +1,32 @@
-# Release Notes - OMniLeads 2.6.0
-[2025-10-09]
+# Release Notes - OMniLeads 2.6.1
+[2025-11-25]
 
 ## Added
 
-* [OMLAPP][WhatsApp] Added support for the Meta WhatsApp Provider.
-* [OMLAPP] Added the ability for the agent webphone to place participants on hold.
+* oml-3001 Internal agents calls permission.
+* oml-3118 Phone rating.
+* oml-3165 Bulk Messaging Meta providers Support.
 
 ## Changed
 
-* [DIALER] Implemented WebSocket (WS) auto-reconnection on the websocket_ari component.
-* [DIALER] Optimized the Stasis App code (dialer-dialplan). Updated Python and Gearman library versions.
-* [DIALER] Implemented campaign priorities setting.
-* [ANSIBLE] Modified the systemd restart parameter for the Dialer and WhatsApp components from on-failure to always.
+* oml-3128 Database Results shows Subdispositions.
+* oml-3190 Search Audits now includes non engaged dispositions.
+* oml-3206 Allow editing Disconnection time for preview campaigns.
+* oml-3105 Visual changes in Contact Disposition form.
 
 ## Fixed
 
-* [ANSIBLE] Fixed missing Restart configuration for the Dialer components: process-contact, event, and campaign.
-* [OMLAPP] Restored the command responsible for logging out expired web sessions.
-* [ACD] Fixed issues with the activation/deactivation of Asterisk verbosity logs.
-* [DIALER] Restricted pending schedules used for campaign finalization to the scope of their own campaign.
+* oml-3212 Fix External site interaction double trigger.
+* oml-3229 Avoid Error 500 generating Call Reports with bad logs.
+* oml-3240 OMniDialer boost factor
+* oml-795 Fixed backup/restore tool
+* oml-853 Disable SElinux on upgrades
+* oml-863 Enable promtail service
+* oml-855 Set 644 permission on postgresql.conf binded file
 
 ## Removed
-
 No removals in this release.
 
-## PostgreSQL Migrations
+## DB Migrations
 
-* 2.6.0 whatsapp_app: 0015
+* 2.6.1 ominicontacto_app: 0114, 0115

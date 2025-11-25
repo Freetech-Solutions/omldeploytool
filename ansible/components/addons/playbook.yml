@@ -28,7 +28,6 @@
       - { name: 'wallboard_listener', src: '{{ addons_repo_path }}templates/wallboard_listener.service' }
       - { name: 'wallboard_worker', src: '{{ addons_repo_path }}templates/wallboard_worker.service' }
       - { name: 'bulk_messages', src: '{{ addons_repo_path }}templates/bulk_messages.service' }
-      - { name: 'survey_worker', src: '{{ addons_repo_path }}templates/survey_worker.service' }
 
   tasks:
     - name: ADDON Copy systemd services

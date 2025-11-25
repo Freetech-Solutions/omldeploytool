@@ -11,6 +11,37 @@ Restart=on-failure
 TimeoutStartSec=600
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
+{% if callrec_transcriptions_engine == "gcp" %}  
+ExecStart=/usr/bin/podman run \
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --replace \
+  --detach \
+  --network=host \
+  --log-driver=journald \
+  --env-file=/etc/default/interaction_processor.env \
+  --name=oml-callrec-transcriber-server \
+  --volume=asterisk_callrec:/var/spool/asterisk/monitor \
+  --volume=/etc/omnileads/google_credential.json:/tmp/google_credential.json \
+  --rm  \
+{{ callrec_transcriber_img }}
+{% elif callrec_transcriptions_engine == "local" %}
+ExecStart=/usr/bin/podman run \
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --replace \
+  --detach \
+  --network=host \
+  --log-driver=journald \
+  --env-file=/etc/default/interaction_processor.env \
+  --name=oml-callrec-transcriber-server \
+  --volume=asterisk_callrec:/var/spool/asterisk/monitor \
+  --volume=faster_whisper_cache:/opt/models \
+  --rm  \
+{{ callrec_transcriber_img }}
+{% else %}
 ExecStart=/usr/bin/podman run \
   --cidfile=%t/%n.ctr-id \
   --cgroups=no-conmon \
@@ -24,6 +55,7 @@ ExecStart=/usr/bin/podman run \
   --volume=asterisk_callrec:/var/spool/asterisk/monitor \
   --rm  \
 {{ callrec_transcriber_img }}
+{% endif %}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

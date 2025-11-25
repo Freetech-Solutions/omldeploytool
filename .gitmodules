@@ -37,3 +37,12 @@
 [submodule "omlqa"]
 	path = components-git-repo/omlqa
 	url = https://gitlab.com/omnileads/omlqa.git
+[submodule "components-git-repo/kamailio-pstn"]
+	path = components-git-repo/kamailio-pstn
+	url = https://gitlab.com/omnileads/tel_pstn_proxy
+[submodule "components-git-repo/omlutilities"]
+	path = components-git-repo/omlutilities
+	url = https://gitlab.com/omnileads/omlutilities
+[submodule "components-git-repo/asterisk_builder"]
+	path = components-git-repo/asterisk_builder
+	url = https://gitlab.com/omnileads/asterisk_base_img
