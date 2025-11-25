@@ -16,11 +16,11 @@ callrec_compressor_img: docker.io/omnileads/callrec_compressor:20250825-802afa6c
 callrec_transcriber_img: docker.io/freetechsolutions/callrec_transcriber:20251027-ab73565a
 
 # --- OMnidialer components images
-dialer_api_img: docker.io/omnileads/dialer_api:20251013-6fed77c1
-dialer_listener_img: docker.io/omnileads/dialer_listener:20251013-6fed77c1
-dialer_worker_img: docker.io/omnileads/dialer_worker:20251013-6fed77c1
-dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20251013-6fed77c1
-dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20251013-6fed77c1
+dialer_api_img: docker.io/omnileads/dialer_api:20251125-8aef0813
+dialer_listener_img: docker.io/omnileads/dialer_listener:20251125-8aef0813
+dialer_worker_img: docker.io/omnileads/dialer_worker:20251125-8aef0813
+dialer_dialplan_img: docker.io/omnileads/dialer_dialplan:20251125-8aef0813
+dialer_asterisk_img: docker.io/omnileads/dialer_asterisk:20251125-8aef0813
 
 # --- Backend components images
 redis_img: docker.io/omnileads/redis:231125.01

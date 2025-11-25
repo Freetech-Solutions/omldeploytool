@@ -466,7 +466,7 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20251106-ae3fd398
+    omnileads_img: docker.io/freetechsolutions/omlapp:20251125-0dbfd404
     asterisk_img: docker.io/omnileads/asterisk:20251002-b75cdedd
 
 ##########################################################################################################
