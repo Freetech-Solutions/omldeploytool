@@ -94,7 +94,7 @@
         - backup_filename is defined
 
     - name: POSTGRESQL RESTORE postgres DB pg_restore
-      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
+      shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
       tags:
         - install
       when:
@@ -103,7 +103,4 @@
 - name: POSTGRESQL Include High Availability playbook
   import_playbook: ha.yml
   when: omnileads_ha is defined
-  
-- name: POSTGRESQL Include Prometheus playbook
-  import_playbook: prometheus.yml
   

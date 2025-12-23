@@ -92,14 +92,21 @@
       set_fact:
         file_timestamp: "{{ ansible_date_time.epoch }}"
 
-    - name: RESTORE postgres DB pg_restore
-      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
+    - name: RESTORE postgres OML DB pg_restore
+      shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} {{ backup_restore_img }} python restore.py"
       when:
         - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is not defined      
-    
+
+    - name: RESTORE postgres OMD DB pg_restore
+      shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e SQL_DATABASE=omnidialer -e BACKUP_FILENAME={{ backup_filename_OMD }} {{ backup_restore_img }} python restore.py"
+      when:
+        - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+        - omnileads_ha is not defined
+        - backup_filename_OMD is defined
+
     - name: DJANGO run migrations 
-      shell: "podman run --env-file /etc/default/django.env --rm {{ omnileads_img }} /opt/omnileads/bin/django_migrations.sh"
+      shell: "podman run --network=host --env-file /etc/default/django.env {{ omnileads_img }} /opt/omnileads/bin/django_migrations.sh"
       tags:  
         - install
         - upgrade
@@ -130,13 +137,21 @@
         - inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is defined
 
-    - name: RESTORE postgres DB pg_restore HA scenary
-      shell: "podman run --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} --rm {{ backup_restore_img }} python restore.py"
+    - name: RESTORE postgres OML DB pg_restore HA scenary
+      shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} {{ backup_restore_img }} python restore.py"
       when:
         - inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is defined     
         - ha_role == 'main'
     
+    - name: RESTORE postgres OMD DB pg_restore HA scenary
+      shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e SQL_DATABASE=omnidialer -e BACKUP_FILENAME={{ backup_filename_OMD }} {{ backup_restore_img }} python restore.py"
+      when:
+        - inventory_hostname in groups['omnileads_aio']
+        - omnileads_ha is defined     
+        - ha_role == 'main'
+        - backup_filename_OMD is defined
+
     - name: RESTORE Create replication user
       postgresql_user:
         name: "{{ postgres_user }}"
@@ -213,14 +228,14 @@
         - ha_role == 'main'
 
     - name: POSTGRESQL REPMGR readonly clone from main dry_run simulation
-      shell: "podman run --rm --network=host --env-file=/etc/default/postgres.env --name=oml-postgresql-standby --volume=oml_postgres:/var/lib/postgresql/data --volume=/etc/omnileads/repmgr.conf:/etc/postgresql/repmgr.conf --volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf --volume=/etc/omnileads/pg_hba.conf:/etc/postgresql/pg_hba.conf --volume=/etc/omnileads/pgpass:/var/lib/postgresql/.pgpass {{ postgres_ha_img }}  sudo -u postgres repmgr -h {{ aio_1 }} -U repmgr -d repmgr -f /etc/postgresql/repmgr.conf standby clone --dry-run"
+      shell: "podman run --network=host --env-file=/etc/default/postgres.env --name=oml-postgresql-standby --volume=oml_postgres:/var/lib/postgresql/data --volume=/etc/omnileads/repmgr.conf:/etc/postgresql/repmgr.conf --volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf --volume=/etc/omnileads/pg_hba.conf:/etc/postgresql/pg_hba.conf --volume=/etc/omnileads/pgpass:/var/lib/postgresql/.pgpass {{ postgres_ha_img }}  sudo -u postgres repmgr -h {{ aio_1 }} -U repmgr -d repmgr -f /etc/postgresql/repmgr.conf standby clone --dry-run"
       when: 
         - inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is defined      
         - ha_role == 'backup'
 
     - name: RESTORE POSTGRESQL REPMGR readonly clone from main
-      shell: "podman run --rm --network=host --env-file=/etc/default/postgres.env --name=oml-postgresql-standby --volume=oml_postgres:/var/lib/postgresql/data --volume=/etc/omnileads/repmgr.conf:/etc/postgresql/repmgr.conf --volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf --volume=/etc/omnileads/pg_hba.conf:/etc/postgresql/pg_hba.conf --volume=/etc/omnileads/pgpass:/var/lib/postgresql/.pgpass {{ postgres_ha_img }}  sudo -u postgres repmgr -h {{ aio_1 }} -U repmgr -d repmgr -f /etc/postgresql/repmgr.conf standby clone -F"
+      shell: "podman run --network=host --env-file=/etc/default/postgres.env --name=oml-postgresql-standby --volume=oml_postgres:/var/lib/postgresql/data --volume=/etc/omnileads/repmgr.conf:/etc/postgresql/repmgr.conf --volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf --volume=/etc/omnileads/pg_hba.conf:/etc/postgresql/pg_hba.conf --volume=/etc/omnileads/pgpass:/var/lib/postgresql/.pgpass {{ postgres_ha_img }}  sudo -u postgres repmgr -h {{ aio_1 }} -U repmgr -d repmgr -f /etc/postgresql/repmgr.conf standby clone -F"
       when: 
         - inventory_hostname in groups['omnileads_aio']
         - omnileads_ha is defined      

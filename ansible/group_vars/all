@@ -10,11 +10,10 @@ asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:20250825-47b3a
 fastagi_img: docker.io/omnileads/fastagi:20250825-2e557c10
 astami_img: docker.io/omnileads/astami:20250825-5d38d2e1
 kamailio_img: docker.io/omnileads/kamailio:20250825-6b854038
-rtpengine_img: docker.io/omnileads/rtpengine:20250911-0d2c9b76
+rtpengine_img: docker.io/omnileads/rtpengine:20251204-a63c6600
 call_logger_img: docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
-callrec_compressor_img: docker.io/omnileads/callrec_compressor:20250825-802afa6c
-callrec_transcriber_img: docker.io/freetechsolutions/callrec_transcriber:20251027-ab73565a
-
+callrec_compressor_img: docker.io/omnileads/callrec_compressor:20251203-7de4a125
+callrec_transcriber_img: docker.io/omnileads/callrec_transcriber:20251203-7de4a125
 # --- OMnidialer components images
 dialer_api_img: docker.io/omnileads/dialer_api:20251125-8aef0813
 dialer_listener_img: docker.io/omnileads/dialer_listener:20251125-8aef0813
@@ -33,11 +32,13 @@ gearman_img: docker.io/artefactual/gearmand:1.1.21.2-alpine
 
 # --- Monitoring components images
 prometheus_img: docker.io/prom/prometheus:v2.55.1
-prometheus_node_exp_img: docker.io/prom/node-exporter:v1.7.0
-prometheus_podman_exp_img: quay.io/navidys/prometheus-podman-exporter:latest
-postgres_prometheus_img: docker.io/prometheuscommunity/postgres-exporter
-redis_prometheus_img: docker.io/oliver006/redis_exporter:latest
-promtail_img: docker.io/grafana/promtail:latest
+prometheus_node_img: docker.io/prom/node-exporter:v1.7.0
+prometheus_podman_img: quay.io/navidys/prometheus-podman-exporter:latest
+prometheus_uwsgi_img: docker.io/timonwong/uwsgi-exporter:v1.3.0
+prometheus_gearman_img: docker.io/gearmanexporter/gearman-exporter:v0.5.0
+prometheus_postgres_img: docker.io/prometheuscommunity/postgres-exporter
+prometheus_redis_img: docker.io/oliver006/redis_exporter:latest
+promtail_img: docker.io/grafana/promtail:3.3.2
 
 # --- Other components images
 backup_restore_img: docker.io/omnileads/backup_restore:20251105-f437faca

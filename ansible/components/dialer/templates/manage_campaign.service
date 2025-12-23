@@ -24,7 +24,7 @@ ExecStart=/usr/bin/podman run \
 -e GEARMAN_JOBS=create-campaign|start-campaign|pause-campaign|resume-campaign|stop-campaign|edit-campaign|delete-campaign|change-database \
 --env-file=/etc/default/dialer.env \
 --name=dialer-manage-campaign \
---rm  \
+--label tier=dialer \
 {{ dialer_worker_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

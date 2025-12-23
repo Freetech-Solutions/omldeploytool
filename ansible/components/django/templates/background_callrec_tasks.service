@@ -22,7 +22,7 @@ ExecStart=/usr/bin/podman run \
 --env-file=/etc/default/django.env \
 -e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
 --name=oml-callrec-tasks-worker \
---rm  \
+--label tier=omlapp \
 {{ omnileads_img }} /opt/omnileads/bin/init_worker_bgtasks.sh
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

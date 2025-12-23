@@ -21,7 +21,7 @@ ExecStart=/usr/bin/podman run \
   --env-file=/etc/default/redis.env \
   --name=oml-redis-server \
   --volume=oml_redis:/data \
-  --rm \
+  --label tier=backend \
 {% if scale_redis is defined and scale_redis %}
   --volume=/etc/omnileads/redis.conf:/etc/redis/redis.conf \
   --entrypoint redis-server \

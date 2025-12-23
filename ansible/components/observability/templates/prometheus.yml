@@ -90,6 +90,27 @@ scrape_configs:
           arq: 'aio'
           component: 'podman'
 
+  - job_name: '{{ tenant_id }}_gearman'
+    static_configs:
+      - targets: ['{{ omni_ip_lan }}:9418']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'gearman'
+
+  - job_name: '{{ tenant_id }}_uwsgi'
+    static_configs:
+      - targets: ['{{ omni_ip_lan }}:9117']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'uwsgi'
+
+  - job_name: '{{ tenant_id }}_rtpengine'
+    static_configs:
+      - targets: ['{{ omni_ip_lan }}:22223']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'rtpengine'
+
 {% endif %}
 
 {% else %}
@@ -165,5 +186,26 @@ scrape_configs:
           tenant: '{{ tenant_id }}'
           arq: 'cluster'
           component: 'asterisk'
+
+  - job_name: '{{ tenant_id }}_gearman'
+    static_configs:
+      - targets: ['{{ application_host }}:9418']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'gearman'
+
+  - job_name: '{{ tenant_id }}_uwsgi'
+    static_configs:
+      - targets: ['{{ application_host }}:9117']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'uwsgi'
+
+  - job_name: '{{ tenant_id }}_rtpengine'
+    static_configs:
+      - targets: ['{{ voice_host }}:22223']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'rtpengine'
 
 {% endif %}

@@ -1,5 +1,5 @@
 [Unit]
-Description=Podman dialer-resume_campaign.service
+Description=Podman prometheus-postgres.service
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
 After=network-online.target
@@ -8,28 +8,22 @@ RequiresMountsFor=%t/containers
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
-RestartSec=60
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
---cidfile=%t/%n.ctr-id \
---cgroups=no-conmon \
---sdnotify=conmon \
---replace \
---detach \
---network=omnidialer \
---log-driver=journald \
--e GEARMAN_JOBS=resume-campaign \
---env-file=/etc/default/dialer.env \
---name=dialer-resume-campaign \
---rm  \
-{{ dialer_worker_img }}
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --replace \
+  --detach \
+  --network=host \
+  --env-file=/etc/default/prometheus_postgres.env \
+  --name=obs-prometheus-postgres \
+  {{ prometheus_postgres_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
 NotifyAccess=all
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=default.target

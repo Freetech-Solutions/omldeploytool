@@ -1,43 +1,78 @@
 global:
   scrape_interval: 10s
   evaluation_interval: 10s
+  external_labels:
+    tenant: "devenv"
+    environment: "production"
 
 scrape_configs:
 
-  - job_name: 'omnileads_host'
+  - job_name: 'prometheus localhost'
+    static_configs:
+      - targets: ['prometheus:9090']
+        labels:
+          tenant: 'testing'
+          component: 'prometheus'
+
+  - job_name: 'node-exporter localhost'
     static_configs:
       - targets: ['nodeexporter:9100']
         labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
-          component: 'aio_os'
+          tenant: 'testing'
+          component: 'nodeexporter'
 
-  - job_name: 'omnileads_redis'
+  - job_name: 'cadvisor localhost'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          tenant: 'testing'
+          component: 'cadvisor'
+
+  - job_name: 'redis localhost'
     static_configs:
       - targets: ['redis-exporter:9121']
         labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
+          tenant: 'testing'
           component: 'redis'
-
-  - job_name: 'omnileads_asterisk'
-    static_configs:
-      - targets: ['acd:7088']
-        labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
-          component: 'asterisk'
-
-  - job_name: 'omnileads_postgres'
+ 
+  - job_name: 'postgres localhost'
     static_configs:
       - targets: ['postgres-exporter:9187']
         labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
+          tenant: 'testing'
           component: 'postgres'
-
-  - job_name: cadvisor
-    scrape_interval: 5s
+ 
+  - job_name: 'podman localhost'
     static_configs:
-    - targets:
-      - cadvisor:8080
+      - targets: ['podman-exporter:9882']
+        labels:
+          tenant: 'testing'
+          component: 'podman'
+
+  - job_name: 'gearman localhost'
+    static_configs:
+      - targets: ['gearman-exporter:9418']
+        labels:
+          tenant: 'testing'
+          component: 'gearman'
+
+  - job_name: 'uwsgi localhost'
+    static_configs:
+      - targets: ['uwsgi-exporter:9117']
+        labels:
+          tenant: 'testing'
+          component: 'uwsgi'
+
+  - job_name: 'ACD localhost'
+    static_configs:
+      - targets:  ['acd:7088']
+        labels:
+          tenant: 'testing'
+          component: 'acd'
+
+  - job_name: 'rtpengine'
+    static_configs:
+      - targets: ['rtpengine:22223']
+        labels:
+          tenant: 'testing'
+          component: 'rtpengine'

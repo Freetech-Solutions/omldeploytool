@@ -23,7 +23,7 @@ ExecStart=/usr/bin/podman run \
   --volume=/etc/omnileads/certs:/etc/omnileads/certs \
   --volume=django_static:/opt/omnileads/static \
   --volume=django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor \
-  --rm  \
+  --label tier=omlapp \
   {{ nginx_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id

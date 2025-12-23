@@ -11,16 +11,16 @@ Restart=on-failure
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
-  --cidfile=%t/%n.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  --replace \
-  --detach \
-  --network=host \
-  --log-driver=journald \
-  --name=oml-gearman-server \
-  --rm \
-  {{ gearman_img }}
+--cidfile=%t/%n.ctr-id \
+--cgroups=no-conmon \
+--sdnotify=conmon \
+--replace \
+--detach \
+--network=host \
+--log-driver=journald \
+--name=oml-gearman-server \
+--label tier=backend \
+{{ gearman_img }}
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

@@ -102,8 +102,16 @@ x-django-web-common: &django-web-common
       reservations:
         memory: 512M
         cpus: '0.25'
-
-
+# Django worker common template
+x-django-worker-common: &django-worker-common
+  <<: *django-common
+  depends_on:
+    postgresql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  working_dir: /opt/omnileads/ominicontacto
+  stop_grace_period: 30s
 # Worker common template
 x-worker-common: &worker-common
   build:
@@ -347,8 +355,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      django-app:
-        condition: service_healthy  
     environment:
       <<: *django-env
     command: /opt/omnileads/bin/init_cronos.sh
@@ -388,38 +394,20 @@ services:
       - ${UWSGI_EXT_BIND_IP:-0.0.0.0}:${DAPHNE_EXT_PORT:-8098}:8098/tcp
   
   whatsapp:
-    <<: *django-common
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *django-worker-common
     command: /opt/omnileads/bin/init_whatsapp.sh
-    working_dir: /opt/omnileads/ominicontacto
-    stop_grace_period: 30s
 
   background_tasks:
-    <<: *django-common
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *django-worker-common
     command: /opt/omnileads/bin/init_worker_bgtasks.sh
-    working_dir: /opt/omnileads/ominicontacto
-    stop_grace_period: 30s
   
   background-dialer-tasks:
-    <<: *django-common
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *django-worker-common
     command: python manage.py omnidialer_events_listener
-    working_dir: /opt/omnileads/ominicontacto
-    stop_grace_period: 30s
-  
+
+  # background-supervision-tasks:
+  #   <<: *django-worker-common
+  #   command: python manage.py supervision_events_listener
   # ----------------------------------------------------------------------------
   # WEBSOCKET & WEBSERVER SERVICES
   # ----------------------------------------------------------------------------
@@ -540,6 +528,7 @@ services:
     - asterisk_callrec:/var/spool/asterisk/monitor/
     - asterisk_conf:/etc/asterisk/retrieve_conf
     - asterisk_sounds:/var/lib/asterisk/sounds
+    # - ./.custom_conf/extensions.conf:/etc/asterisk/oml_extensions_custom.conf:ro
     
   fastagi:
     build: 

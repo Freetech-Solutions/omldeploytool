@@ -1,5 +1,5 @@
 [Unit]
-Description=Podman dialer-update_incidence_rule.service
+Description=Podman prometheus_podman_exporter.service
 Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target
 After=network-online.target
@@ -8,28 +8,24 @@ RequiresMountsFor=%t/containers
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
-RestartSec=60
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
---cidfile=%t/%n.ctr-id \
---cgroups=no-conmon \
---sdnotify=conmon \
---replace \
---detach \
---network=omnidialer \
---log-driver=journald \
--e GEARMAN_JOBS=update-incidence-rule \
---env-file=/etc/default/dialer.env \
---name=dialer-update-incidence-rule \
---rm  \
-{{ dialer_worker_img }}
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --replace \
+  --detach \
+  --network=host \
+  --name=obs-promtheus_podman_exporter-server \
+  -e CONTAINER_HOST=unix:///run/podman/podman.sock \
+  -v /run/podman/podman.sock:/run/podman/podman.sock \
+  -u root \
+  {{ prometheus_podman_img }} prometheus-podman-exporter --collector.enable-all --collector.store_labels --collector.enhance-metrics
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
 NotifyAccess=all
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=default.target

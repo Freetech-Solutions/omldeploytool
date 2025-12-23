@@ -128,11 +128,15 @@ check_health() {
 # -----------------------------------------------------------------------------
 # Show Stack Status & Averages
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Show Stack Status & Validate Execution (Status + Health)
+# -----------------------------------------------------------------------------
 show_status() {
     echo
     info "Container Status:"
     docker_compose ps --format table || docker_compose ps
 
+    # --- (Mantengo tu bloque de métricas original para no perder funcionalidad) ---
     echo
     info "Real-Time Metrics (averages):"
     local tmp_cpu tmp_mem tmp_count
@@ -168,6 +172,85 @@ show_status() {
     fi
 
     show_raw_stats
+
+    # -------------------------------------------------------------------------
+    # NEW: DEEP HEALTH VALIDATION CHECK
+    # -------------------------------------------------------------------------
+    echo
+    info "Validating container health and states..."
+    
+    local all_cids
+    all_cids=$(docker_compose ps -q)
+
+    if [[ -z "$all_cids" ]]; then
+        error "SYSTEM DOWN: No containers found defined for project '$PROJECT_NAME'."
+        return 1
+    fi
+
+    local stopped_containers=()
+    local unhealthy_containers=()
+    local starting_containers=()
+
+    for cid in $all_cids; do
+        local c_name c_info state health
+        
+        c_name=$(docker inspect --format '{{.Name}}' "$cid" | sed 's/^\///')
+        
+        # Truco de experto: Extraemos estado y salud en una sola llamada usando condicionales de Go templates
+        # Si no tiene healthcheck, devuelve 'none'
+        c_info=$(docker inspect --format '{{.State.Status}}:{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid")
+        
+        state=${c_info%:*}   # Todo antes de los dos puntos
+        health=${c_info#*:}  # Todo después de los dos puntos
+
+        if [[ "$state" != "running" ]]; then
+            stopped_containers+=("$c_name (Status: $state)")
+        elif [[ "$health" == "unhealthy" ]]; then
+            unhealthy_containers+=("$c_name (Health: $health)")
+        elif [[ "$health" == "starting" ]]; then
+            # Opcional: Puedes decidir si 'starting' es un error o un warning. 
+            # Aquí lo guardamos para informar, pero no romperemos ejecución drásticamente si no quieres.
+            starting_containers+=("$c_name")
+        fi
+    done
+
+    local has_errors=0
+
+    # Reporte de Contenedores Detenidos
+    if (( ${#stopped_containers[@]} )); then
+        echo
+        error "CRITICAL: The following containers are NOT running:"
+        for item in "${stopped_containers[@]}"; do echo -e "  ${RED}✖ ${item}${NC}"; done
+        has_errors=1
+    fi
+
+    # Reporte de Contenedores Unhealthy (Corren, pero fallan internamente)
+    if (( ${#unhealthy_containers[@]} )); then
+        echo
+        error "CRITICAL: The following containers are UNHEALTHY:"
+        for item in "${unhealthy_containers[@]}"; do echo -e "  ${RED}✖ ${item}${NC}"; done
+        has_errors=1
+    fi
+
+    # Advertencia de iniciando (no es error crítico, pero el sistema no está listo 100%)
+    if (( ${#starting_containers[@]} )); then
+        echo
+        warning "The following containers are still STARTING (check again in a few seconds):"
+        for item in "${starting_containers[@]}"; do echo -e "  ${YELLOW}⏳ ${item}${NC}"; done
+        # Dependiendo de tu criterio, esto podría ser un error. 
+        # Si quieres que el script falle si algo está 'starting', descomenta la siguiente línea:
+        # has_errors=1 
+    fi
+
+    if (( has_errors == 1 )); then
+        echo
+        error "System check FAILED."
+        return 1
+    else
+        echo
+        success "SYSTEM INTEGRITY OK: All services are running and healthy."
+        return 0
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -287,6 +370,38 @@ rebuild_services() {
 }
 
 # -----------------------------------------------------------------------------
+# Open Interactive Terminal
+# -----------------------------------------------------------------------------
+open_terminal() {
+    local service="${1:-}"
+
+    # 1. Validar que el usuario ingresó un nombre de servicio
+    if [[ -z "$service" ]]; then
+        error "You must specify a service name."
+        info "Usage: ./manage.sh terminal <service_name>"
+        echo
+        info "Available running services:"
+        docker_compose ps --services --filter "status=running"
+        return 1
+    fi
+
+    # 2. Validar que el servicio esté corriendo realmente
+    if ! docker_compose ps -q "$service" &>/dev/null; then
+        error "Service '$service' is not running or does not exist."
+        return 1
+    fi
+
+    log "Opening interactive shell in '$service'..."
+
+    # 3. Intentar BASH, si falla (exit code != 0), intentar SH
+    #    El '||' ejecuta el segundo comando solo si el primero falla.
+    docker_compose exec "$service" bash 2>/dev/null || {
+        warning "'bash' not found inside container. Falling back to 'sh'..."
+        docker_compose exec "$service" sh
+    }
+}
+
+# -----------------------------------------------------------------------------
 # Compose Version Helper
 # -----------------------------------------------------------------------------
 compose_version() {
@@ -361,6 +476,7 @@ main() {
         send-call)      send_call ;;
         backup)         backup_database ;;
         restore)        restore_database ;;
+        terminal)       shift; open_terminal "${1:-}" ;;
         rebuild)        shift; rebuild_services "${1:-}" ;;
         env)            if [[ -f "$ENV_FILE" ]]; then grep -h '^[A-Z_]\+=' "$ENV_FILE" | head -20; else warning ".env not found"; fi ;;
         version)        printf "Docker: %s\n" "$(docker --version)"; printf "Compose: %s\n" "$(compose_version)"; ;;
