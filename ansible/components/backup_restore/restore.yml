@@ -59,34 +59,7 @@
         name: postgresql
         state: started
       when:
-        - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']  
-
-    - name: RESTORE wait for PostgreSQL to be available AIO
-      wait_for:
-        host: "{{ omni_ip_lan }}"
-        port: "{{ postgres_port }}"
-        state: started
-        timeout: 120
-      when:
-        - inventory_hostname in groups['omnileads_aio']
-
-    - name: RESTORE wait for PostgreSQL to be available AIT
-      wait_for:
-        host: "{{ data_host }}"
-        port: "{{ postgres_port }}"
-        state: started
-        timeout: 120
-      when:
-        - inventory_hostname in groups['omnileads_app']
-
-    - name: RESTORE wait for PostgreSQL to be available External Postgres
-      wait_for:
-        host: "{{ postgres_host }}"
-        port: "{{ postgres_port }}"
-        state: started
-        timeout: 120
-      when:
-        - inventory_hostname in groups['omnileads_app']
+        - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']
 
     - name: RESTORE generate file_timestamp
       set_fact:
@@ -96,7 +69,7 @@
       shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e BACKUP_FILENAME={{ backup_filename }} {{ backup_restore_img }} python restore.py"
       when:
         - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
-        - omnileads_ha is not defined      
+        - omnileads_ha is not defined
 
     - name: RESTORE postgres OMD DB pg_restore
       shell: "podman run --network=host --name pgsql_bk_{{ file_timestamp }} --env-file /etc/default/backup.env -e SQL_DATABASE=omnidialer -e BACKUP_FILENAME={{ backup_filename_OMD }} {{ backup_restore_img }} python restore.py"
@@ -112,7 +85,8 @@
         - upgrade
         - update
       when:
-        - omnileads_ha is not defined  
+        - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+        - omnileads_ha is not defined
 
     - name: RESTORE DJANGO Restart systemd service
       systemd:
@@ -122,7 +96,7 @@
         daemon_reload: yes
       when:
         - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
-        - omnileads_ha is not defined      
+        - omnileads_ha is not defined
 
     ######################################## HA tasks ###################################################
     ######################################## HA tasks ###################################################
