@@ -28,14 +28,14 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads images WEB
-OML_APP_IMG=docker.io/freetechsolutions/omlapp:20251203-c6f1cb35
-OML_NGINX_IMG=docker.io/omnileads/nginx:20250909-b9e079d4
+OML_APP_IMG=docker.io/omnileads/omlapp:20260220-038fb9ac
+OML_NGINX_IMG=docker.io/omnileads/nginx:20260129-4e2e865f
 OML_WS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
 
 # --- OMniLeads images TEL
-OML_ACD_IMG=docker.io/omnileads/asterisk:20251203-d895bbdb
+OML_ACD_IMG=docker.io/omnileads/asterisk:20260116-0b3394b4
 OML_ACD_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
-OML_FASTAGI_IMG=docker.io/omnileads/fastagi:20250825-2e557c10
+OML_FASTAGI_IMG=docker.io/omnileads/fastagi:20260213-da00c122
 OML_AMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
 OML_KAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
 OML_RTPENGINE_IMG=docker.io/omnileads/rtpengine:20251203-0d2c9b76
@@ -242,6 +242,7 @@ NGINX_EXT_PORT=443
 NGINX_WEBUI_MODE=static
 NGINX_WALLBOARD_WEBUI_PATH=/opt/omnileads/static/webui-wallboard
 NGINX_PREMIUMREPORTS_WEBUI_PATH=/opt/omnileads/static/webui-premiumreports
+NGINX_SURVEY_WEBUI_PATH=/opt/omnileads/static/webui-survey
 # -----------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
 # "${OML_HOSTNAME}" is the prod profile or "redis" is the dev profile
