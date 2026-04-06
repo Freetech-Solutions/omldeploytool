@@ -24,6 +24,7 @@ ExecStart=/usr/bin/podman run \
 --env-file=/etc/default/django.env \
 -e GOOGLE_MAPS_CENTER='{{ google_maps_center }}' \
 --name=oml-whatsapp-worker \
+--volume=django_media:/opt/omnileads/media_root \
 --label tier=omlapp \
 {{ omnileads_img }} /opt/omnileads/bin/init_whatsapp.sh
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id

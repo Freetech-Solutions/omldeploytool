@@ -3,7 +3,7 @@
 #################### containers img tags  ################################
 
 # --- OMniLeads core application images
-nginx_img: docker.io/omnileads/nginx:20260129-4e2e865f
+nginx_img: docker.io/omnileads/nginx:20260325-e26582d8
 websockets_img: docker.io/omnileads/websockets:20250825-3b0448ff
 
 asterisk_retrieve_conf_img: docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78

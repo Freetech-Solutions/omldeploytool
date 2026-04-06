@@ -1,36 +1,41 @@
-# Release Notes - OMniLeads 2.6.3
-[2026-02-20]
+# Release Notes - OMniLeads 2.6.4
+[2026-04-06]
 
 ## Added
 
-* oml-3166 IVR: Dialer campaigns with Survey as destination.
-* oml-3250 Browser Notification alert to desktop in inbound calls .
-* oml-3252 Bulk Messages: Excell file support.
+ * oml-3158 New Channel: Messenger Meta
+ * oml-3175 Added new Whatsapp template type support.
+ * oml-3243 Bulk Messages: Added several Whatsapp template types support.
+ * oml-3042 UI Improvements: Sidebar, Dark mode, Icons, Vue transitions, Supervision.
 
 ## Changed
 
-* oml-3240 Survey reports csv with columns names.
-* oml-3263 Automatic transfer to survey on agent hangup.
-* oml-3253 Wallboard: Enhanced agents table filtering.
+ * oml-3169 Edit Interactive menues from Line Options.
+ * oml-3280 Change IdentificadorCliente url field max_length=512
+ * oml-3294 Add inbound/outbound tags to agents conversations.
+ * devops-962 Change timeout on direct calls to agents
 
 ## Fixed
 
-* oml-2795 Fix bug receiving inbound with telephone starting with "+".
-* oml-3257 Fix bug "undefined" name for Whatsapp chats.
-* oml-3259 Fix bug error dispositioning 'Anonymous' inbound phone calls.
-* oml-3260 Fix Bug wombat list names max length.
-* oml-3261 Avoid error 500 on Omnidialer service API call failure
-* oml-3167 Fix Whatsapp service async calls and exception catching.
-* oml-3273 Fixes msg-orchestrator crashes with non supported messages.
-* oml-3140 Survey: Fix csv reports missing headers.
-* oml-3276 Enterprise: Licence check deactivated for certain cron jobs.
-* devops-843: Fix bug backup/restore.
-* devops-881: Fix bug click2call via API.
-* devops-891: Fix bug CRM interaction type 2.
+ * oml-2972 Fix agent blocked dispositioning with force unpause.
+ * oml-3171 Fix: Do not show hidden disposition options in Whatsapp disposition menu.
+ * oml-3275 Fix slow load time for new Whatsapp conversations.
+ * oml-3269 Fix add asterisk queue member with correct pause state.
+ * oml-3047 Fix do not show "contact not saved" on identified inbound contacts transfers.
+ * oml-3279 Fix Consultative transfer for campaigns with survey error.
+ * oml-3286 Fix External Site Authentication form validation.
+ * oml-3287 Improved Whatsapp usability and fixes attachments and transfers problems.
+ * oml-3288 Handle Whatsapp fowarded messages safely.
+ * oml-3289 Fix Whatsapp time validation logic.
+ * oml-3294 Fix Whatsapp conversation and transfers issues.
+ * oml-3293 Fix Whatsapp attachment files uploading issues.
+ * oml-3295 Fix orphaned Whatsapp conversations
 
 ## Removed
 No removals in this release.
 
 ## DB Migrations
 
-* 2.6.3 whatsapp_app: 0016
+* ominicontacto_app: 0117
+* facebook_meta_app: 0001
+* configuracion_telefonia_app: 0024, 0025
