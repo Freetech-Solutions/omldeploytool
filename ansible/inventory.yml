@@ -468,8 +468,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20260220-038fb9ac
-    asterisk_img: docker.io/omnileads/asterisk:20260116-0b3394b4
+    omnileads_img: docker.io/omnileads/omlapp:20260406-588c953e
+    asterisk_img: docker.io/omnileads/asterisk:20260406-b413ed4c
 
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
