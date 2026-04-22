@@ -297,10 +297,12 @@ all:
     # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
     acd_log_level: 1
 
-    # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip  & port
+    # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip & port, 
     acd_pjsip_transport_dialer: 127.0.0.1:5260
     acd_pjsip_transport_agent: 127.0.0.1:5160
     acd_pjsip_transport_trunk: 127.0.0.1:5060
+    # acd_pjsip_transport_trunk_external_media_address: X.X.X.X
+    # acd_pjsip_transport_trunk_external_signaling_address: X.X.X.X
     acd_api_listen_ip: 127.0.0.1
 
     # If you set scale_asterisk to true, then you must assign values to
