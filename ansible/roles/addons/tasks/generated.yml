@@ -1,0 +1,21 @@
+- name: ADDON Copy systemd services
+  template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.name }}.service"
+  loop: "{{ addons_services }}"
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: ADDON Enable and start systemd services
+  systemd:
+    name: "{{ item.name }}.service"
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  loop: "{{ addons_services }}"
+  tags:
+    - install
+    - upgrade
+    - restart

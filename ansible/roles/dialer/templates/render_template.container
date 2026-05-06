@@ -1,0 +1,24 @@
+[Unit]
+Description=OMniLeads Dialer Render Template Worker
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=dialer-render-template
+Image={{ DIALER_WORKER_IMG }}
+Pod=dialer_workers.pod
+EnvironmentFile=/etc/default/dialer.env
+Environment=GEARMAN_JOBS=render-template
+Label=tier=dialer
+LogDriver=journald
+# Argumento seguro para evitar fallos en tu versión de Podman:
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=on-failure
+RestartSec=60
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

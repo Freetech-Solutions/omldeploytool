@@ -1,0 +1,26 @@
+[Unit]
+Description=OMniLeads Daphne Server
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target omnileads.service
+Requires=omlapp_web-pod.service
+
+[Container]
+ContainerName={{ omlapp_daphne_container_name  }}
+Image={{ APP_IMG }}
+Pod=omlapp_web.pod
+EnvironmentFile=/etc/default/django.env
+Environment=DAPHNE_PORT={{ daphne_port }}
+Environment=DJANGO_HOSTNAME=0.0.0.0
+Environment=DAPHNE_ENABLE=true
+Label=tier=omlapp
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Exec=/opt/omnileads/bin/init_daphne.sh
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

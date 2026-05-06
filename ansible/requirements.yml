@@ -1,0 +1,27 @@
+---
+# Colecciones de Ansible Galaxy requeridas para el deploy de OMniLeads.
+# Se instalan con: ansible-galaxy install -r requirements.yml
+# (ver ansible/bootstrap.sh).
+collections:
+  # Módulo postgresql_db usado en roles/omlapp y roles/upgrade_from_2X
+  - name: community.postgresql
+    version: ">=4.2.0"
+
+  # Módulos podman_volume (roles/prerequisitos) y podman_network (roles/dialer)
+  - name: containers.podman
+    version: ">=1.19.0"
+
+  # Módulos selinux, mount, sysctl (roles/prerequisitos) y
+  # callbacks profile_tasks / timer declarados en ansible.cfg
+  - name: ansible.posix
+    version: ">=1.5.4"
+
+  # Módulos timezone (roles/prerequisitos) y archive (roles/upgrade_from_2X)
+  - name: community.general
+    version: ">=8.0.0"
+
+  # Reservadas para filtros/lookups de red (ipaddr, json_query, etc.).
+  # No se usan directamente hoy: revisar antes de quitar si se incorporan
+  # nuevos roles que las requieran.
+  - name: ansible.netcommon
+  - name: ansible.utils

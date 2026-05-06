@@ -1,0 +1,9 @@
+---
+component_addons_enabled: false
+addons_services:
+  - name: wallboard_listener
+    src: wallboard_listener.service
+  - name: wallboard_worker
+    src: wallboard_worker.service
+  - name: bulk_messages
+    src: bulk_messages.service

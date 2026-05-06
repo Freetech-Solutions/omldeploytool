@@ -1,0 +1,18 @@
+---
+# Por capas: primero data (PostgreSQL, Redis, red Podman…), luego edge, nodos y AIO.
+# Así los despliegues parciales (p. ej. --tags omlapp) no mezclan en paralelo data con compute.
+- import_playbook: site_core.yml
+  vars:
+    oml_play_hosts: omnileads_data
+
+- import_playbook: site_core.yml
+  vars:
+    oml_play_hosts: omnileads_edge
+
+- import_playbook: site_core.yml
+  vars:
+    oml_play_hosts: omnileads_nodes
+
+- import_playbook: site_core.yml
+  vars:
+    oml_play_hosts: omnileads_aio

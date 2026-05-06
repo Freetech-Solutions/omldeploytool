@@ -1,0 +1,12 @@
+[Unit]
+StopWhenUnneeded=false
+Description=OmniLeads DATA Stateless Pod 
+
+[Pod]
+Network={{ oml_network }}
+
+PublishPort={{ omni_ip_lan }}:6379:6379
+PublishPort={{ omni_ip_lan }}:4730:4730
+
+[Install]
+WantedBy=multi-user.target

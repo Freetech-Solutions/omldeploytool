@@ -1,0 +1,12 @@
+---
+# Activar en inventory: upgrade_from_2X: true
+upgrade_from_2X: false
+
+# Fase ejecutada por esta invocación del rol (site.yml pasa vars distintas por bloque).
+# Valores: cleanup_systemd | upgrade_to_debian13 | restore_dbs
+upgrade_from_2X_phase: cleanup_systemd
+
+# Hosts donde corre el restore (misma convención que backup.env en prerequisitos).
+upgrade_from_2X_target_host_groups:
+  - omnileads_aio
+  - omnileads_nodes

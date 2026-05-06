@@ -1,0 +1,118 @@
+---
+websocket_host: websocket-server
+websocket_port: 8000
+uwsgi_port: 8099
+daphne_port: 8098
+redis_port: 6379
+gearman_port: 4730
+fastagi_port: 4573
+postgres_port: 5432
+kamailio_wss_port: 10060
+kamailio_webrtc_udp_port: 10060
+
+INSTALL_PREFIX: /opt/omnileads/
+django_deploy_path: /opt/omnileads/
+asterisk_location_conf: /etc/asterisk
+certs_location: /etc/omnileads/certs
+swap_file: /swapfile
+
+USUARIO: omnileads
+MONITORFORMAT: mp3
+postgres_homer_db: homer7
+schedule: Agenda
+usuario: omnileads
+container_image_registry: docker.io
+container_orchest: systemd
+force_image_pull: false
+
+acd_app: oml_acd
+acd_ari_port: 7088
+acd_ag_handoff_ttl: 10
+
+oml_network: omnileads
+
+django_settings_module: ominicontacto.settings.production
+task_call_processor: acd-call-processor
+kamailio_pstn_port: 5060
+
+data_stateless_pod: data-stateless-server
+# Unidad systemd del quadlet data_stateless.pod (Redis + Gearman); debe estar activa al reiniciar contenedores del pod.
+data_stateless_pod_systemd_unit: data_stateless-pod.service
+data_statefull_pod: data-statefull-server
+# Unidad systemd del quadlet data_statefull.pod (PostgreSQL + MinIO, etc.)
+data_statefull_pod_systemd_unit: data_statefull-pod.service
+# Unidad systemd del quadlet telephony_edge.pod (rtpengine + kamailio_pstn + kamailio_webrtc).
+# Debe estar activa al reiniciar contenedores del pod; reiniciar contenedores
+# individuales tira la infra del pod y los siguientes starts fallan con
+# "Bound to unit telephony_edge-pod.service, but unit isn't active".
+telephony_edge_pod_systemd_unit: telephony_edge-pod.service
+acd_pod: acd
+dialer_api_pod: dialer
+web_pod: omlapp
+
+acd_host: 127.0.0.1
+
+acd_server_container_name: acd-server
+acd_app_container_name: acd-app
+acd_conf_container_name: acd-conf
+acd_fastagi_container_name: acd-fastagi
+callrec_compressor_container_name: callrec-compressor
+callrec_transcriber_container_name: callrec-transcriber
+
+dialer_api_container_name: dialer-api
+dialer_incidence_rules_container_name: dialer-incidence-rules
+dialer_manage_campaign_container_name: dialer-manage-campaign
+dialer_process_campaign_container_name: dialer-process-campaign
+dialer_process_container_name: dialer-process
+dialer_render_template_container_name: dialer-render-template
+dialer_scheduler_container_name: dialer-scheduler
+dialer_send_reports_container_name: dialer-send-reports
+kamailio_webrtc_container_name: kamailio-webrtc
+kamailio_pstn_container_name: kamailio-pstn-server
+nginx_container_name: oml-nginx-server
+
+omlapp_daphne_container_name: omlapp-daphne
+omlapp_uwsgi_container_name: omlapp-uwsgi
+omlapp_whatsapp_container_name: omlapp-whatsapp
+
+websocket_container_name: websocket-server
+
+rtpengine_container_name: rtpengine-server
+pstn_qa_container_name: oml-pstn-server
+
+autheph_sk: "{{ vault_autheph_sk }}"
+
+# Tags que disparan el rol 'pods'. Debe correr siempre que corra cualquier rol
+# cuyos .container declaren Pod=<name>.pod / Requires=<name>-pod.service, sino
+# Quadlet no genera el .service del .container y systemd responde:
+# "Could not find the requested service <name>.service: host".
+pods_role_tags:
+  - install
+  - upgrade
+  - update
+  - prerequisitos
+  - pods
+  # capas
+  - data
+  - edge
+  - nodes
+  - voice
+  - app
+  # componentes con .container que usan Pod=
+  - postgres
+  - minio
+  - redis
+  - gearman
+  - telephony-edge
+  - acd
+  - websockets
+  - omlapp
+  - omlapp_workers
+  - omlapp-workers
+  - interaction_processor
+  - dialer
+  - nginx
+  - haproxy
+  - observability
+  - addons
+  - qa

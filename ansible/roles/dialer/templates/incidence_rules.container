@@ -1,0 +1,28 @@
+
+[Unit]
+Description=OMniLeads Dialer Incidence Rules Worker
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Container]
+ContainerName=dialer-incidence-rules
+Image={{ DIALER_WORKER_IMG }}
+Pod=dialer_workers.pod
+EnvironmentFile=/etc/default/dialer.env
+Environment=GEARMAN_JOBS=add-incidence-rule-disposition|delete-incidence-rule|create-incidence-rule|update-incidence-rule
+Label=tier=dialer
+LogDriver=journald
+# Usamos el argumento seguro:
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

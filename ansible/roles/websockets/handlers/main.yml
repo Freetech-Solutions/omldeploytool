@@ -1,0 +1,8 @@
+- name: Restart websockets service
+  ansible.builtin.systemd:
+    name: omlapp_web-pod.service
+    state: restarted
+  tags:
+    - install
+    - upgrade
+    - update

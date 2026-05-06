@@ -1,0 +1,4 @@
+---
+- name: traefik_lb systemd daemon reload
+  ansible.builtin.systemd_service:
+    daemon_reload: true

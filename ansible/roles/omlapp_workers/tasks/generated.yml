@@ -1,0 +1,102 @@
+
+- name: OMLApp Workers set environment variables for this installation
+  ansible.builtin.template:
+    src: call_logger.env
+    dest: /etc/default/call_logger.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: omlapp_workers_env_file
+  notify: Restart omlapp_workers services
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp WorkersCopy Quadlet container units
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  register: omlapp_workers_quadlet_units
+  notify: Restart omlapp_workers services
+  loop:
+    - { src: "call_logger.container", dest: "/etc/containers/systemd/call_logger.container" }
+    - { src: "daily_redis_cleanup.container", dest: "/etc/containers/systemd/daily_redis_cleanup.container" }
+    - { src: "background_dialer_tasks.container", dest: "/etc/containers/systemd/background_dialer_tasks.container" }
+    - { src: "background_callrec_tasks.container", dest: "/etc/containers/systemd/background_callrec_tasks.container" }
+    - { src: "dashboard_agent_scheduler.container", dest: "/etc/containers/systemd/dashboard_agent_scheduler.container" }
+    - { src: "supervision_agentes_scheduler.container", dest: "/etc/containers/systemd/supervision_agentes_scheduler.container" }
+    - { src: "supervision_events_listener.container", dest: "/etc/containers/systemd/supervision_events_listener.container" }
+    - { src: "presence_heartbeat_scheduler.container", dest: "/etc/containers/systemd/presence_heartbeat_scheduler.container" }
+    - { src: "whatsapp.service", dest: "/etc/containers/systemd/whatsapp.container" }
+    
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: omlapp_workers_quadlet_units is changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers determine changed services
+  ansible.builtin.set_fact:
+    omlapp_workers_changed_services: >-
+      {{
+        (
+          (
+            [
+              'call_logger.service',
+              'daily_redis_cleanup.service',
+              'background_dialer_tasks.service',
+              'background_callrec_tasks.service',
+              'dashboard_agent_scheduler.service',
+              'supervision_agentes_scheduler.service',
+              'supervision_events_listener.service',
+              'presence_heartbeat_scheduler.service',
+              'whatsapp.service'
+            ]
+            if omlapp_workers_env_file.changed else []
+          )
+          +
+          (
+            omlapp_workers_quadlet_units.results | default([])
+            | selectattr('changed', 'equalto', true)
+            | map(attribute='dest')
+            | map('basename')
+            | map('replace', '.container', '.service')
+            | list
+          )
+        )
+        | unique
+        | list
+      }}
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp WorkersEnable and start systemd services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - call_logger.service
+    - daily_redis_cleanup.service
+    - background_dialer_tasks.service
+    - background_callrec_tasks.service
+    - dashboard_agent_scheduler.service
+    - supervision_agentes_scheduler.service
+    - supervision_events_listener.service
+    - presence_heartbeat_scheduler.service
+    - whatsapp.service
+  tags:
+    - install
+    - upgrade

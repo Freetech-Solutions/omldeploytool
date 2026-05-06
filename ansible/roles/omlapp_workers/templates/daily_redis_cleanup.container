@@ -1,0 +1,24 @@
+[Unit]
+Description=OMniLeads daily Redis cleanup worker
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=omlapp-daily-redis-cleanup
+Image={{ APP_IMG }}
+Pod=omlapp_workers.pod
+EnvironmentFile=/etc/default/django.env
+Environment=GOOGLE_MAPS_CENTER={{ google_maps_center }}
+Label=tier=omlapp_workers
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Exec=/opt/omnileads/bin/init_daily_redis_cleanup.sh
+
+[Service]
+Restart=on-failure
+RestartSec=60
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

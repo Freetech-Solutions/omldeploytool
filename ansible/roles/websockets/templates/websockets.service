@@ -1,0 +1,23 @@
+[Unit]
+Description=OMniLeads Websockets container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target redis.service
+After=network-online.target redis.service
+Requires=omlapp_web-pod.service
+
+[Container]
+ContainerName=websocket-server
+Image={{ WS_IMG }}
+Pod=omlapp_web.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/websockets.env
+Label=tier=omlapp
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

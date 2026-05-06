@@ -1,0 +1,22 @@
+[Unit]
+Description=OMniLeads Gearman container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=gearman-server
+Image={{ GEARMAN_IMG }}
+Pod=data_stateless.pod
+LogDriver=journald
+Label=tier=backend
+PodmanArgs=--cgroups=no-conmon
+Exec=gearmand -t 1
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

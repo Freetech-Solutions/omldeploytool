@@ -1,0 +1,224 @@
+server:
+  http_listen_port: 9080
+  http_listen_address: {{ '0.0.0.0' }}
+
+positions:
+  filename: /tmp/positions.yaml
+  sync_period: 1m
+
+clients:
+{% if tenant_id is defined and tenant_id != '' %}
+  - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
+    tenant_id: {{ tenant_id }}
+{% else %}
+  - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
+{% endif %}
+    batchsize: 102400
+    batchwait: 1s
+    backoff_config:
+      min_period: 1s
+      max_period: 10s
+
+# ============================================
+# DIALER SERVICE MACROS (Defined first)
+# ============================================
+{%- macro dialer_worker_type_config(worker_type, node_type) -%}
+- job_name: dialer_process_{{ worker_type }}
+  journal:
+    json: false
+    max_age: 6h
+    path: /var/log/journal
+    labels:
+      job: dialer_process_{{ worker_type }}
+      tenant: {{ tenant_id | default('unknown') }}
+      host: {{ inventory_hostname }}
+      node_type: {{ node_type }}
+      service_family: dialer
+      service_type: worker
+      worker_type: {{ worker_type }}
+      total_replicas: {{ vars['dialer_process_' ~ worker_type ~ '_replicas'] | default('unknown') }}
+  relabel_configs:
+    - source_labels: ['__journal__systemd_unit']
+      regex: 'dialer_process_{{ worker_type }}@.*\.service'
+      action: keep
+    - source_labels: ['__journal__systemd_unit']
+      target_label: 'unit'
+    - source_labels: ['__journal__systemd_unit']
+      regex: 'dialer_process_{{ worker_type }}@(.+)\.service'
+      target_label: 'instance_id'
+      replacement: '${1}'
+    - source_labels: ['instance_id']
+      target_label: 'worker_instance'
+      replacement: '{{ worker_type }}-${1}'
+    - source_labels: ['__journal_container_name']
+      target_label: 'container_name'
+    - source_labels: ['__journal_container_id']
+      regex: '(.{12}).*'
+      target_label: 'container_id'
+      replacement: '${1}'
+{%- endmacro -%}
+
+{%- macro dialer_services_config(node_type, services_list) -%}
+{% for service in services_list %}
+- job_name: {{ service }}
+  journal:
+    json: false
+    max_age: 6h
+    path: /var/log/journal
+    matches: "_SYSTEMD_UNIT={{ service }}.service"
+    labels:
+      job: {{ service }}
+      tenant: {{ tenant_id | default('unknown') }}
+      host: {{ inventory_hostname }}
+      node_type: {{ node_type }}
+      service_family: dialer
+  relabel_configs:
+    - source_labels: ['__journal__systemd_unit']
+      target_label: 'unit'
+    - source_labels: ['__journal_container_name']
+      target_label: 'container_name'
+    - source_labels: ['__journal_container_id']
+      regex: '(.{12}).*'
+      target_label: 'container_id'
+      replacement: '${1}'
+{% endfor %}
+{%- endmacro -%}
+
+{%- macro dialer_all_services_block() -%}
+{% set node_type = 'aio' if inventory_hostname in groups.get('omnileads_aio', []) else 'nodes' if inventory_hostname in groups.get('omnileads_nodes', []) else 'standalone' %}
+{{ dialer_worker_type_config('campaign', node_type) | indent(2, true) }}
+{{ dialer_worker_type_config('contact', node_type) | indent(2, true) }}
+{{ dialer_worker_type_config('event', node_type) | indent(2, true) }}
+{% set all_dialer_services = [
+  'dialer_incidence_rules', 'dialer_manaege_campaign', 'dialer_flask', 
+  'dialer_postgresql', 'dialer_render_template', 'dialer_send_reports',] %}
+{{ dialer_services_config(node_type, all_dialer_services) | indent(2, true) }}
+{%- endmacro -%}
+
+# ============================================
+# SCRAPE CONFIGURATIONS
+# ============================================
+scrape_configs:
+{% if inventory_hostname in groups.get('omnileads_aio', []) or inventory_hostname in groups.get('omnileads_nodes', []) %}
+# ============================================
+# OMNILEADS AIO / omnileads_nodes: full stack vs cluster compute
+# ============================================
+{% set promtail_compute_node_type = 'aio' if inventory_hostname in groups.get('omnileads_aio', []) else 'nodes' %}
+{% set aio_services_full = [
+  {'name': 'acd-app', 'unit': 'acd-app.container', 'family': 'acd'},
+  {'name': 'acd-conf', 'unit': 'acd-conf.container', 'family': 'acd'},
+  {'name': 'acd-server', 'unit': 'acd-server.container', 'family': 'acd'},
+  {'name': 'acd-fastagi', 'unit': 'acd-fastagi.container', 'family': 'acd'},
+  {'name': 'background_callrec_tasks', 'unit': 'background_callrec_tasks.service', 'family': 'omlapp-worker'},
+  {'name': 'background_dialer_tasks', 'unit': 'background_dialer_tasks.service', 'family': 'omlapp-worker'},
+  {'name': 'call_logger', 'unit': 'call_logger.service', 'family': 'omlapp-worker'},
+  {'name': 'daily_redis_cleanup', 'unit': 'daily_redis_cleanup.service', 'family': 'omlapp-worker'},
+  {'name': 'dashboard_agent_scheduler', 'unit': 'dashboard_agent_scheduler.service', 'family': 'omlapp-worker'},
+  {'name': 'supervision_agentes_scheduler', 'unit': 'supervision_agentes_scheduler.service', 'family': 'omlapp-worker'},
+  {'name': 'supervision_events_listener', 'unit': 'supervision_events_listener.service', 'family': 'omlapp-worker'},
+  {'name': 'presence_heartbeat_scheduler', 'unit': 'presence_heartbeat_scheduler.service', 'family': 'omlapp-worker'},
+  {'name': 'kamailio_pstn', 'unit': 'kamailio_pstn.container', 'family': 'telephony'},
+  {'name': 'kamailio_webrtc', 'unit': 'kamailio_webrtc.container', 'family': 'telephony'},
+  {'name': 'rtpengine', 'unit': 'rtpengine.container', 'family': 'telephony'},
+  {'name': 'websockets', 'unit': 'websockets.container', 'family': 'communication'},
+  {'name': 'callrec_compressor', 'unit': 'callrec_compressor.container', 'family': 'telephony'},
+  {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.container', 'family': 'telephony'},
+  {'name': 'postgresql', 'unit': 'postgresql.container', 'family': 'infrastructure'},
+  {'name': 'redis', 'unit': 'redis.container', 'family': 'infrastructure'},
+  {'name': 'omnileads', 'unit': 'omnileads.container', 'family': 'omnileads'},
+  {'name': 'daphne', 'unit': 'daphne.service', 'family': 'communication'},
+  {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
+] %}
+{% set aio_services_cluster_compute = [
+  {'name': 'acd-app', 'unit': 'acd-app.container', 'family': 'acd'},
+  {'name': 'acd-conf', 'unit': 'acd-conf.container', 'family': 'acd'},
+  {'name': 'acd-server', 'unit': 'acd-server.container', 'family': 'acd'},
+  {'name': 'acd-fastagi', 'unit': 'acd-fastagi.container', 'family': 'acd'},
+  {'name': 'background_callrec_tasks', 'unit': 'background_callrec_tasks.service', 'family': 'omlapp-worker'},
+  {'name': 'background_dialer_tasks', 'unit': 'background_dialer_tasks.service', 'family': 'omlapp-worker'},
+  {'name': 'call_logger', 'unit': 'call_logger.service', 'family': 'omlapp-worker'},
+  {'name': 'daily_redis_cleanup', 'unit': 'daily_redis_cleanup.service', 'family': 'omlapp-worker'},
+  {'name': 'dashboard_agent_scheduler', 'unit': 'dashboard_agent_scheduler.service', 'family': 'omlapp-worker'},
+  {'name': 'supervision_agentes_scheduler', 'unit': 'supervision_agentes_scheduler.service', 'family': 'omlapp-worker'},
+  {'name': 'supervision_events_listener', 'unit': 'supervision_events_listener.service', 'family': 'omlapp-worker'},
+  {'name': 'presence_heartbeat_scheduler', 'unit': 'presence_heartbeat_scheduler.service', 'family': 'omlapp-worker'},
+  {'name': 'websockets', 'unit': 'websockets.container', 'family': 'communication'},
+  {'name': 'callrec_compressor', 'unit': 'callrec_compressor.container', 'family': 'telephony'},
+  {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.container', 'family': 'telephony'},
+  {'name': 'omnileads', 'unit': 'omnileads.container', 'family': 'omnileads'},
+  {'name': 'daphne', 'unit': 'daphne.service', 'family': 'communication'},
+] %}
+{% set aio_services = aio_services_full if (oml_is_aio_only | default(true)) else aio_services_cluster_compute %}
+{% for service in aio_services %}
+  - job_name: {{ service.name }}
+    journal:
+      json: false
+      max_age: 6h
+      path: /var/log/journal
+      matches: "_SYSTEMD_UNIT={{ service.unit }}"
+      labels:
+        job: {{ service.name }}
+        tenant: {{ tenant_id | default('unknown') }}
+        host: {{ inventory_hostname }}
+        node_type: {{ promtail_compute_node_type }}
+        service_family: {{ service.family }}
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit'
+{% endfor %}
+# All Dialer services on AIO compute
+{{ dialer_all_services_block() }}
+{% elif inventory_hostname in groups.get('omnileads_data', []) %}
+# ============================================
+# OMNILEADS DATA NODE (cluster): data_statefull + data_stateless
+# ============================================
+{% set data_services = [
+  {'name': 'postgresql', 'unit': 'postgresql.container', 'family': 'infrastructure'},
+  {'name': 'redis', 'unit': 'redis.container', 'family': 'infrastructure'},
+  {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
+  {'name': 'minio', 'unit': 'minio.service', 'family': 'infrastructure'},
+] %}
+{% for service in data_services %}
+  - job_name: {{ service.name }}
+    journal:
+      json: false
+      max_age: 6h
+      path: /var/log/journal
+      matches: "_SYSTEMD_UNIT={{ service.unit }}"
+      labels:
+        job: {{ service.name }}
+        tenant: {{ tenant_id | default('unknown') }}
+        host: {{ inventory_hostname }}
+        node_type: data
+        service_family: {{ service.family }}
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit'
+{% endfor %}
+{% elif inventory_hostname in groups.get('omnileads_edge', []) %}
+# ============================================
+# OMNILEADS EDGE NODE (cluster): telephony_edge pod
+# ============================================
+{% set edge_services = [
+  {'name': 'kamailio_pstn', 'unit': 'kamailio_pstn.container', 'family': 'telephony'},
+  {'name': 'kamailio_webrtc', 'unit': 'kamailio_webrtc.container', 'family': 'telephony'},
+  {'name': 'rtpengine', 'unit': 'rtpengine.container', 'family': 'telephony'},
+] %}
+{% for service in edge_services %}
+  - job_name: {{ service.name }}
+    journal:
+      json: false
+      max_age: 6h
+      path: /var/log/journal
+      matches: "_SYSTEMD_UNIT={{ service.unit }}"
+      labels:
+        job: {{ service.name }}
+        tenant: {{ tenant_id | default('unknown') }}
+        host: {{ inventory_hostname }}
+        node_type: edge
+        service_family: {{ service.family }}
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit'
+{% endfor %}
+{% endif %}

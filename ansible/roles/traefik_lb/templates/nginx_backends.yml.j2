@@ -1,0 +1,23 @@
+# Configuración dinámica: balanceo hacia Nginx + sticky cookie (WebSockets)
+http:
+  routers:
+    django-router:
+      rule: "{{ traefik_lb_django_router_rule }}"
+      service: django-cluster
+      entryPoints:
+{% for ep in traefik_lb_django_entrypoints %}
+        - {{ ep }}
+{% endfor %}
+
+  services:
+    django-cluster:
+      loadBalancer:
+        sticky:
+          cookie:
+            name: "{{ traefik_lb_sticky_cookie_name }}"
+        servers:
+{% for host in groups['nginx_nodes'] | default([]) %}
+{% set hv = hostvars[host] %}
+{% set addr = hv[traefik_lb_nginx_host_var] | default(hv.ansible_host | default(host)) %}
+          - url: "http://{{ addr }}:{{ traefik_lb_nginx_port }}"
+{% endfor %}

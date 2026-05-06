@@ -1,0 +1,14 @@
+---
+# minio.container declara Pod=data_statefull.pod. Quadlet inyecta BindsTo del
+# pod, así que reiniciamos el pod completo para evitar el error
+# "Bound to unit data_statefull-pod.service, but unit isn't active" cuando el
+# ExecStop del contenedor termina tirando la infra del pod.
+- name: Restart minio service
+  ansible.builtin.systemd:
+    name: "{{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}"
+    state: restarted
+    daemon_reload: true
+  tags:
+    - install
+    - upgrade
+    - update

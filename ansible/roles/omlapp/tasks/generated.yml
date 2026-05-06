@@ -1,0 +1,134 @@
+
+- name: DJANGO environment variables for this installation
+  template:
+    src: "django.env"
+    dest: /etc/default/django.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: omlapp_env_file
+  notify: Restart omlapp services
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: DJANGO Copy Quadlet container units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode | default('0644') }}"
+  register: omlapp_quadlet_units
+  notify: Restart omlapp services
+  loop:
+    - { src: "django.service", dest: "/etc/containers/systemd/omnileads.container" }
+    - { src: "daphne.service", dest: "/etc/containers/systemd/daphne.container" }
+  tags:
+    - install
+    - upgrade
+    - update
+
+# Siempre recargar tras los .container: con loop, `omlapp_quadlet_units is changed` no refleja bien el agregado;
+# sin reload systemd no expone omnileads.service / daphne.service (Quadlet) y el handler de restart falla.
+- name: DJANGO Reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: DJANGO Determine changed services and bootstrap need
+  ansible.builtin.set_fact:
+    omlapp_changed_services: >-
+      {{
+        (
+          (
+            ['omnileads.service', 'daphne.service']
+            if omlapp_env_file.changed else []
+          )
+          +
+          (
+            omlapp_quadlet_units.results | default([])
+            | selectattr('changed', 'equalto', true)
+            | map(attribute='dest')
+            | map('basename')
+            | map('replace', '.container', '.service')
+            | list
+          )
+        )
+        | unique
+        | list
+      }}
+    omlapp_bootstrap_required: "{{ omlapp_env_file.changed or (omlapp_quadlet_units.results | default([]) | selectattr('changed', 'equalto', true) | list | length > 0) }}"
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: Force handlers to run immediately (Boot up PostgreSQL)
+  meta: flush_handlers
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: Wait for PostgreSQL to accept connections
+  ansible.builtin.wait_for:
+    host: "{{ postgres_host | trim }}"
+    port: "{{ postgres_port }}"
+    timeout: 120
+  tags:
+    - install
+    - upgrade
+    - update
+- name: POSTGRESQL Create a new database with name {{ postgres_database }}
+  postgresql_db:
+    name: "{{ postgres_database }}"
+    login_host: "{{ postgres_host  | trim }}"
+    login_password: "{{ postgres_password }}"
+    login_user: "{{ postgres_user }}"
+    port: "{{ postgres_port }}"
+    maintenance_db: "{{ postgres_maintenance_db }}"
+    state: present
+  tags:
+    - install
+  when: 
+    - upgrade_from_oml_1 is not defined 
+    - postgres_out == true
+
+- name: DJANGO run migrations 
+  ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} /opt/omnileads/bin/django_migrations.sh"
+  tags:  
+    - install
+    - upgrade
+    - update
+  when: omlapp_bootstrap_required | bool
+
+- name: DJANGO run django_commands
+  ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} --volume=django_static:/opt/omnileads/static {{ APP_IMG }} /opt/omnileads/bin/django_commands.sh"
+  tags:
+    - install      
+  when: omlapp_bootstrap_required | bool
+
+- name: DJANGO reset admin pass
+  ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} python /opt/omnileads/ominicontacto/manage.py cambiar_admin_password"
+  tags:
+    - install
+  when:
+    - upgrade_from_oml_1 is not defined
+    - backup_filename is not defined
+    - omlapp_bootstrap_required | bool
+
+- name: DJANGO Enable and start systemd services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - omnileads.service
+    - daphne.service
+  tags:
+    - install
+    - upgrade

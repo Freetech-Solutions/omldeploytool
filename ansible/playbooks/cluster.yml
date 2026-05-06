@@ -1,0 +1,16 @@
+---
+- name: Validate cluster inventory layout
+  hosts: omnileads_data:omnileads_edge:omnileads_nodes:omnileads_aio
+  gather_facts: true
+  pre_tasks:
+    - name: Load normalized topology for cluster validation
+      ansible.builtin.include_role:
+        name: topology_normalize
+  tasks:
+    - name: Assert cluster layout
+      ansible.builtin.assert:
+        that:
+          - oml_layout == "cluster"
+        fail_msg: "Este playbook espera un inventario cluster sin HA."
+
+- import_playbook: site.yml

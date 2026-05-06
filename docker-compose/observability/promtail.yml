@@ -1,0 +1,66 @@
+server:
+  http_listen_port: 9080
+  
+positions:
+  filename: /var/lib/promtail/positions.yaml
+  sync_period: 1m
+
+clients:
+  - url: http://grafana.sephir.tech:3100/loki/api/v1/push
+    batchsize: 102400
+    batchwait: 1s
+    backoff_config:
+      min_period: 1s
+      max_period: 10s
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # TODOS LOS CONTAINERS DOCKER DEL HOST
+  # ---------------------------------------------------------------------------
+  - job_name: Konecta_Verloop
+
+    # Descubrimiento dinámico de containers vía Docker API
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 10s
+
+    pipeline_stages:
+      # Parsea el JSON de logs de Docker (driver json-file)
+      - docker: {}
+
+      - drop:
+          older_than: 3h
+          drop_counter_reason: "too_old_for_loki"
+
+      - match:
+          selector: '{service=~"promtail|cadvisor|nodeexporter"}'
+          action: drop
+          drop_counter_reason: "monitoring_noise"
+
+      # Añade etiquetas estáticas (útil para queries en Loki)
+      - labels:
+          tenant: Konecta_Verloop_AIO
+          source: docker
+          node_type: docker-compose
+
+    relabel_configs:
+      # Ruta del archivo de log del container -> __path__
+      - source_labels: ['__meta_docker_container_logpath']
+        target_label: '__path__'
+
+      # Nombre del container (sin el "/")
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+        regex: '/(.*)'
+
+      # Nombre del servicio de docker-compose (si existe)
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+
+      # Nombre del proyecto/stack de docker-compose (si existe)
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'stack'
+
+      # Etiqueta de red (por ejemplo, containers conectados a "omnileads")
+      - source_labels: ['__meta_docker_network_name']
+        target_label: 'network'

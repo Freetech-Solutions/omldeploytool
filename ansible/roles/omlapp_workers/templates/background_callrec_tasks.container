@@ -1,0 +1,25 @@
+[Unit]
+Description=OMniLeads Background Tasks Worker (Callrec)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=omlapp-callrec-worker
+Image={{ APP_IMG }}
+Pod=omlapp_workers.pod
+EnvironmentFile=/etc/default/django.env
+Environment=GOOGLE_MAPS_CENTER={{ google_maps_center }}
+Label=tier=omlapp_workers
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Exec=/opt/omnileads/bin/init_worker_bgtasks.sh
+
+[Service]
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+# Actualizado para que arranque al reiniciar el servidor
+WantedBy=multi-user.target

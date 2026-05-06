@@ -1,0 +1,26 @@
+---
+# Inventario: define el grupo `nginx_nodes` con los hosts que actúan como backend Nginx.
+# Por host, se usa `traefik_lb_nginx_host_var` (por defecto ansible_host) para construir la URL http://<addr>:<puerto>.
+# Ejemplo de inventario:
+#   nginx_nodes:
+#     hosts:
+#       nginx1:
+#         ansible_host: 10.0.0.10
+#       nginx2:
+#         ansible_host: 10.0.0.11
+# Para LAN interna (p. ej. omni_ip_lan en este proyecto): traefik_lb_nginx_host_var: omni_ip_lan
+
+# Regla del router (ajustar según FQDN / Host en producción)
+traefik_lb_django_router_rule: "PathPrefix(`/`)"
+traefik_lb_django_entrypoints:
+  - web
+  # - websecure   # descomentar cuando tengas TLS resuelto en Traefik
+
+# Backends Nginx: puerto donde escucha Nginx en cada nodo
+traefik_lb_nginx_port: 80
+
+# Clave en hostvars para la IP/FQDN del backend (p. ej. omni_ip_lan o ansible_host)
+traefik_lb_nginx_host_var: ansible_host
+
+# Cookie de sticky session (WebSockets)
+traefik_lb_sticky_cookie_name: traefik_lb_nginx

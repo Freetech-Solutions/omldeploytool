@@ -1,0 +1,23 @@
+[Unit]
+Description=OMniLeads FastAGI container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target daphne.service omnileads.service
+
+[Container]
+ContainerName=acd-fastagi
+Image={{ FASTAGI_IMG }}
+Pod=acd.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/acd-fastagi.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+Exec=python /app/fastagi.py
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

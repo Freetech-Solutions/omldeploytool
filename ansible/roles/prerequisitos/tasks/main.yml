@@ -22,45 +22,24 @@
     name:
       - curl
       - net-tools
+      - podman
       - wget
       - jq
       - sngrep
       - python3-boto3
       - python3-psycopg2      
     update_cache: yes
-    state: latest
+    cache_valid_time: 3600
+    state: present
   when: ansible_os_family == "Debian"
-  tags: 
-    - install
-
-- name: MAIN Install postgresql-client for Ubuntu
-  apt:
-    name:
-      - postgresql-client-{{ ha_postgresql_version }}
-    update_cache: yes
-    state: latest
-  when: 
-    - ansible_facts['distribution'] == "Ubuntu"
-    - omnileads_ha is defined
-  tags: 
-    - install
-
-- name: MAIN Install postgresql-client for Debian
-  apt:
-    name:
-      - postgresql-client-15
-    update_cache: yes
-    state: latest
-  when: 
-    - ansible_facts['distribution'] == "Debian"
-    - omnileads_ha is defined
-  tags: 
-    - install
+  # Mismo criterio que red Quadlet / Rocky+podman: si solo queda tag `install`, los nodos nuevos
+  # no reciben podman en `upgrade|update|prerequisitos_partial_*` y systemd no genera *.network.
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
 
 - name: MAIN Enable EPEL Repository on Rocky or Alma Linux
   dnf:
     name: epel-release
-    state: latest
+    state: present
   when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux" 
   tags: 
     - install
@@ -73,7 +52,7 @@
       - python3-psycopg2
       - jq
       - postgresql
-    state: latest
+    state: present
   when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux" 
   tags: 
     - install
@@ -87,115 +66,92 @@
       - python3
       - python3-pip
       - podman
-    state: latest
+    state: present
   when: ansible_facts['distribution'] == "CentOS" 
-  tags: 
-    - install
+  # Sin comas dentro del Jinja: Ansible parte tags en string por comas y rompe listas tipo ['a', 'b'].
+  tags: "{{ (['install'] + prerequisitos_partial_deploy_tags) | unique }}"
 
-# --- install DOCKER
-- name: MAIN Descargar el script de instalación de Docker
-  get_url:
-    url: https://get.docker.com/
-    dest: /tmp/get-docker.sh
-  tags:
-    - install
-  when:
-    - container_orchest == "docker_compose"
-    - ansible_os_family == "Debian" 
-
-- name: MAIN Ejecutar el script de instalación de Docker
-  command: sh /tmp/get-docker.sh
-  tags:
-    - install
-  when:
-    - container_orchest == "docker_compose"   
-    - ansible_os_family == "Debian"
-    
-- name: MAIN Add docker centos repo
-  command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-  tags:
-    - install
-  when:
-    - container_orchest == "docker_compose" 
-    - ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux" 
-
-- name: MAIN Install docker on redhat based
+- name: MAIN Install PODMAN
   dnf:
     name:
-      - docker-ce 
-      - docker-ce-cli
-      - containerd.io
-  tags:
-    - install    
-  when:
-    - container_orchest == "docker_compose" 
-    - ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux" 
+      - podman
+    state: present
+  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"
+  tags: "{{ (['install'] + prerequisitos_partial_deploy_tags) | unique }}"
 
-- name: MAIN Agregar el usuario al grupo de Docker
-  user:
-    name: '{{ usuario }}'
-    groups: docker
-  tags:
-    - install
-  when:
-    - container_orchest == "docker_compose"
-    - ansible_os_family == "Debian"
+- name: MAIN Ensure Podman Quadlet directory exists
+  file:
+    path: /etc/containers/systemd
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
 
-- name: MAIN Reiniciar el servicio de Docker
-  systemd:
-    name: docker
+- name: MAIN Render Podman network Quadlet files
+  template:
+    src: "{{ item }}"
+    dest: "/etc/containers/systemd/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ prerequisitos_quadlet_networks }}"
+  loop_control:
+    label: "{{ item }}"
+  register: prerequisitos_network_quadlets
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
+
+# Siempre recargar tras los .network: con loop, `register is changed` / `is changed` no siempre reflejan
+# el agregado; sin reload systemd no expone omnileads-network.service (Quadlet) y el restart falla.
+- name: MAIN Reload systemd after network Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
+
+- name: MAIN Restart Podman network when Quadlet file changed
+  ansible.builtin.systemd:
+    name: "{{ (item.item | regex_replace('\\.network$', '')) }}-network.service"
     state: restarted
-  tags:
-    - install  
-  when:
-    - container_orchest == "docker_compose"   
+    daemon_reload: true
+  loop: "{{ prerequisitos_network_quadlets.results | default([]) }}"
+  when: item.changed | default(false)
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
 
-- name: MAIN docker-compose link bin
-  file: 
-    src: /usr/libexec/docker/cli-plugins/docker-compose
-    dest: /usr/local/bin/docker-compose
-    state: link 
-  tags:
-    - install  
-  when:
-    - container_orchest == "docker_compose"
+- name: MAIN Ensure OMniLeads Podman network exists
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
+  block:
+    - name: MAIN Start Quadlet omnileads network unit
+      ansible.builtin.systemd:
+        name: omnileads-network.service
+        state: started
+        enabled: true
+        daemon_reload: true
+  rescue:
+    # Si el generador Quadlet no expone la unidad (Podman viejo o paquetes distintos), la red sigue siendo necesaria para los pods.
+    - name: MAIN Create omnileads Podman network when Quadlet unit is missing
+      ansible.builtin.command:
+        argv:
+          - podman
+          - network
+          - create
+          - --driver
+          - bridge
+          - omnileads
+      register: prerequisitos_podman_network_create
+      changed_when: prerequisitos_podman_network_create.rc == 0
+      failed_when: >-
+        prerequisitos_podman_network_create.rc != 0 and
+        not (
+          ('already' in (prerequisitos_podman_network_create.stderr | default('') | lower)) or
+          ('already' in (prerequisitos_podman_network_create.stdout | default('') | lower)) or
+          ('exists' in (prerequisitos_podman_network_create.stderr | default('') | lower))
+        )
 
-- name: MAIN add docker-plugin Loki logs
-  command: docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
-  tags:
-    - install
-  when:
-    - container_orchest == "docker_compose" 
-  ignore_errors: yes
+- name: MAIN Run preflight checks
+  import_tasks: checks_preflight.yml
 
-# --- install PODMAN
-- name: MAIN Install PODMAN
-  apt:
-    name:
-      - podman
-    update_cache: yes
-    state: latest
-  when: 
-     - ansible_os_family == "Debian"
-     - container_orchest == "systemd"
-  tags: 
-    - install
+- name: MAIN Validate normalized variables
+  import_tasks: checks_validate.yml
 
-- name: MAIN Install PODMAN
-  dnf:
-    name:
-      - podman
-    state: latest
-  when: 
-    - ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux" 
-    - container_orchest == "systemd"
-  tags: 
-    - install
-
-- name: MAIN Check if Omnileads has been installed previously
-  import_tasks: checks.yml
-  
 - name: MAIN First configuration in server or servers
   import_tasks: os_configuration.yml
-
-

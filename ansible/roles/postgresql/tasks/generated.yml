@@ -1,0 +1,72 @@
+---
+- name: POSTGRESQL Set environment variables for this installation
+  ansible.builtin.template:
+    src: postgres.env
+    dest: /etc/default/postgres.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  notify: Restart postgresql service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: POSTGRESQL Render omnidialer SQL init script
+  ansible.builtin.template:
+    src: omnidialer.sql
+    dest: /etc/omnileads/omnidialer.sql
+    mode: "0644"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: POSTGRESQL Copy Quadlet file
+  ansible.builtin.template:
+    src: "postgresql.service"
+    dest: /etc/containers/systemd/postgresql.container
+    mode: "0644"
+  register: postgresql_quadlet_file
+  notify: Restart postgresql service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: POSTGRESQL Reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: postgresql_quadlet_file.changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+# Workaround para race con podman 5.x (Debian Trixie) cuando el handler de prerequisitos
+# reinicia data_statefull-pod ANTES de que exista la unit postgresql.service: el container
+# se une después al pod, pero los PublishPort declarados en el .pod no rearman el portmap
+# hasta el siguiente restart del pod, dejando 5432 inalcanzable en omni_ip_lan.
+# Solo se ejecuta cuando se acaba de (re)generar el Quadlet de postgres, así que es idempotente
+# en corridas posteriores.
+- name: POSTGRESQL Reinit data_statefull pod portmap (workaround podman 5.x)
+  ansible.builtin.systemd:
+    name: "{{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}"
+    state: restarted
+  when: postgresql_quadlet_file.changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: POSTGRESQL Enable and start service
+  ansible.builtin.systemd:
+    name: postgresql.service
+    state: started
+    enabled: yes
+  tags:
+    - install
+    - upgrade
+    - update

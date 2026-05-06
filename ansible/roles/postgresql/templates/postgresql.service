@@ -1,0 +1,32 @@
+[Unit]
+Description=OMniLeads PostgreSQL container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+Requires={{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}
+
+[Container]
+ContainerName=postgresql-server
+Image={{ POSTGRES_IMG }}
+Pod=data_statefull.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/postgres.env
+Label=tier=backend
+PodmanArgs=--cgroups=no-conmon
+PodmanArgs=--shm-size=1g
+Volume=oml_postgres_data:/var/lib/postgresql
+Volume=/etc/omnileads/omnidialer.sql:/docker-entrypoint-initdb.d/init.sql
+{% if scale_postgres is defined and scale_postgres %}
+Volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf
+Exec=postgres -c config_file=/etc/postgresql/postgresql.conf
+{% else %}
+Exec=postgres
+{% endif %}
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

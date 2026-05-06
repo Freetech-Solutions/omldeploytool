@@ -1,0 +1,104 @@
+
+- name: INTERACTION_PROCESSOR environment variables
+  template:
+    src: "callrec_processor.env"
+    dest: /etc/default/callrec_processor.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: interaction_processor_env_file
+  notify: Restart interaction_processor services
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: INTERACTION_PROCESSOR Deploy Quadlet templates
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  register: interaction_processor_quadlets
+  notify: Restart interaction_processor services
+  loop:
+    - { src: "callrec_compressor.service", dest: "/etc/containers/systemd/callrec_compressor.container" }
+    - { src: "callrec_transcriber.service", dest: "/etc/containers/systemd/callrec_transcriber.container" }
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: INTERACTION_PROCESSOR Determine changed services
+  ansible.builtin.set_fact:
+    interaction_processor_changed_services: >-
+      {{
+        (
+          (
+            ['callrec_compressor.service', 'callrec_transcriber.service']
+            if interaction_processor_env_file.changed else []
+          )
+          +
+          (
+            interaction_processor_quadlets.results | default([])
+            | selectattr('changed', 'equalto', true)
+            | map(attribute='dest')
+            | map('basename')
+            | map('replace', '.container', '.service')
+            | list
+          )
+        )
+        | unique
+        | list
+      }}
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: INTERACTION_PROCESSOR Reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: interaction_processor_quadlets is changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: INTERACTION_PROCESSOR Check image cache
+  command: podman image exists {{ item }}
+  loop:
+    - "{{ CALLREC_COMPRESSOR_IMG }}"
+    - "{{ CALLREC_TRANSCRIBER_IMG }}"
+  register: interaction_processor_image_cache
+  changed_when: false
+  failed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: INTERACTION_PROCESSOR Pull images when missing or forced
+  command: podman pull --quiet {{ item.item }}
+  loop: "{{ interaction_processor_image_cache.results }}"
+  register: interaction_processor_pull
+  retries: 3
+  delay: 5
+  until: interaction_processor_pull is success
+  when: force_image_pull | bool or item.rc != 0
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: INTERACTION_PROCESSOR Enable and start systemd services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - callrec_compressor.service
+    - callrec_transcriber.service
+  tags:
+    - install
+    - upgrade

@@ -1,0 +1,38 @@
+# OMniLeads HAProxy — TLS en edge, backends Nginx en compute nodes
+# Generado por Ansible (rol haproxy)
+#
+# El backend nginx escucha en :80 (redirige todo a https) y en :443
+# (sirve la app). Por eso HAProxy hace SSL re-encrypt al :443 de nginx
+# para no caer en un loop de redirecciones.
+
+global
+    log stdout format raw local0
+    maxconn 50000
+
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    option  forwardfor
+    timeout connect 10s
+    timeout client  300s
+    timeout server  300s
+
+frontend http_in
+    bind *:{{ haproxy_http_port }}
+    http-request redirect scheme https code 301
+
+frontend https_in
+    bind *:{{ haproxy_https_port }} ssl crt {{ haproxy_pem_file }} alpn h2,http/1.1
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Port %[dst_port]
+    default_backend nginx_cluster
+
+backend nginx_cluster
+    balance roundrobin
+    cookie {{ haproxy_sticky_cookie }} insert indirect nocache
+{% set _ssl_opts = (' ssl verify ' ~ (haproxy_backend_ssl_verify | default('none'))) if (haproxy_backend_ssl | default(false)) else '' %}
+{% for h in haproxy_nginx_peers %}
+    server srv{{ loop.index0 }} {{ hostvars[h]['omni_ip_lan'] }}:{{ haproxy_backend_port }} check{{ _ssl_opts }} cookie srv{{ loop.index0 }}
+{% endfor %}

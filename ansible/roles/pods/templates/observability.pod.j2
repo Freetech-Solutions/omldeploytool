@@ -1,0 +1,9 @@
+[Unit]
+StopWhenUnneeded=false
+Description=OmniLeads Observability Pod 
+
+[Pod]
+Network={{ oml_network }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+---
+component_observability_prometheus_enabled: false
+
+# Imágenes canónicas (sobrescribibles vía group_vars, p. ej. group_vars/all/images.yml)
+PROMETHEUS_IMG: docker.io/prom/prometheus:v3.0.1
+PROMETHEUS_NODE_EXPORTER_IMG: docker.io/prom/node-exporter:v1.7.0
+REDIS_EXPORTER_IMG: docker.io/oliver006/redis_exporter:latest
+POSTGRES_EXPORTER_IMG: docker.io/prometheuscommunity/postgres-exporter:latest
+GEARMAN_EXPORTER_IMG: docker.io/gearmanexporter/gearman-exporter:v0.5.0
+UWSGI_EXPORTER_IMG: docker.io/timonwong/uwsgi-exporter:v1.3.0
+PROMETHEUS_PODMAN_EXPORTER_IMG: quay.io/navidys/prometheus-podman-exporter:v1.21.0
+
+# Alias usados por las plantillas Quadlet (compatibilidad con inventarios existentes)
+prometheus_img: "{{ PROMETHEUS_IMG }}"
+prometheus_uwsgi_img: "{{ UWSGI_EXPORTER_IMG }}"
+prometheus_podman_img: "{{ PROMETHEUS_PODMAN_EXPORTER_IMG }}"
+prometheus_postgres_img: "{{ POSTGRES_EXPORTER_IMG }}"
+prometheus_redis_img: "{{ REDIS_EXPORTER_IMG }}"
+prometheus_node_img: "{{ PROMETHEUS_NODE_EXPORTER_IMG }}"
+prometheus_gearman_img: "{{ GEARMAN_EXPORTER_IMG }}"

@@ -1,0 +1,14 @@
+---
+# redis.container declara Pod=data_stateless.pod. Reiniciamos el pod completo
+# para evitar el problema de Quadlet en el que el restart del contenedor tira
+# la infra del pod y el siguiente start falla con
+# "Bound to unit data_stateless-pod.service, but unit isn't active".
+- name: Restart redis service
+  ansible.builtin.systemd:
+    name: "{{ data_stateless_pod_systemd_unit | default('data_stateless-pod.service') }}"
+    state: restarted
+    daemon_reload: true
+  tags:
+    - install
+    - upgrade
+    - update

@@ -1,0 +1,27 @@
+[Unit]
+Description=OMniLeads Dialer Process Contact Worker Instancia %i
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Container]
+# El %i se reemplazará por el número de instancia al iniciarlo:
+ContainerName=dialer-process-contact-%i
+Image={{ DIALER_WORKER_IMG }}
+Pod=dialer_workers.pod
+EnvironmentFile=/etc/default/dialer.env
+Environment=GEARMAN_JOBS=process-contact
+Label=tier=dialer
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

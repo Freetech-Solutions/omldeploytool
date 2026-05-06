@@ -1,0 +1,27 @@
+[Unit]
+Description=OMniLeads Redis container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=redis-server
+Image={{ REDIS_IMG }}
+Pod=data_stateless.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/redis.env
+Label=tier=backend
+PodmanArgs=--cgroups=no-conmon
+Volume=oml_redis:/data
+{% if scale_redis is defined and scale_redis %}
+Volume=/etc/omnileads/redis.conf:/etc/redis/redis.conf
+Exec=redis-server /etc/redis/redis.conf
+{% endif %}
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

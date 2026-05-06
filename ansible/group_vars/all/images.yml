@@ -1,0 +1,40 @@
+---
+
+# --- OMniLeads images WEB
+APP_IMG: docker.io/freetechsolutions/omlapp:20260506-832941a2
+NGINX_IMG: docker.io/freetechsolutions/nginx:20260403-72e1ff68
+WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
+
+# --- OMniLeads images TEL
+ACD_IMG: docker.io/freetechsolutions/acd:20260506-c0ce912a
+KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260408-0292f718
+RTPENGINE_IMG: docker.io/freetechsolutions/rtpengine:20260218-4e51bf30
+CALLREC_COMPRESSOR_IMG: docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
+CALLREC_TRANSCRIBER_IMG: docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3
+FASTAGI_IMG: docker.io/freetechsolutions/fastagi:20260211-0d7a1c9b
+
+# --- OMniLeads images DIALER
+DIALER_API_IMG: docker.io/freetechsolutions/dialer_api:20260302-6c129b12
+DIALER_WORKER_IMG: docker.io/freetechsolutions/dialer_worker:20260302-6c129b12
+
+# --- Backend services common images
+REDIS_IMG: docker.io/redislabs/redisgears:1.0.9
+POSTGRES_IMG: docker.io/library/postgres:18-trixie
+MINIO_IMG: docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
+MINIO_MC_IMG: docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
+GEARMAN_IMG: docker.io/artefactual/gearmand:1.1.21.2-alpine
+
+# --- Edge HTTP(S) load balancer (Quadlet en omnileads_edge)
+HAPROXY_IMG: docker.io/library/haproxy:3.3
+
+# --- Observability (Prometheus stack; alineado con docker-compose/observability/.env)
+PROMETHEUS_IMG: docker.io/prom/prometheus:v3.0.1
+PROMETHEUS_NODE_EXPORTER_IMG: docker.io/prom/node-exporter:v1.7.0
+REDIS_EXPORTER_IMG: docker.io/oliver006/redis_exporter:latest
+POSTGRES_EXPORTER_IMG: docker.io/prometheuscommunity/postgres-exporter:latest
+GEARMAN_EXPORTER_IMG: docker.io/gearmanexporter/gearman-exporter:v0.5.0
+UWSGI_EXPORTER_IMG: docker.io/timonwong/uwsgi-exporter:v1.3.0
+PROMETHEUS_PODMAN_EXPORTER_IMG: quay.io/navidys/prometheus-podman-exporter:v1.21.0
+PROMETHEUS_PODMAN_IMG: quay.io/navidys/prometheus-podman-exporter:latest
+PROMTAIL_IMG: docker.io/grafana/promtail:main-9f5f159
+BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260422-16161cf0

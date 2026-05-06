@@ -1,0 +1,3 @@
+---
+- name: REDIS Load generated tasks
+  ansible.builtin.import_tasks: generated.yml

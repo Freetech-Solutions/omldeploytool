@@ -1,0 +1,97 @@
+---
+
+- name: Set list of legacy systemd units to remove
+  ansible.builtin.set_fact:
+    legacy_systemd_units:
+      - ami.service
+      - asterisk.service
+      - asterisk_retrieve_conf.service
+      - background_dialer_tasks.service
+      - background_tasks.service
+      - bulk_messages.service
+      - call_logger.service
+      - daphne.service
+      - dialer_asterisk.service
+      - dialer_dialplan.service
+      - dialer_flask.service
+      - dialer_incidence_rules.service
+      - dialer_listener.service
+      - dialer_manage_campaign.service
+      - dialer_process_campaign@.service
+      - dialer_process_contact@.service
+      - dialer_process_event@.service
+      - dialer_render_template.service
+      - dialer_scheduler.service
+      - dialer_send_reports.service
+      - fastagi.service
+      - gearman.service
+      - interaction_processor.service
+      - kamailio.service
+      - postgres.service
+      - postgresql.service
+      - prometheus.service
+      - prometheus_gearman.service
+      - prometheus_node_exporter.service
+      - prometheus_podman_exporter.service
+      - prometheus_postgres.service
+      - prometheus_redis.service
+      - prometheus_uwsgi.service
+      - minio.service
+      - nginx.service
+      - nginx_certbot.service
+      - omlcron.service
+      - omnileads.service
+      - redis.service
+      - rtpengine.service
+      - wallboard_listener.service
+      - wallboard_worker.service
+      - websockets.service
+      - whatsapp.service
+  tags:
+    - upgrade
+    - upgrade_from_2X
+
+- name: Stop legacy systemd services if running (non-templated)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop: "{{ legacy_systemd_units | reject('search', '@') | list }}"
+  failed_when: false
+  tags:
+    - upgrade
+    - upgrade_from_2X
+
+- name: Stop legacy systemd templated services if running
+  ansible.builtin.shell: "systemctl stop '{{ item | regex_replace('\\.service$', '') }}*' 2>/dev/null || true"
+  loop: "{{ legacy_systemd_units | select('search', '@') | list }}"
+  changed_when: false
+  failed_when: false
+  tags:
+    - upgrade
+    - upgrade_from_2X
+
+- name: Disable legacy systemd services if enabled (non-templated)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+  loop: "{{ legacy_systemd_units | reject('search', '@') | list }}"
+  failed_when: false
+  tags:
+    - upgrade
+    - upgrade_from_2X
+
+- name: Remove legacy systemd unit files if present
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}"
+    state: absent
+  loop: "{{ legacy_systemd_units }}"
+  tags:
+    - upgrade
+    - upgrade_from_2X
+
+- name: Reload systemd after removing legacy unit files
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags:
+    - upgrade
+    - upgrade_from_2X

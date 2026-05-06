@@ -1,0 +1,68 @@
+---
+- name: CHECKS Validate required global variables
+  ansible.builtin.assert:
+    that:
+      - TZ is defined
+      - certs is defined
+      - postgres_user is defined
+      - postgres_password is defined
+      - postgres_port is defined
+      - APP_IMG is defined
+      - NGINX_IMG is defined
+      - WS_IMG is defined
+      - ACD_IMG is defined
+      - KAMAILIO_IMG is defined
+      - RTPENGINE_IMG is defined
+      - CALLREC_COMPRESSOR_IMG is defined
+      - CALLREC_TRANSCRIBER_IMG is defined
+      - FASTAGI_IMG is defined
+      - DIALER_API_IMG is defined
+      - DIALER_WORKER_IMG is defined
+      - REDIS_IMG is defined
+      - POSTGRES_IMG is defined
+      - MINIO_IMG is defined
+      - MINIO_MC_IMG is defined
+      - GEARMAN_IMG is defined
+    fail_msg: "Faltan variables globales requeridas en el inventario o group_vars (incluidas imágenes en group_vars/all/images.yml)."
+  tags:
+    - always
+
+- name: CHECKS Validate AMI credentials when component is enabled
+  ansible.builtin.assert:
+    that:
+      - ami_user is defined
+      - ami_password is defined
+    fail_msg: "ami_user y ami_password son requeridos cuando el componente AMI está habilitado."
+  when: component_ami_enabled | default(false)
+  tags:
+    - always
+
+- name: CHECKS Validate bucket credentials when internal MinIO is enabled
+  ansible.builtin.assert:
+    that:
+      - bucket_access_key is defined
+      - bucket_secret_key is defined
+      - bucket_name is defined
+    fail_msg: "bucket_access_key, bucket_secret_key y bucket_name son requeridos cuando MinIO interno está habilitado."
+  when: component_minio_enabled | default(false)
+  tags:
+    - always
+
+- name: CHECKS Validate omni_ip_lan syntax
+  ansible.builtin.assert:
+    that:
+      - omni_ip_lan is match('^\\d+\\.\\d+\\.\\d+\\.\\d+$')
+    fail_msg: "The private IP is wrong"
+  tags:
+    - always
+
+- name: CHECKS Set default websockets_host when undefined
+  ansible.builtin.set_fact:
+    websockets_host: "websocket-server"
+  changed_when: false
+  when: websockets_host is not defined
+  tags:
+    - install
+    - upgrade
+    - update
+

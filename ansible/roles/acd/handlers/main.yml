@@ -1,0 +1,10 @@
+- name: Restart acd services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ acd_changed_services | default([]) }}"
+  when: (acd_changed_services | default([]) | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update

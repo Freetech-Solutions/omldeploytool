@@ -1,0 +1,26 @@
+[Unit]
+Description=OMniLeads Kamailio WebRTC container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target redis.service
+After=network-online.target redis.service
+
+[Container]
+ContainerName=kamailio-webrtc
+Image={{ KAMAILIO_IMG }}
+Pod=telephony_edge.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/kamailio_webrtc.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+PodmanArgs=--entrypoint=/bin/sh
+Exec=-c "kamailio -DD -E -m {{ kamailio_shm_size | default(64 ,true)}} -M {{ kamailio_pkg_size | default(8, true) }} -f /etc/kamailio/kamailio_webrtc.cfg"
+
+#{{ dialer_password | default('demoadmin', true)}}
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

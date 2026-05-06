@@ -1,0 +1,12 @@
+---
+component_minio_enabled: false
+minio_cmd: /usr/bin/minio_cmd
+# group_vars/all/images.yml define MINIO_IMG; alias for templates/tasks
+minio_img: "{{ MINIO_IMG }}"
+# Cliente mc (imagen minio/mc). Nunca usar MINIO_IMG aquí.
+minio_mc_container_image: "{{ MINIO_MC_IMG | default('docker.io/minio/mc:RELEASE.2025-04-08T17-26-02Z') }}"
+# Red donde vive el pod data_statefull (quadlet).
+minio_mc_podman_network: "{{ oml_network | default('omnileads') }}"
+# Endpoint interno para bootstrap con mc.
+minio_mc_alias_endpoint: >-
+  {{ 'http://' ~ (bucket_endpoint_internal | default('data-statefull-server')) ~ ':9000' }}

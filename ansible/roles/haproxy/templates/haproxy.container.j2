@@ -1,0 +1,24 @@
+[Unit]
+Description=OMniLeads HAProxy edge load balancer (Podman Quadlet)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=oml-haproxy
+Image={{ HAPROXY_IMG }}
+User=0
+Network=host
+Volume=/etc/default/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro,Z
+Volume={{ haproxy_pem_file }}:{{ haproxy_pem_file }}:ro,Z
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Label=tier=edge
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

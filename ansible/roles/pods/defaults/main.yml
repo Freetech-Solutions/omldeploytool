@@ -1,0 +1,49 @@
+---
+# Fallback para tags en tasks/main.yml (| default(...)). Mantener alineado con
+# group_vars/all/runtime.yml -> pods_role_tags (all group_vars pisa este valor).
+pods_role_tags_default:
+  - install
+  - upgrade
+  - update
+  - prerequisitos
+  - pods
+  - data
+  - edge
+  - nodes
+  - voice
+  - app
+  - postgres
+  - minio
+  - redis
+  - gearman
+  - telephony-edge
+  - acd
+  - websockets
+  - omlapp
+  - omlapp_workers
+  - omlapp-workers
+  - interaction_processor
+  - dialer
+  - nginx
+  - haproxy
+  - observability
+  - addons
+  - qa
+
+# Quadlets .pod por topología (omnileads_data / omnileads_edge / omnileads_nodes).
+# AIO: unión en runtime en tasks/main.yml. Cada entrada requiere templates/<nombre>.pod.j2.
+pods_topology:
+  data:
+    - data_statefull
+    - data_stateless
+    - observability
+  edge:
+    - telephony_edge
+    - observability
+  nodes:
+    - acd
+    - callrec_processor
+    - dialer_workers
+    - omlapp_web
+    - omlapp_workers
+    - observability

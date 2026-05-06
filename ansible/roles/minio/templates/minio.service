@@ -1,0 +1,22 @@
+[Unit]
+Description=OMniLeads MinIO container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+
+[Container]
+ContainerName=minio-server
+Image={{ MINIO_IMG }}
+Pod=data_statefull.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/minio.env
+Label=tier=backend
+PodmanArgs=--cgroups=no-conmon
+Volume=oml_minio:/data
+Exec=server /data
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

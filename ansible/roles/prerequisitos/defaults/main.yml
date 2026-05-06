@@ -1,0 +1,29 @@
+---
+# Coincide con las etiquetas de roles en playbooks/site.yml para que las acciones
+# parciales de deploy.sh (--tags voice, postgres, etc.) sigan creando red Podman y paquetes mínimos.
+prerequisitos_partial_deploy_tags:
+  - minio
+  - postgres
+  - redis
+  - gearman
+  - telephony-edge
+  - acd
+  - kamailio
+  - websockets
+  - omlapp
+  - omlapp_workers
+  - omlapp-workers
+  - interaction_processor
+  - dialer
+  - nginx
+  - observability
+  - addons
+  - qa
+  - data
+  - voice
+  - app
+  - nodes
+
+# Quadlets .network en /etc/containers/systemd
+prerequisitos_quadlet_networks:
+  - omnileads.network

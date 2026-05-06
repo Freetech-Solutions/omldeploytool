@@ -1,0 +1,3 @@
+---
+- name: DIALER Load generated tasks
+  ansible.builtin.import_tasks: generated.yml

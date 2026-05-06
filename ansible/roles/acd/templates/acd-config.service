@@ -1,0 +1,30 @@
+[Unit]
+Description=OMniLeads ACD (Asterisk) container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target asterisk_retrieve_conf.service
+After=network-online.target asterisk_retrieve_conf.service
+
+[Container]
+ContainerName=acd-conf
+Image={{ ACD_IMG }}
+Pod=acd.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/acd-config.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+Volume=asterisk_conf:/home/omnileads/astconf
+Volume=asterisk_sounds:/home/omnileads/sounds
+WorkingDir=/opt/asterisk/workers/
+PodmanArgs=--entrypoint=python
+Exec=astconf.py
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+{% if scale_asterisk is defined and scale_asterisk %}
+MemoryMax={{ asterisk_mem_limit | default("1G", true) }}
+{% endif %}
+
+[Install]
+WantedBy=multi-user.target

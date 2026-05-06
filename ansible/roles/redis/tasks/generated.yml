@@ -1,0 +1,91 @@
+
+- name: REDIS Set Redis environment variables for this installation
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  notify: Restart redis service
+  loop:
+    - { src: "redis.env", dest: "/etc/default/redis.env" }
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: REDIS Ensure Quadlet directory exists
+  ansible.builtin.file:
+    path: /etc/containers/systemd
+    state: directory
+    mode: "0755"
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: REDIS Copy Quadlet file
+  ansible.builtin.template:
+    src: redis.service
+    dest: /etc/containers/systemd/redis.container
+    mode: "0644"
+  register: redis_quadlet_file
+  notify: Restart redis service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: REDIS Reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: redis_quadlet_file.changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: REDIS Check image cache
+  command: podman image exists {{ REDIS_IMG }}
+  register: redis_image_cache
+  changed_when: false
+  failed_when: redis_image_cache.rc not in [0, 1]
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: REDIS Pull image when missing or forced
+  command: podman pull --quiet {{ REDIS_IMG }}
+  register: redis_pull
+  retries: 3
+  delay: 5
+  until: redis_pull is success
+  tags:
+    - install
+    - upgrade
+    - update
+  when: force_image_pull | bool or redis_image_cache.rc != 0
+
+- name: REDIS Template files for scale tunnings are rendered
+  template:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+  notify: Restart redis service
+  loop:
+    - { src: 'redis.conf', dest: '/etc/omnileads/redis.conf' }
+  tags:
+    - install
+    - upgrade
+    - update
+  when: scale_redis is defined and scale_redis  
+
+- name: REDIS Enable and start service
+  systemd:
+    name: redis.service
+    state: started
+    enabled: yes
+  tags:
+    - install
+    - upgrade
+    - update

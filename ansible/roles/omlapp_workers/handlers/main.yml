@@ -1,0 +1,10 @@
+- name: Restart omlapp_workers services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ omlapp_workers_changed_services | default([]) }}"
+  when: (omlapp_workers_changed_services | default([]) | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update

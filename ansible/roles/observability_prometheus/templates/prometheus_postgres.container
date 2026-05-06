@@ -1,0 +1,22 @@
+[Unit]
+Description=OMniLeads Prometheus postgres exporter (Podman Quadlet)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=%t/containers
+
+[Container]
+ContainerName=obs-prometheus-postgres
+Image={{ POSTGRES_EXPORTER_IMG }}
+Pod=observability.pod
+EnvironmentFile=/etc/default/prometheus_postgres.env
+PodmanArgs=--cgroups=no-conmon
+LogDriver=journald
+Label=tier=observability
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

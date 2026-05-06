@@ -1,0 +1,95 @@
+x-healthcheck-tcp: &healthcheck-tcp
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 30s
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# ============================================================================
+# NETWORKS & VOLUMES
+# ============================================================================
+networks:
+  pstn:
+    driver: bridge
+    ipam:
+      driver: default
+
+volumes:
+  redis:
+
+    # ============================================================================
+    # SERVICES
+    # ============================================================================
+services:
+
+  redis:
+    image: ${REDIS_IMG}
+    dns: 8.8.8.8
+    environment:
+      TZ: ${TZ}
+      BIND_IP: 0.0.0.0
+    ports:
+      - ${REDIS_EXT_BIND_IP:-0.0.0.0}:${REDIS_EXT_PORT}:6379/tcp
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      <<: *healthcheck-tcp
+    restart: on-failure
+    logging: *default-logging
+    stop_grace_period: 30s
+    volumes:
+      - redis:/data
+
+  kamailio-pstn:
+    build:
+      context: ./$REPO_PATH/kamailio/
+      dockerfile: Dockerfile
+    image: ${OML_KAM_IMG}
+    #entrypoint: [ "/bin/sh", "-c", "kamailio -DD -E -m ${SHM_SIZE} -M ${PKG_SIZE} -f /etc/kamailio/kamailio_pstn.cfg" ]
+    entrypoint: [ "/entrypoint_pstn.sh" ]
+    depends_on:
+      redis:
+        condition: service_healthy
+      rtpengine:
+        condition: service_started
+    environment:
+      ACD_NODES: ${ACD_NODES}
+      IPADDR_PUBLIC: ${PUBLIC_IP}
+      IPADDR_PRIVATE: ${PRIVATE_IP}
+      ITSP_NODES: ${ITSP_NODES}
+      DOMAIN: ${DOMAIN}
+      FQDN: ${FQDN}
+      RTPENGINE_SOCKET: udp:${RTPENGINE_BIND_UDP_ADDR}:${RTPENGINE_BIND_UDP_PORT}
+      KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
+    dns: 8.8.8.8
+    privileged: true
+    restart: on-failure
+    logging: *default-logging
+    stop_grace_period: 10s
+    network_mode: host
+
+  rtpengine:
+    build:
+      context: ./$REPO_PATH/rtpengine/
+      dockerfile: Dockerfile
+    image: ${OML_RTPENGINE_IMG}
+    environment:
+      ENV: ${VOIP_ENV}
+      NG_BIND_ADDR: ${RTPENGINE_BIND_UDP_ADDR}
+      NG_BIND_PORT: ${RTPENGINE_BIND_UDP_PORT}
+      NAT: ${VOIP_NAT}
+      LOG_LEVEL: ${RTPENGINE_LOG_LEVEL}
+      PUBLIC_IP: ${RTPENGINE_HOSTNAME}
+      RTPENGINE_HOSTNAME: ${RTPENGINE_HOSTNAME}
+      RTP_PORT_MIN: ${RTPENGINE_RTP_PORT_MIN}
+      RTP_PORT_MAX: ${RTPENGINE_RTP_PORT_MAX}
+      TZ: ${TZ}
+    privileged: true
+    restart: on-failure
+    logging: *default-logging
+    stop_grace_period: 10s
+    network_mode: host

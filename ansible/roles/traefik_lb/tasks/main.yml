@@ -1,0 +1,40 @@
+---
+- name: Asegurar directorio Quadlet de systemd
+  ansible.builtin.file:
+    path: /etc/containers/systemd
+    state: directory
+    mode: "0755"
+
+- name: Desplegar EnvironmentFile de Traefik
+  ansible.builtin.template:
+    src: traefik.env.j2
+    dest: /etc/default/traefik.env
+    mode: "0644"
+
+- name: Desplegar configuración estática de Traefik
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: /etc/default/traefik.yml
+    mode: "0644"
+
+- name: Desplegar configuración dinámica (backends Nginx)
+  ansible.builtin.template:
+    src: nginx_backends.yml.j2
+    dest: /etc/default/nginx_backends.yml
+    mode: "0644"
+
+- name: Desplegar unidad Quadlet traefik.container
+  ansible.builtin.template:
+    src: traefik.container.j2
+    dest: /etc/containers/systemd/traefik.container
+    mode: "0644"
+  notify: traefik_lb systemd daemon reload
+
+- name: Aplicar daemon-reload pendiente antes de habilitar el servicio
+  ansible.builtin.meta: flush_handlers
+
+- name: Habilitar e iniciar traefik.service (generado por Quadlet)
+  ansible.builtin.systemd_service:
+    name: traefik.service
+    state: started
+    enabled: true

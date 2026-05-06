@@ -1,0 +1,66 @@
+
+- name: WEBSOCKETS environment variables for this installation
+  template:
+    src: "websockets.env"
+    dest: /etc/default/websockets.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  notify: Restart websockets service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: WEBSOCKETS Check image cache
+  command: podman image exists {{ WS_IMG }}
+  register: websockets_image_cache
+  changed_when: false
+  failed_when: websockets_image_cache.rc not in [0, 1]
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: WEBSOCKETS Pull image when missing or forced
+  command: podman pull --quiet {{ WS_IMG }}
+  register: websockets_pull
+  retries: 3
+  delay: 5
+  until: websockets_pull is success
+  when: force_image_pull | bool or websockets_image_cache.rc != 0
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: WEBSOCKETS Copy Quadlet file
+  template:
+    src: "websockets.service"
+    dest: /etc/containers/systemd/websockets.container
+    mode: "0644"
+  register: websockets_quadlet_file
+  notify: Restart websockets service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: WEBSOCKETS Reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: websockets_quadlet_file.changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: WEBSOCKETS Enable and start Websockets service
+  systemd:
+    name: websockets.service
+    state: started
+    enabled: yes
+  tags:
+    - install
+    - upgrade
+    - update

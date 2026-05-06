@@ -1,0 +1,16 @@
+---
+# Reiniciamos el pod (no el contenedor) porque postgresql.container declara
+# Pod=data_statefull.pod y Quadlet inyecta BindsTo=data_statefull-pod.service.
+# Hacer "systemctl restart postgresql.service" tira el contenedor pause del pod
+# y el restart falla con "Bound to unit data_statefull-pod.service, but unit isn't active".
+# Reiniciar el .pod.service rearma la infra del pod y el Wants= que Quadlet genera
+# vuelve a levantar postgresql + minio (mismo pod).
+- name: Restart postgresql service
+  ansible.builtin.systemd:
+    name: "{{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}"
+    state: restarted
+    daemon_reload: true
+  tags:
+    - install
+    - upgrade
+    - update

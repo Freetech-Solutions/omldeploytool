@@ -1,0 +1,106 @@
+---
+- name: OBSERVABILITY Promtail validate required variables
+  ansible.builtin.assert:
+    that:
+      - tenant_id is defined
+      - omni_ip_lan is defined
+    fail_msg: "tenant_id y omni_ip_lan son requeridos para Promtail."
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability
+
+- name: OBSERVABILITY Promtail create config directory
+  ansible.builtin.file:
+    path: /etc/default
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - install
+    - upgrade
+    - observability
+
+- name: OBSERVABILITY Promtail render configuration
+  ansible.builtin.template:
+    src: promtail.yml
+    dest: /etc/default/promtail.yml
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  notify: restart promtail
+  tags:
+    - install
+    - upgrade
+    - config
+    - observability
+
+- name: OBSERVABILITY Promtail render Quadlet container unit
+  ansible.builtin.template:
+    src: promtail.container
+    dest: /etc/containers/systemd/promtail.container
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: promtail_quadlet_unit
+  notify: restart promtail
+  tags:
+    - install
+    - upgrade
+    - observability
+
+- name: OBSERVABILITY Promtail reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: promtail_quadlet_unit.changed
+  tags:
+    - install
+    - upgrade
+    - observability
+
+- name: OBSERVABILITY Promtail enable and start service
+  ansible.builtin.systemd:
+    name: promtail.service
+    state: started
+    enabled: true
+  tags:
+    - install
+    - upgrade
+    - service
+    - observability
+
+- name: OBSERVABILITY Promtail test Loki connectivity
+  ansible.builtin.uri:
+    url: "http://{{ loki_host }}:3100/ready"
+    method: GET
+    timeout: 10
+  register: loki_health_check
+  failed_when: false
+  changed_when: false
+  when:
+    - loki_host is defined
+    - loki_host not in ["", "127.0.0.1"]
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability
+
+- name: OBSERVABILITY Promtail display Loki connectivity status
+  ansible.builtin.debug:
+    msg: |
+      Loki connectivity status: {{ 'SUCCESS' if (loki_health_check.status | default(0)) == 200 else 'FAILED' }}
+      Loki URL: http://{{ loki_host | default('not_configured') }}:3100
+      Status Code: {{ loki_health_check.status | default('No response') }}
+  when:
+    - loki_host is defined
+    - loki_host != ""
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability

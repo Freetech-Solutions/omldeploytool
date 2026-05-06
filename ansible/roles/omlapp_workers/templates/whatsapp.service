@@ -1,0 +1,26 @@
+[Unit]
+Description=OMniLeads WhatsApp Worker
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Container]
+ContainerName=omlapp-whatsapp
+Image={{ APP_IMG }}
+Pod=omlapp_workers.pod
+EnvironmentFile=/etc/default/django.env
+Environment=GOOGLE_MAPS_CENTER={{ google_maps_center }}
+Label=tier=omlapp
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Exec=/opt/omnileads/bin/init_whatsapp.sh
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

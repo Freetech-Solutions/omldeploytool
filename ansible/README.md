@@ -28,12 +28,12 @@
 * [Observability](#observability)
 * [Scalability](#scalability)
 * [Deploy Cluster all in three (AIT) instance](#ait-deploy)
-* [Deploy Onpremise Cluster HA](#cluster-ha-deploy)
-* [Cluster HA recovery tools](#cluster_ha_recovery)
-* [Deploy an upgrade from CentOS7](#upgrade_from_centos7)
+* [Deploy an upgrade from OMniLeads 2.X](#upgrade_from_oml2)
 * [User docs](#user-docs)
 
-# OMniLeads automation your subscribers deploys with Ansible
+# OMniLeads automation your tenant deploys with Ansible
+
+Para los pasos previos de preparación del entorno, ver [ANSIBLE_BOOTSTRAP.md](ANSIBLE_BOOTSTRAP.md).
 
 ```
 git clone https://gitlab.com/omnileads/omldeploytool.git
@@ -65,16 +65,22 @@ An instance of OMniLeads is launched on a Linux server (using Systemd & Podman) 
 
 This executable script triggers the deploy actions. It is responsible for receiving the action parameters to execute and the tenant on which to deploy the action.
 
-The script searches for the inventory file of the tenant (or group of them) on which it needs to operate and then launches the root Ansible playbook (matrix.yml) through ansible-playbook with the corresponding tags to respond to the request made. 
+The script resolves the inventory (either `instances/<tenant>/inventory.yml` when using **--tenant=**, or an absolute path with **--inventory=**) and runs `ansible-playbook` against [playbooks/site.yml](playbooks/site.yml) (or other playbooks for operational actions) with the appropriate **--tags**.
 
 ```
 ./deploy.sh --help
 ```
 
-To run an installation, upgrades, backup or restore deployment, two parameters must be called.
+Typical parameters:
 
-* **--action=**
-* **--tenant=**
+* **--action=** (see `./deploy.sh --help`, including `layout-cluster`, `layout-aio`)
+* **--tenant=** and/or **--inventory=**
+
+If you pass **--inventory=/path/to/prod.yml** without **--tenant=**, `tenant_folder` for files under `instances/<tenant>/` (TLS certs, keys, etc.) defaults to the inventory basename (`prod` in this example). Override with **--tenant=** if your folder name differs.
+
+Partial actions (`voice`, `postgres`, `redis`, …) only run tasks with matching tags; run **install** first on new servers. The `prerequisitos` role tags Podman and the `omnileads` network so component-scoped actions still bring up container networking when needed.
+
+**Operational playbooks** (backup, restore, recycle) live under [components/](components/README.md). The public clone may ship placeholders that explain how to add your organization’s real playbooks.
 
 for example: 
 
@@ -86,16 +92,13 @@ for example:
 
 Ansible allows you to run a number of tasks on a set of hosts specified in your inventory file. Depending on the structure and variables of this file, OMniLeads instances based on podman containers can be launched .
 
-This tool is capable of deploying OMniLeads in three layouts: 
+This tool is capable of deploying OMniLeads in two layouts:
 
 * **OML All in One with Podman & Systemd:**
 ![Diagrama deploy tool](./png/deploy-tool-tenant-aio.png)
 
 * **OML  Cluster with Podman & Systemd:**
 ![Diagrama deploy tool](./png/deploy-tool-tenant-ait.png)
-
-* **OML  Cluster HA with Podman & Systemd:**
-![Diagrama deploy tool](./png/deploy-tool-tenant-ha.png)
 
 The following is the generic version of inventory.yml file available in this repository.
 
@@ -109,15 +112,16 @@ Cluster instances:
 
 ![inventory deploy 2 section](./png/inventory_cluster_section.png)
 
-Cluster HA instances:
-
-![inventory deploy 3 section](./png/inventory_cluster_ha_section.png)
-
 In the second section of the file you can parameterize the runtime variables. By default it affects ALL declared instances, unless the same variable is declared within the host or group specific variables section.
 
-Finally, we have the section where the hosts should be grouped according arq. 
-On one side we have the omnileads_aio family, here below you must list the AIO instances you want to deploy.
-Then we have *omnileads_data*, *omnileads_voice*, *omnileads_app* where the instances that form clusters should be grouped. 
+Finally, we have the section where the hosts should be grouped by deployment architecture.
+
+* **omnileads_aio**: instancias **todo-en-uno (AIO)**.
+* **omnileads_data**: Postgres, Redis, MinIO, Gearman (estado y servicios de datos del cluster).
+* **omnileads_edge**: telefonía de borde (Kamailio, RTPengine, etc.).
+* **omnileads_nodes**: **cómputo** del cluster (omlapp, ACD, dialer, nginx, websockets, workers, interaction_processor, Prometheus del stack, etc.). En cluster, este grupo sustituye el antiguo patrón de poner esos servicios bajo `omnileads_aio`; deje `omnileads_aio` vacío o sin hosts para ese tenant.
+
+El play de instalación/actualización de cluster (`ansible/playbooks/site.yml`, `cluster.yml` y `deploy.sh` con layout cluster) incluye **`omnileads_data:omnileads_edge:omnileads_nodes:omnileads_aio`** en `hosts`.
 
 
 ```
@@ -126,34 +130,22 @@ omnileads_aio:
     #tenant_example_1:
     #tenant_example_2:
 
-################ Active/Pasive HA cluster ######################
-################ Active/Pasive HA cluster ######################
-
-    #tenant_example_7_HA_1:
-    #tenant_example_7_HA_2:
-
-##################### 4 Host cluster ###########################    
-##################### 4 Host cluster ###########################    
+##################### Cluster (data / edge / nodes) ###########################
 
 omnileads_data:
   hosts:
     #tenant_example_5_data:  
     #tenant_example_6_data:  
     
-omnileads_voice:
+omnileads_edge:
   hosts:
-    #tenant_example_5_voice:
-    #tenant_example_6_voice:
+    #tenant_example_5_edge:
+    #tenant_example_6_edge:
 
-omnileads_app:
+omnileads_nodes:
   hosts:
-    #tenant_example_5_app:
-    #tenant_example_6_app:
-
-omnileads_dialer:
-  hosts:
-    #tenant_example_5_dialer:
-    #tenant_example_6_dialer
+    #tenant_example_5_node_A:
+    #tenant_example_5_node_B:
 ```
 
 # Inventory file :office: <a name="subscriber-traking"></a>
@@ -251,11 +243,11 @@ Then in the vars section, we have all the parameters that omnileads expects to w
     ....
 ```
 
-Finally in the last section of the file, we must make sure that our tenant is listed in the omnileads_aio hosts group.
+In the last section of the file, list each host under the group that matches its role: **omnileads_aio** for AIO, or for cluster **omnileads_data**, **omnileads_edge**, and **omnileads_nodes** (cómputo).
 
 ```
 #############################################################################################################
-# -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA).     #
+# -- In this section the hosts are grouped based on the type of deployment (AIO, Cluster).     #
 #############################################################################################################
 
 omnileads_aio:
@@ -270,20 +262,15 @@ omnileads_data:
     #tenant_example_5_data:
     #tenant_example_6_data:
     
-omnileads_voice:
+omnileads_edge:
   hosts:
-    #tenant_example_5_voice:
-    #tenant_example_6_voice:
+    #tenant_example_5_edge:
+    #tenant_example_6_edge:
 
-omnileads_app:
+omnileads_nodes:
   hosts:
-    #tenant_example_5_app:
-    #tenant_example_6_app:
-
-omnileads_dialer:
-  hosts:
-    #tenant_example_5_dialer:
-    #tenant_example_6_dialer:
+    #tenant_example_5_node_A:
+    #tenant_example_5_node_B:
 ```
 
 Let's run the bash scrip:
@@ -402,41 +389,33 @@ systemctl stop component
 
 Behind every action triggered by the systemctl command, there is actually a Podman container that is launched, stopped, or restarted. This container is the result of the image invoked along with the environment variables.
 
-For example, if we look at the systemd file of the Nginx component.
+For example, if we look at the Nginx component, the Quadlet unit is `/etc/containers/systemd/nginx.container`; systemd still exposes the generated unit as `nginx.service` (same `systemctl` name as before).
 
-/etc/systemd/system/nginx.service looks like:
+`/etc/containers/systemd/nginx.container` looks like:
 
 ```
 [Unit]
-Description=Podman container-oml-nginx-server.service
-Documentation=man:podman-generate-systemd(1)
+Description=OMniLeads nginx reverse proxy (Podman Quadlet)
 Wants=network-online.target
 After=network-online.target
 RequiresMountsFor=%t/containers
 
+[Container]
+ContainerName=oml-nginx-server
+Image=docker.io/omnileads/nginx:230215.01
+Network=host
+EnvironmentFile=/etc/default/nginx.env
+Volume=/etc/omnileads/certs:/etc/omnileads/certs
+Volume=django_static:/opt/omnileads/static
+Volume=django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+Label=tier=omlapp
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Notify=true
+
 [Service]
-Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
 TimeoutStopSec=70
-ExecStartPre=/bin/rm -f %t/%n.ctr-id
-ExecStart=/usr/bin/podman run \
-  --cidfile=%t/%n.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  --replace \
-  --detach \
-  --network=host \
-  --env-file=/etc/default/nginx.env \
-  --name=oml-nginx-server \
-  --volume=/etc/omnileads/certs:/etc/omnileads/certs \
-  --volume=django_static:/opt/omnileads/static \
-  --volume=django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor \
-  --rm  \
-  docker.io/omnileads/nginx:230215.01
-ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
-ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
-Type=notify
-NotifyAccess=all
 
 [Install]
 WantedBy=default.target
@@ -758,7 +737,7 @@ By setting the scale_uwsgi value on the host or group, you enable the ability to
     # rtpengine_final_timeout: 3600
 ```
 
-# Install on Cluster Instances (Data, Voice, Web & Dialer). 🚀 <a name="ait-deploy"></a>
+# Install on Cluster Instances (data, edge & nodes). 🚀 <a name="ait-deploy"></a>
 
 You must have four Linux instances with Internet access and **your public key (ssh) available**, since
 Ansible needs to establish an SSH connection to deploy the actions.
@@ -777,52 +756,49 @@ Then you should work on the inventory.yml tenant file.
           hosts:
             tenant_example_5_data:
               ansible_host: 164.92.101.39
-              omni_ip_lan: 172.16.101.41
+              omni_ip_lan: 10.10.10.23
               ansible_ssh_port: 22
-            tenant_example_5_voice:
+            tenant_example_5_edge:
               ansible_host: 143.198.142.25
-              omni_ip_lan: 172.16.101.42
+              omni_ip_lan: 10.10.10.21
               ansible_ssh_port: 22
-            tenant_example_5_app:
+            tenant_example_5_node_A:
               ansible_host: 165.232.137.234
-              omni_ip_lan: 172.16.101.43
+              omni_ip_lan: 10.10.10.22
               ansible_ssh_port: 22
-            tenant_example_5_dialer:
+            tenant_example_5_node_B:
               ansible_host: 143.198.151.31
-              omni_ip_lan: 172.16.101.44
+              omni_ip_lan: 10.10.10.20
               ansible_ssh_port: 22
           vars:
             tenant_id: tenant_example_5
-            data_host: 172.16.101.41
-            voice_host: 172.16.101.42
-            application_host: 172.16.101.43
-            dialer_host: 172.16.101.44
             infra_env: cloud
 ```
 The parameter ansible_host refers to the IP or FQDN used to establish an SSH connection. The omni_ip_lan parameter refers to the private IP (LAN) that will be used when opening certain ports for components and when they connect with each other.
 
-Finally in the last section of the file, we must make sure that our tenant is listed in the omnileads_aio hosts group.
+> Note: `data_host`, `edge_host` and `aio_host` are inferred automatically by the `topology_normalize` role from the membership of each host in the `omnileads_data`, `omnileads_edge` and `omnileads_nodes` groups (intersected with the tenant group). You only need to declare them under `vars:` if you want to override the inferred value.
+
+In the last section, assign hosts to **omnileads_data**, **omnileads_edge**, and **omnileads_nodes**. Leave **omnileads_aio** empty for this cluster tenant.
 
 ```
+omnileads_aio:
+  hosts:
+
 omnileads_data:
   hosts:
     tenant_example_5_data:  
     #tenant_example_6_data:  
     
-omnileads_voice:
+omnileads_edge:
   hosts:
-    tenant_example_5_voice:
-    #tenant_example_6_voice:
+    tenant_example_5_edge:
+    #tenant_example_6_edge:
 
-omnileads_app:
+omnileads_nodes:
   hosts:
-    tenant_example_5_app:
-    #tenant_example_6_app:
-
-omnileads_dialer:
-  hosts:
-    tenant_example_5_dialer:
-    #tenant_example_2_dialer
+    tenant_example_5_node_A:
+    tenant_example_5_node_B:
+    #tenant_example_2_node_A:
 ```
 
 ```
@@ -830,148 +806,6 @@ omnileads_dialer:
 ```
 
 Once the URL is available with the App returning the login view,  we can log in with the user *admin*, password *admin*.
-
-# Install on HA cluster instances. 🚀 <a name="cluster-ha-deploy"></a>
-
-You must have four Linux instances with Internet access and **your public key (ssh) available**, since
-Ansible needs to establish an SSH connection to deploy the actions. 
-
-* OMniLeads AIO main Node: Debian 12 Bookworm
-* OMniLeads AIO backup Node: Debian 12 Bookworm
-
-![Diagrama deploy cloud services](./png/deploy-tool-tenant-components-ha.png)
-
-
-Then you should work on the inventory.yml tenant file.
-
-```
-# -----------------------------------------
-# -----------------------------------------
-    ha_instances:
-      children:
-        tenant_example_7:
-          hosts:              
-            tenant_example_7_aio_A:
-              tenant_id: tenant_example_7_aio_A
-              ansible_host: 172.16.101.43
-              omni_ip_lan: 172.16.101.43
-              ha_role: main
-            tenant_example_7_aio_B:
-              tenant_id: tenant_example_7_aio_B
-              ansible_host: 172.16.101.44
-              omni_ip_lan: 172.16.101.44
-              ha_role: backup                            
-          vars:                        
-            omnileads_ha: true
-            ha_vip_nic: ens18 
-            netaddr: 172.16.101.0/24
-            netprefix: 24                        
-            aio_1: 172.16.101.43
-            aio_2: 172.16.101.44
-            omnileads_vip: 172.16.101.205            
-            postgres_rw_vip: 172.16.101.206
-            postgres_ro_vip: 172.16.101.207   
-            infra_env: lan
-```
-
-The parameter ansible_host refers to the IP or FQDN used to establish an SSH connection. The omni_ip_lan parameter refers to the private IP (LAN) that will be used when opening certain ports for components and when they connect with each other.
-
-The infra_env variable can be initialized as "lan" or "cloud", depending on whether the OMniLeads instance will be accessible via WAN access (IPADDR or FQDN) or via LAN access (IP or FQDN).
-
-* ha_vip_nic: 
-
-This parameter is used to assign the virtual IP on NIC
-
-In a high availability environment, we need to indicate to each cluster node its initial condition (ha_role), and since the role of the node implies the assignment of a virtual IP address (ha_vip_nic), we also need to indicate the name of the NIC over which the VIP is going to be established.
-
-* omnileads_ha: true
-
-This parameter is used to instruct Ansible to launch certain tasks inherent to the HA configuration.
-
-* netaddr: 172.16.101.0/16
-* netprefix: 24
-
-These 2 parameters are used by the cluster. 
-
-* aio_1: 172.16.101.43
-* aio_2: 172.16.101.44
-
-These 2 parameters are used by the cluster managers keepalived and rempgr. to indicate the IP of the nodes.
-
-* omnileads_vip: 172.16.101.205
-
-The Virtual IP used to https access.
-
-Finally in the last section of the file, we must make sure that our tenant is listed in the omnileads_aio hosts group.
-
-```
-omnileads_aio:
-  hosts:
-    #tenant_example_1:
-    #tenant_example_2:
-    #tenant_example_3:
-    #tenant_example_4:
-
-    tenant_example_7_aio_A:
-    tenant_example_7_aio_B:
-
-################################################    
-omnileads_data:
-  hosts:
-    #tenant_example_5_data:  
-    
-omnileads_voice:
-  hosts:
-    #tenant_example_5_voice:
-
-omnileads_app:
-  hosts:
-    #tenant_example_5_app:
-```
-
-it can be seen that at host grouping level, we have the 4 hosts that conform the HA cluster distributed in the groups: ha_omnileads_sql and omnileads_aio instances group.
-
-```
-./deploy.sh --action=install --tenant=tenant_name_folder
-```
-
-Once the URL is available with the App returning the login view,  we can log in with the user *admin*, password *admin*.
-
-## Postgres Cluster actions :arrows_clockwise: <a name="cluster_ha_recovery"></a>
-
-### **Recovery Postgres main node**
-
-When a Failover from Postgres Main to Postgres Backup occurs, then the Backup node takes the floating IP of the cluster and remains as the only RW/RO node with its corresponding IPs. 
-as the only RW/RO node with its corresponding IPs. 
-
-To return Postgres to the initial state two actions must be carried out:
-
-```
-./deploy.sh --action=pgsql_node_recovery_main --tenant=tenant_name_folder
-```
-
-This command is in charge of rejoining the Postgres Main node to the cluster. But if we only execute this action then 
-the Cluster will be inverted, i.e. Postgres B as main and Postgres A as backup.
-
-### **Takeover Postgres main node**
-
-
-This command implies that a Recovery has been previously executed as described in the previous step.
-
-```
-./deploy.sh --action=pgsql_node_takeover_main --tenant=tenant_name_folder
-```
-
-After the execution of the takeover we will have the cluster in the initial state, i.e. Postgres A as Main and Postgres B as backup.
-
-### **Recovery Postgres backup node**
-
-When the VM hosting the Postgres Backup node shuts down, the Main node takes the floating RO IP of the cluster and remains as the only RW/RO node with its corresponding IPs. as the only RW/RO node with its corresponding IPs. To rejoin the backup node to the cluster and in this way recover the RO's VIP, it is necessary to run a
-the RO VIP, a recovery deploy of the postgres backup node must be executed.
-
-```
-./deploy.sh --action=pgsql_node_recovery_backup --tenant=tenant_name_folder
-```
 
 ## OMniLeads Enterprise
 
@@ -998,102 +832,26 @@ omnileads_img: docker.io/your_registry/omlapp:231227.01-enterprise
 ```
 
 
-# Upgrade from CentOS-7 OMniLeads instance :arrows_counterclockwise: <a name="upgrade_from_centos7"></a>
-
+# Upgrade from OMniLeads 2.X instance :arrows_counterclockwise: <a name="upgrade_from_oml2"></a>
 
 You must deploy the new **OMniLeads Community** instance making sure that the inventory.yml variables listed below should be the same as their 
-counterparts in the CentOS 7 instance from which you want to migrate. below should be the same as their counterparts in the CentOS 7 instance from which you want to migrate.
+counterparts in the OML 2.X instance from which you want to migrate. below should be the same as their counterparts in the OML 2.X instance from which you want to migrate.
 
-* ami_user
-* ami_password
 * postgres_password
 * postgres_database
 * postgres_user
-* dialer_user
-* dialer_password
 
-We must consider that the version of the Postgres image to be deployed with OMniLeads 2.X should be "omnileads/postgres:230624.01". Therefore, you will need to temporarily change the variable groupall/all inherent to Postgres, as follows:
+Para el upgrade se debe:
 
-```
-#################### containers img tag  ################################
+1 - cp inventory.yml vigente
+2 - cambiar lineas:
 
-#postgres_img: docker.io/postgres:14.9-bullseye
-postgres_img: docker.io/omnileads/postgres:230624.01
-```
+.....
+.....
+.....
 
-On the OMniLeads 1.X CentOS-7 instance run the following commands to generate a postgres backup on the one hand 
-and then upload to the Bucket Object Storage of the new OMniLeads version the call recordings, telephony audios and the Postgres DB backup.
+3 - activar flag upgrade_from_2X: True
 
-```
-export NOMBRE_BACKUP=some_file_name
-pg_dump -h ${PGHOST} -p ${PGPORT} -U ${PGUSER} -Fc -b -v -f /tmp/psql-backup-${NOMBRE_BACKUP}.sql -d ${PGDATABASE} --no-acl
-export AWS_ACCESS_KEY_ID=$your_new_instance_bucket_key
-export AWS_SECRET_ACCESS_KEY=$your_new_instance_bucket_secret_key
-export S3_BUCKET_NAME=$your_new_instance_bucket_name
-```
-
-If you are going to use the object storage self-hosted by OMnileads in an AIO instance:
-```
-export S3_ENDPOINT=http://$YOUR_OML_AIO_IP:9000 
-```
-
-If you are going to use the object storage self-hosted by OMnileads in an AIT cluster instance:
-```
-export S3_ENDPOINT=http://$YOUR_OML_DATA_IP:9000 
-```
-
-If you are going to use an external object storage service:
-```
-export S3_ENDPOINT=https://$object_storage_url
-```
-
-Finally, all backups are uploaded to the bucklet of the new OMniLeads instance:
-```
-aws --endpoint ${S3_ENDPOINT} s3 sync /opt/omnileads/media_root s3://${S3_BUCKET_NAME}/media_root
-aws --endpoint ${S3_ENDPOINT} s3 sync /opt/omnileads/asterisk/var/spool/asterisk/monitor/ s3://${S3_BUCKET_NAME}
-aws --endpoint ${S3_ENDPOINT} s3 cp /tmp/pgsql-backup-$NOMBRE_BACKUP.sql  s3://${S3_BUCKET_NAME}/backup/
-```
-
-Given that all the necessary components for restoring the service on the new infrastructure are available in the same Bucket,
-you can proceed with deploying the restoration process.
-
-At the end of the file there is the variable *restore_file_timestamp* which must contain the name used in the previous step to refer to the backups.
-previous step to refer to the backups taken.
-
-```
-aio_instances:
-      hosts:
-        algarrobo:
-          tenant_id: algarrobo
-          ansible_host: 190.19.150.18
-          omni_ip_lan: 172.16.101.44
-          infra_env: cloud
-          fqdn: tenant_name.omnileads.net
-          cert_file_name: cert_custom_filename.pem
-          key_file_name: key_custom_filename.pem 
-          restore_file_timestamp: $NOMBRE_BACKUP
-```
-
-Execute the restore deploy on the new instance with OML 2.0:
-
-```
-./deploy.sh --action=restore --tenant=$your_inventory_folder_name
-```
-
-Now we must revert back to the original Postgres image, which means restoring our group_vars/all file to its previous state:
-
-```
-#################### containers img taf  ################################
-
-postgres_img: docker.io/postgres:14.9-bullseye
-#postgres_img: omnileads/postgres:230624.01
-```
-
-And finally, execute:
-
-```
-./deploy.sh --action=upgrade --tenant=$your_inventory_folder_name
-```
 
 ## User docs <a name="user-docs"></a>
 

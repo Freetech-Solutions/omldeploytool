@@ -1,0 +1,16 @@
+---
+- name: Validate AIO inventory layout
+  hosts: omnileads_aio
+  gather_facts: true
+  pre_tasks:
+    - name: Load normalized topology for AIO validation
+      ansible.builtin.include_role:
+        name: topology_normalize
+  tasks:
+    - name: Assert AIO layout
+      ansible.builtin.assert:
+        that:
+          - oml_layout == "aio"
+        fail_msg: "Este playbook espera un inventario AIO."
+
+- import_playbook: site.yml

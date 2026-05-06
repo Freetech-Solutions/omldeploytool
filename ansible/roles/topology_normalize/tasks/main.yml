@@ -1,0 +1,161 @@
+---
+- name: TOPOLOGY Derive node roles
+  ansible.builtin.set_fact:
+    oml_is_aio: "{{ 'omnileads_aio' in group_names }}"
+    oml_is_nodes: "{{ 'omnileads_nodes' in group_names }}"
+    oml_is_data: "{{ 'omnileads_data' in group_names }}"
+    oml_is_edge: "{{ 'omnileads_edge' in group_names }}"
+    oml_layout: >-
+      {% if (groups.get('omnileads_data', []) | length > 0) or (groups.get('omnileads_edge', []) | length > 0) %}cluster{% else %}aio{% endif %}
+    oml_is_compute: "{{ ('omnileads_aio' in group_names) or ('omnileads_nodes' in group_names) }}"
+  tags:
+    - always
+
+- name: TOPOLOGY Derive aio-only flag
+  ansible.builtin.set_fact:
+    oml_is_aio_only: "{{ oml_layout == 'aio' }}"
+  tags:
+    - always
+
+- name: TOPOLOGY Detect external services
+  ansible.builtin.set_fact:
+    postgres_out: "{{ postgres_host is defined }}"
+    rtpengine_out: "{{ rtpengine_host is defined }}"
+    kamailio_pstn_out: "{{ kamailio_pstn_host is defined }}"
+    bucket_out: "{{ bucket_url is defined }}"
+  tags:
+    - always
+
+- name: TOPOLOGY Normalize base connectivity values (aio)
+  ansible.builtin.set_fact:
+    data_host: "{{ data_host | default(omni_ip_lan) }}"
+    edge_host: "{{ edge_host | default(omni_ip_lan) }}"
+    aio_host: "{{ aio_host | default(omni_ip_lan) }}"
+    omni_ip_wan: "{{ omni_ip_wan | default(nat_ip_addr | default(ansible_host)) }}"
+  when: oml_layout == 'aio'
+  tags:
+    - always
+
+# En cluster cada host del tenant pertenece a uno de los grupos de rol
+# (omnileads_data/edge/nodes). La intersección entre el grupo del tenant y el
+# grupo de rol identifica al peer y permite derivar su omni_ip_lan, evitando
+# tener que declarar data_host/edge_host/aio_host a mano en cada inventario.
+- name: TOPOLOGY Resolve cluster peers from groups
+  vars:
+    _structural_groups:
+      - all
+      - aio_instances
+      - cluster_instances
+      - omnileads_aio
+      - omnileads_data
+      - omnileads_edge
+      - omnileads_nodes
+    tenant_group: "{{ (group_names | difference(_structural_groups)) | first | default('') }}"
+    tenant_hosts: "{{ groups[tenant_group] | default([]) }}"
+    data_peers: "{{ tenant_hosts | intersect(groups['omnileads_data'] | default([])) }}"
+    edge_peers: "{{ tenant_hosts | intersect(groups['omnileads_edge'] | default([])) }}"
+    nodes_peers: "{{ tenant_hosts | intersect(groups['omnileads_nodes'] | default([])) }}"
+  ansible.builtin.set_fact:
+    data_host: "{{ data_host | default(hostvars[data_peers | first].omni_ip_lan if data_peers | length > 0 else omni_ip_lan) }}"
+    edge_host: "{{ edge_host | default(hostvars[edge_peers | first].omni_ip_lan if edge_peers | length > 0 else omni_ip_lan) }}"
+    aio_host: "{{ aio_host | default(hostvars[nodes_peers | first].omni_ip_lan if nodes_peers | length > 0 else omni_ip_lan) }}"
+    omni_ip_wan: "{{ omni_ip_wan | default(nat_ip_addr | default(ansible_host)) }}"
+  when: oml_layout == 'cluster'
+  tags:
+    - always
+
+- name: TOPOLOGY Assert cluster peers were resolved
+  ansible.builtin.assert:
+    that:
+      - data_host is defined
+      - edge_host is defined
+      - aio_host is defined
+    fail_msg: >-
+      No se pudo inferir data_host/edge_host/aio_host. Verifica que los hosts
+      del cluster estén declarados en omnileads_data, omnileads_edge y
+      omnileads_nodes en el inventario.
+  when: oml_layout == 'cluster'
+  tags:
+    - always
+
+- name: TOPOLOGY Normalize service endpoints
+  ansible.builtin.set_fact:
+    postgres_host: >-
+      {% if postgres_host is defined %}
+      {{ postgres_host | trim }}
+      {% elif oml_is_aio_only %}
+      {{ omni_ip_lan }}
+      {% else %}
+      {{ data_host }}
+      {% endif %}
+    bucket_host: >-
+      {% if bucket_url is defined %}
+      {{ bucket_url }}
+      {% elif oml_is_aio_only %}
+      http://{{ omni_ip_lan }}:9000
+      {% else %}
+      http://{{ data_host }}:9000
+      {% endif %}
+    redis_host: >-
+      {% if redis_host is defined %}
+      {{ redis_host | trim }}
+      {% elif oml_is_aio_only %}
+      {{ omni_ip_lan }}
+      {% else %}
+      {{ data_host }}
+      {% endif %}
+    gearman_host: "{{ gearman_host | default(omni_ip_lan if oml_is_aio_only else data_host) }}"
+    kamailio_host: "{{ kamailio_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
+    acd_host: "{{ acd_host | default(omni_ip_lan if oml_is_aio_only else aio_host) }}"
+    rtpengine_host: "{{ rtpengine_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
+    fastagi_host: "{{ fastagi_host | default(omni_ip_lan if oml_is_aio_only else aio_host) }}"
+    nginx_host: "{{ nginx_host | default(omni_ip_lan if oml_is_aio_only else aio_host) }}"
+    dialer_host: "{{ dialer_host | default(omni_ip_lan if oml_is_aio_only else aio_host) }}"
+  tags:
+    - always
+
+# ACD (acd.env SIP_PROXY) necesita el host del Kamailio PSTN; en edge es local (omni_ip_lan), en AIO-only también; en cluster compute apunta al nodo edge.
+- name: TOPOLOGY Default kamailio_pstn_host when not set in inventory
+  ansible.builtin.set_fact:
+    kamailio_pstn_host: "{{ edge_host if oml_is_nodes else omni_ip_lan }}"
+  when:
+    - kamailio_pstn_host is not defined
+    - oml_is_edge or oml_is_aio or oml_is_nodes
+  tags:
+    - always
+
+- name: TOPOLOGY Normalize dialer defaults
+  ansible.builtin.set_fact:
+    dialer_caps: "{{ dialer_caps | default(1) }}"
+    dialer_process_campaign_replicas: "{{ dialer_process_campaign_replicas | default(10) }}"
+    dialer_process_contact_replicas: "{{ dialer_process_contact_replicas | default(1) }}"
+    dialer_process_event_replicas: "{{ dialer_process_event_replicas | default(1) }}"
+  when:
+    - dialer_engine is defined
+    - dialer_engine == "omnidialer"
+  tags:
+    - always
+
+- name: TOPOLOGY Compute component switches
+  ansible.builtin.set_fact:
+    component_minio_enabled: "{{ (oml_is_data or oml_is_aio_only) and not bucket_out }}"
+    component_postgresql_enabled: "{{ (oml_is_data or oml_is_aio_only) and not postgres_out }}"
+    component_redis_enabled: "{{ oml_is_data or oml_is_aio_only }}"
+    component_gearman_enabled: "{{ oml_is_data or oml_is_aio_only }}"
+    component_rtpengine_enabled: "{{ (oml_is_edge or oml_is_aio_only) and not rtpengine_out }}"
+    component_telephony_edge_enabled: "{{ oml_is_edge or oml_is_aio_only }}"
+    component_haproxy_enabled: "{{ oml_is_edge }}"
+    component_acd_enabled: "{{ oml_is_compute }}"
+    component_websockets_enabled: "{{ oml_is_compute }}"
+    component_omlapp_enabled: "{{ oml_is_compute }}"
+    component_omlapp_workers_enabled: "{{ oml_is_compute }}"
+    component_interaction_processor_enabled: "{{ oml_is_compute }}"
+    component_dialer_enabled: "{{ oml_is_compute and dialer_engine is defined and dialer_engine == 'omnidialer' }}"
+    component_nginx_enabled: "{{ oml_is_compute }}"
+    component_call_logger_enabled: "{{ oml_is_compute }}"
+    component_observability_prometheus_enabled: "{{ oml_is_compute }}"
+    component_observability_promtail_enabled: "{{ loki_host is defined or (oml_observability_deploy | default(false) | bool) }}"
+    component_addons_enabled: "{{ oml_is_compute }}"
+    component_qa_enabled: "{{ qa_env is defined }}"
+  tags:
+    - always

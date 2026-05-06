@@ -1,0 +1,28 @@
+
+[Unit]
+Description=OMniLeads Dialer Manage Campaign Worker
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Container]
+ContainerName=dialer-manage-campaign
+Image={{ DIALER_WORKER_IMG }}
+Pod=dialer_workers.pod
+EnvironmentFile=/etc/default/dialer.env
+Environment=GEARMAN_JOBS=create-campaign|start-campaign|pause-campaign|resume-campaign|stop-campaign|edit-campaign|delete-campaign|change-database
+Label=tier=dialer
+LogDriver=journald
+# Usamos el argumento seguro para tu versión de Podman:
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

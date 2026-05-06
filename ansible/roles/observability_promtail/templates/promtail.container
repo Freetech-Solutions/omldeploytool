@@ -1,0 +1,40 @@
+# Promtail Quadlet (Podman) — {{ inventory_hostname }}, tenant {{ tenant_id }}
+
+[Unit]
+Description=Promtail service - Log aggregator for {{ tenant_id }}
+Documentation=https://grafana.com/docs/loki/latest/clients/promtail/
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=%t/containers
+
+[Container]
+ContainerName=obs-promtail
+Image={{ PROMTAIL_IMG }}
+Network={{ oml_network }}
+Volume=/etc/default/promtail.yml:/etc/promtail/config.yml:ro
+Volume=promtail_data:/tmp
+Volume=/run/log/journal/:/var/log/journal/:ro
+Volume=/etc/machine-id:/etc/machine-id:ro
+Label=tenant={{ tenant_id }}
+Label=service=promtail
+Label=node_type={{ 'aio' if (oml_is_aio | default(false)) else 'nodes' if (oml_is_nodes | default(false)) else 'data' if (oml_is_data | default(false)) else 'edge' if (oml_is_edge | default(false)) else 'standalone' }}
+Exec=-config.file=/etc/promtail/config.yml -config.expand-env=true
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon --cpus=1 --cpu-shares=256
+Notify=false
+
+[Service]
+NotifyAccess=all
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=70
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=promtail
+MemoryLimit={{ promtail_memory_limit | default('512M') }}
+CPUQuota={{ promtail_cpu_quota | default('50%') }}
+
+[Install]
+WantedBy=multi-user.target

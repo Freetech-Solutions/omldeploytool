@@ -1,0 +1,27 @@
+[Unit]
+Description=OMniLeads Django uWSGI Server
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+Requires=omlapp_web-pod.service
+
+[Container]
+ContainerName={{ omlapp_uwsgi_container_name }}
+Image={{ APP_IMG }}
+Pod=omlapp_web.pod
+EnvironmentFile=/etc/default/django.env
+Environment=GOOGLE_MAPS_CENTER={{ google_maps_center }}
+Label=tier=omlapp
+LogDriver=journald
+Volume=django_static:/opt/omnileads/static
+Volume=django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
+Volume=django_media:/opt/omnileads/media_root
+PodmanArgs=--cgroups=no-conmon
+Exec=/opt/omnileads/bin/init_uwsgi.sh
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

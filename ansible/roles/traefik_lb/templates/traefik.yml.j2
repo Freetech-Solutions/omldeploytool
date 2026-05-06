@@ -1,0 +1,22 @@
+# Configuración estática Traefik v3 (Ansible: rol traefik_lb)
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic/nginx_backends.yml
+    watch: true
+
+log:
+  level: INFO

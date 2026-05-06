@@ -17,66 +17,42 @@
 #
 ---
 - name: OS_CONF Disable ufw
-  systemd:
+  ansible.builtin.systemd:
     name: ufw
     state: stopped
-    enabled: no
-    daemon_reload: yes
+    enabled: false
   ignore_errors: true
   tags:
     - install
 
 - name: OS_CONF Disable firewallD
-  systemd:
+  ansible.builtin.systemd:
     name: firewalld
     state: stopped
-    enabled: no
-    daemon_reload: yes
+    enabled: false
   ignore_errors: true
   tags:
     - install
 
-- name: MAIN Disable SELinux Rocky or Alma Linux
-  command: setenforce 0
+- name: MAIN Disable SELinux on Rocky, Alma Linux or CentOS
+  ansible.posix.selinux:
+    state: disabled
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux", "CentOS"]
+  ignore_errors: true
   tags:
     - install
     - upgrade
     - update
-  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"  or ansible_facts['distribution'] == "CentOS"
-  ignore_errors: true
-
-- name: MAIN Disable SELinux on Rocky or Alma Linux permanently
-  lineinfile:
-    path: /etc/selinux/config
-    regexp: '^SELINUX='
-    line: 'SELINUX=disabled'
-  tags:
-    - install
-    - upgrade
-    - update
-  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"  or ansible_facts['distribution'] == "CentOS"
-  ignore_errors: true
-
-- name: OS_CONF Enable and start systemd Prometheus Node Exporter service
-  systemd:
-    name: podman.socket
-    state: started
-    enabled: yes
-    daemon_reload: yes
-  tags:
-    - install
-    - upgrade
-  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"
 
 - name: OS_CONF Ensure group {{ usuario }} exists
-  group:
+  ansible.builtin.group:
     name: "{{ usuario }}"
     state: present
   tags:
     - install
 
 - name: OS_CONF Add the {{ usuario }} user
-  user:
+  ansible.builtin.user:
     name: "{{ usuario }}"
     group: "{{ usuario }}"
     comment: OMniLeads OS user
@@ -85,131 +61,102 @@
   tags:
     - install
 
+- name: OS_CONF Check if /etc/omnileads directory exists
+  ansible.builtin.stat:
+    path: /etc/omnileads
+  register: etc_omnileads
+  tags:
+    - install
+
 - name: OS_CONF Creates /etc/omnileads directory
-  file:
+  ansible.builtin.file:
     path: /etc/omnileads
     state: directory
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0764
-    recurse: yes
-  when: etc_omnileads.stat.exists == false
+    mode: '0764'
+    recurse: true
+  when: not etc_omnileads.stat.exists
   tags:
     - install
 
 - name: OS_CONF Copy google speech credentials json
-  copy:
+  ansible.builtin.copy:
     src: "../../../instances/{{ tenant_folder }}/google_credentials.json"
     dest: /etc/omnileads/google_credential.json
+    mode: '0600'
   tags:
     - install
     - upgrade
-    - update
   when:
-    - callrec_transcriptions_engine is defined and callrec_transcriptions_engine == "gcp"
+    - callrec_transcriptions_engine is defined 
+    - callrec_transcriptions_engine == "gcp"
 
-- name: OS_CONF Creates /etc/omnileads/certs directory
-  file:
-    path: "{{ certs_location }}"
+- name: OS_CONF Ensure TLS certs directory exists
+  ansible.builtin.file:
+    path: "{{ certs_location | default('/etc/omnileads/certs') }}"
     state: directory
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0764
-  when: etc_omnileads.stat.exists == false
+    mode: '0755'
   tags:
     - install
+    - upgrade
 
 - name: OS_CONF Copy selfsigned SSL certs
-  copy:
+  ansible.builtin.copy:
     src: "certs/cert.pem"
-    dest: /etc/omnileads/certs/cert.pem
+    dest: "{{ certs_location | default('/etc/omnileads/certs') }}/cert.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0777
+    mode: '0644'
   tags:
     - install
     - upgrade
-    - update
-  when:
-    - certs == "selfsigned"
+  when: certs == "selfsigned"
 
-- name: OS_CONF Copy selfsigned SSL certs
-  copy:
+- name: OS_CONF Copy selfsigned SSL keys
+  ansible.builtin.copy:
     src: "certs/key.pem"
-    dest: /etc/omnileads/certs/key.pem
+    dest: "{{ certs_location | default('/etc/omnileads/certs') }}/key.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0777
+    mode: '0600'
   tags:
     - install
     - upgrade
-    - update
-  when:
-    - certs == "selfsigned"
+  when: certs == "selfsigned"
 
-- name: OS_CONF Copy custom generic filename SSL cert.pem
-  copy:
-    src: "../../../instances/{{ tenant_folder }}/cert.pem"
-    dest: /etc/omnileads/certs/cert.pem
+- name: OS_CONF Copy custom SSL certs
+  ansible.builtin.copy:
+    src: "../../../instances/{{ tenant_folder }}/{{ cert_file_name | default('cert.pem') }}"
+    dest: "{{ certs_location | default('/etc/omnileads/certs') }}/cert.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0777
+    mode: '0644'
   tags:
     - install
     - upgrade
-    - update
-  when:
-    - certs == "custom"
-    - cert_file_name is not defined
+  when: certs == "custom"
 
-- name: OS_CONF Copy custom cert filename tenant SSL cert.pem
-  copy:
-    src: "../../../instances/{{ tenant_folder }}/{{ cert_file_name }}"
-    dest: /etc/omnileads/certs/cert.pem
+- name: OS_CONF Copy custom SSL keys
+  ansible.builtin.copy:
+    src: "../../../instances/{{ tenant_folder }}/{{ key_file_name | default('key.pem') }}"
+    dest: "{{ certs_location | default('/etc/omnileads/certs') }}/key.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0777
+    mode: '0600'
   tags:
     - install
     - upgrade
-    - update
-  when:
-    - cert_file_name is defined
-
-- name: OS_CONF Copy custom generic filename SSL key.pem
-  copy:
-    src: "../../../instances/{{ tenant_folder }}/key.pem"
-    dest: /etc/omnileads/certs/key.pem
-    owner: "{{ usuario }}"
-    group: "{{ usuario }}"
-    mode: 0777
-  tags:
-    - install
-    - upgrade
-    - update
-  when:
-    - certs == "custom"
-    - key_file_name is not defined
-
-- name: OS_CONF Copy custom key filename tenant SSL key.pem
-  copy:
-    src: "../../../instances/{{ tenant_folder }}/{{ key_file_name }}"
-    dest: /etc/omnileads/certs/key.pem
-    owner: "{{ usuario }}"
-    group: "{{ usuario }}"
-    mode: 0777
-  tags:
-    - install
-    - upgrade
-    - update
-  when:
-    - key_file_name is defined
+  when: certs == "custom"
 
 - name: OS_CONF CERTBOT Create directories for Certbot
-  become: yes
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
+    mode: '0755'
+  become: true
   loop:
     - /opt/certbot/
     - /opt/certbot/webroot
@@ -218,154 +165,91 @@
     - install
   when: certs == "certbot"
 
-- name: OS_CONF CERTBOT launch container to generate lets & crypt Certs
-  become: yes
-  shell: "podman run -it --rm --name nginx-certbot -e FQDN={{ fqdn }} -e EMAIL={{ notification_email }} -e RENEW_CERTIFICATE=false -v '/opt/certbot/letsencrypt:/etc/letsencrypt' -v '/opt/certbot/webroot:/var/www/certbot' -p 80:80 {{ certbot_img }}"
+- name: OS_CONF CERTBOT launch container to generate Let's Encrypt Certs
+  become: true
+  ansible.builtin.command: >
+    podman run -i --rm --name nginx-certbot
+    -e FQDN={{ fqdn }}
+    -e EMAIL={{ notification_email }}
+    -e RENEW_CERTIFICATE=false
+    -v '/opt/certbot/letsencrypt:/etc/letsencrypt'
+    -v '/opt/certbot/webroot:/var/www/certbot'
+    -p 80:80 {{ certbot_img }}
   tags:
     - install
-  when:
-    - certs == "certbot"
+  when: certs == "certbot"
 
 - name: OS_CONF CERTBOT SSL Cert Copy
-  become: yes
-  copy:
+  become: true
+  ansible.builtin.copy:
     src: "/opt/certbot/letsencrypt/archive/{{ fqdn }}/fullchain1.pem"
-    dest: "/etc/omnileads/certs/cert.pem"
+    dest: "{{ certs_location | default('/etc/omnileads/certs') }}/cert.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0777
-    remote_src: yes
+    mode: '0644'
+    remote_src: true
   tags:
     - install
-  when:
-    - certs == "certbot"
+  when: certs == "certbot"
 
 - name: OS_CONF CERTBOT SSL Key Copy
-  become: yes
-  copy:
+  become: true
+  ansible.builtin.copy:
     src: "/opt/certbot/letsencrypt/archive/{{ fqdn }}/privkey1.pem"
-    dest: "/etc/omnileads/certs/key.pem"
+    dest: "{{ certs_location | default('/etc/omnileads/certs') }}/key.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
-    mode: 0777
-    remote_src: yes
+    mode: '0600'
+    remote_src: true
   tags:
     - install
-  when:
-    - certs == "certbot"
+  when: certs == "certbot"
 
 - name: OS_CONF Copy oml_manage script
-  template:
+  ansible.builtin.template:
     src: "templates/oml_manage.sh"
     dest: /usr/local/bin/oml_manage
-    mode: 0755
+    mode: '0755'
   tags:
     - install
     - upgrade
-    - update
 
 - name: OS_CONF Set timezone of server
-  timezone: name={{ TZ }}
+  community.general.timezone:
+    name: "{{ TZ }}"
   tags:
     - install
     - upgrade
 
-- name: OS_CONF Copy Prometheus Node Exporter service
-  template:
-    src: "templates/prometheus_node_exporter.service"
-    dest: /etc/systemd/system/
-    mode: 0600
-  tags:
-    - install
-    - upgrade
-  #when:
-  #  - inventory_hostname not in groups['ha_omnileads_sql']
-
-- name: OS_CONF Copy Prometheus Podman Exporter service
-  template:
-    src: "templates/prometheus_podman_exporter.service"
-    dest: /etc/systemd/system/
-    mode: 0600
-  tags:
-    - install
-    - upgrade
-  #when:
-  #  - inventory_hostname not in groups['ha_omnileads_sql']
-
-# - name: OS_CONF Copy Prometheus CENTOS7 Node Exporter service
-#   template:
-#     src: "templates/prometheus_node_exporter_centos7.service"
-#     dest: /etc/systemd/system/prometheus_node_exporter.service
-#     mode: 0600
-#   tags:
-#     - install
-#     - upgrade
-#   when:
-#     - inventory_hostname in groups['ha_omnileads_sql']
-
-- name: OS_CONF Copy Prometheus Node Exporter env
-  template:
-    src: "templates/prometheus_node_exporter.env"
-    dest: /etc/default/
-    mode: 0600
-  tags:
-    - install
-    - upgrade
-
-- name: OS_CONF Enable and start systemd Prometheus Node Exporter service
-  systemd:
-    name: prometheus_node_exporter
-    state: restarted
-    enabled: yes
-    daemon_reload: yes
-  tags:
-    - install
-    - upgrade
-#  when:
-#     - redis_host_ha is not defined
-#     - inventory_hostname not in groups['ha_omnileads_sql']
-- name: OS_CONF Enable and start systemd Prometheus Podman Exporter service
-  systemd:
-    name: prometheus_podman_exporter
-    state: restarted
-    enabled: yes
-    daemon_reload: yes
-  tags:
-    - install
-    - upgrade
-  #when:
-  #   - redis_host_ha is not defined
-  #   - inventory_hostname not in groups['ha_omnileads_sql']
-
-- name: OS_CONF Set Storage volatile journald.conf
-  lineinfile:
+- name: OS_CONF Set Storage journald.conf
+  ansible.builtin.lineinfile:
     path: /etc/systemd/journald.conf
-    regexp: "^#Storage="
+    regexp: "^#?Storage="
     line: "Storage=volatile"
   tags:
     - install
     - upgrade
 
 - name: OS_CONF Set RuntimeMaxUse journald.conf
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/systemd/journald.conf
-    regexp: "^RuntimeMaxUse="
+    regexp: "^#?RuntimeMaxUse="
     line: "RuntimeMaxUse={{ journald_runtime_max_use }}"
   tags:
     - install
     - upgrade
 
 - name: OS_CONF Set RuntimeKeepFree journald.conf
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/systemd/journald.conf
-    regexp: "^SRuntimeKeepFree="
+    regexp: "^#?RuntimeKeepFree="
     line: "RuntimeKeepFree={{ journald_runtime_keep_free }}"
   tags:
     - install
     - upgrade
 
 - name: OS_CONF restart systemd-journald
-  service:
+  ansible.builtin.systemd:
     name: systemd-journald
     state: restarted
   tags:
@@ -373,140 +257,125 @@
     - upgrade
 
 - name: OS_CONF stop OMniLeads App for Upgrade
-  systemd:
+  ansible.builtin.systemd:
     name: "{{ item }}"
     state: stopped
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
   loop:
     - omnileads.service
     - nginx.service
   tags:
     - upgrade
   when:
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+    - oml_is_compute | default(false)
+    - upgrade_from_2X is not defined
 
 - name: OS_CONF stop PostgreSQL for Upgrade
-  systemd:
+  ansible.builtin.systemd:
     name: "{{ item }}"
     state: stopped
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
   loop:
     - postgresql.service
   tags:
     - upgrade
   when:
-    - inventory_hostname in groups['omnileads_data'] or inventory_hostname in groups['omnileads_aio']
+    - oml_is_data | default(false) or oml_is_aio | default(false)
     - postgresql_host_ha is not defined
     - not (postgres_out | default(false) | bool)
+    - upgrade_from_2X is not defined
 
-- name: OS_CONF rm Django static_files
-  become: yes
-  shell: "podman volume rm -f django_static"
+- name: OS_CONF rm Django static_files volume
+  containers.podman.podman_volume:
+    name: django_static
+    state: absent
+  become: true
   tags:
     - upgrade
   when:
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
-  ignore_errors: yes
+    - oml_is_compute | default(false)
+  ignore_errors: true
 
-- name: OS_CONF Check if swap file exists
-  stat:
-    path: "{{ swap_file }}"
-  register: swap_file_check
+- name: OS_CONF Swap file management
+  when: swap_space is defined
   tags:
     - install
     - upgrade
+  block:
+    - name: OS_CONF Check if swap file exists
+      ansible.builtin.stat:
+        path: "{{ swap_file }}"
+      register: swap_file_check
 
-- name: OS_CONF Create swap file if it doesn't exist
-  command:
-    cmd: "fallocate -l {{ swap_space }} {{ swap_file }}"
-  when:
-    - not swap_file_check.stat.exists
-    - swap_space is defined
-  tags:
-    - install
-    - upgrade
+    - name: OS_CONF Create and configure swap file
+      when: not swap_file_check.stat.exists
+      block:
+        - name: OS_CONF Create swap file
+          ansible.builtin.command:
+            cmd: "fallocate -l {{ swap_space }} {{ swap_file }}"
+            creates: "{{ swap_file }}"
 
-- name: OS_CONF Set permissions on swap file
-  file:
-    path: "{{ swap_file }}"
-    mode: "0600"
-  when:
-    - not swap_file_check.stat.exists
-    - swap_space is defined
-  tags:
-    - install
-    - upgrade
+        - name: OS_CONF Set permissions on swap file
+          ansible.builtin.file:
+            path: "{{ swap_file }}"
+            mode: '0600'
 
-- name: OS_CONF Format swap file
-  command:
-    cmd: "mkswap {{ swap_file }}"
-  when:
-    - not swap_file_check.stat.exists
-    - swap_space is defined
-  tags:
-    - install
-    - upgrade
+        - name: OS_CONF Format swap file
+          ansible.builtin.command:
+            cmd: "mkswap {{ swap_file }}"
 
-- name: OS_CONF Add swap file to fstab
-  lineinfile:
-    path: /etc/fstab
-    line: "{{ swap_file }} none swap sw 0 0"
-    state: present
-  when:
-    - not swap_file_check.stat.exists
-    - swap_space is defined
-  tags:
-    - install
-    - upgrade
+        - name: OS_CONF Turn on swap
+          ansible.builtin.command:
+            cmd: "swapon {{ swap_file }}"
 
-- name: OS_CONF Turn on swap
-  command:
-    cmd: "swapon {{ swap_file }}"
-  when:
-    - not swap_file_check.stat.exists
-    - swap_space is defined
-  tags:
-    - install
-    - upgrade
+        - name: OS_CONF Add swap file to fstab
+          ansible.posix.mount:
+            path: none
+            src: "{{ swap_file }}"
+            fstype: swap
+            opts: sw
+            passno: '0'
+            dump: '0'
+            state: present
 
-- name: OS_CONF Set swappiness
-  sysctl:
+- name: OS_CONF Apply swappiness
+  ansible.posix.sysctl:
     name: vm.swappiness
-    value: "1"
+    value: '1'
+    state: present
+    reload: true
   tags:
     - install
     - upgrade
 
 - name: OS_CONF BACKUP Copy Backup ENV file
-  template:
+  ansible.builtin.template:
     src: "templates/backup.env"
     dest: /etc/default/backup.env
-    mode: "0600"
+    mode: '0640'
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
   when: 
     - backup_bucket_url is defined
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+    - oml_is_compute | default(false)
   tags:
     - install
     - upgrade
-    - update
 
 - name: OS_CONF BACKUP Copy Backup BASH file
-  template:
+  ansible.builtin.template:
     src: "templates/backup.sh"
     dest: /usr/local/bin/oml_backup.sh
-    mode: "0755"
+    mode: '0755'
   when: 
     - backup_bucket_url is defined
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+    - oml_is_compute | default(false)
   tags:
     - install
     - upgrade
-    - update
 
 - name: OS_CONF BACKUP Add a cron job BACKUP to the system crontab
-  cron:
+  ansible.builtin.cron:
     name: "OMniLeads Backup Data"
     minute: "{{ cron_backup_mm }}"
     hour: "{{ cron_backup_hh }}"
@@ -514,10 +383,9 @@
     job: "/usr/local/bin/oml_backup.sh > /var/log/backup_registry.log 2>&1"
     state: present
   when:
-    - ansible_os_family in ["Debian", "RedHat"]
+    - ansible_facts['os_family'] in ["Debian", "RedHat"]
     - backup_bucket_url is defined
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
+    - oml_is_compute | default(false)
   tags:
     - install
     - upgrade
-    - update

@@ -1,0 +1,48 @@
+
+- name: NGINX environment variables for this installation
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/default/{{ item }}"
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  notify: Restart nginx service
+  loop:
+    - nginx.env
+    # - nginx_certbot.env
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: NGINX Ensure Quadlet directory exists
+  ansible.builtin.file:
+    path: /etc/containers/systemd
+    state: directory
+    mode: "0755"
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: NGINX Copy nginx Quadlet container unit
+  ansible.builtin.template:
+    src: nginx.container
+    dest: /etc/containers/systemd/nginx.container
+    mode: "0644"
+  notify: Restart nginx service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: NGINX Enable and start oml nginx service
+  systemd:
+    name: nginx.service
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  tags:
+    - install
+    - upgrade
+    - update

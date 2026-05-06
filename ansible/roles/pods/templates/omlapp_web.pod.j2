@@ -1,0 +1,12 @@
+[Unit]
+StopWhenUnneeded=false
+Description=OmniLeads Web Pod 
+
+[Pod]
+Network={{ oml_network }}
+
+PublishPort=80:80
+PublishPort=443:443
+
+[Install]
+WantedBy=multi-user.target

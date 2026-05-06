@@ -1,0 +1,10 @@
+# Motor principal de Ansible y dependencias
+ansible-core==2.17.14
+
+# Optimizador de rendimiento
+mitogen==0.3.47
+
+# Herramientas de calidad de código y linter
+ansible-lint==24.12.2
+yamllint==1.38.0
+black==26.3.1

@@ -1,0 +1,26 @@
+[Unit]
+Description=OMniLeads ACD call-logger worker (Gearman)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=oml-call-logger
+Image={{ ACD_IMG }}
+Pod=omlapp_workers.pod
+DNS=8.8.8.8
+EnvironmentFile=/etc/default/call_logger.env
+Label=tier=omlapp_workers
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+PodmanArgs=--entrypoint=python
+WorkingDir=/opt/asterisk/workers/
+Exec=logger.py
+
+[Service]
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

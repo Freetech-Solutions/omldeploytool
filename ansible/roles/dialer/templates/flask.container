@@ -1,0 +1,26 @@
+[Unit]
+Description=Podman Omnidialer API
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+Requires=network.target
+
+[Container]
+ContainerName=dialer-api
+Image={{ DIALER_API_IMG }}
+Pod=omlapp_web.pod
+EnvironmentFile=/etc/default/dialer.env
+Label=tier=dialer
+LogDriver=journald
+# Pasamos la directiva como argumento seguro para evitar que systemd falle
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
+

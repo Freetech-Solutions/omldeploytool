@@ -1,0 +1,191 @@
+---
+- name: UPGRADE_2X Upgrade Debian 12 (Bookworm) to Debian 13 (Trixie)
+  become: true
+  when:
+    - ansible_distribution == "Debian"
+    - ansible_distribution_major_version == "12"
+  vars:
+    backup_dir: "/root/debian_upgrade_backup"
+    apt_lock_timeout_seconds: 900
+    apt_lock_retry_delay_seconds: 5
+    apt_lock_wait_retries: "{{ (apt_lock_timeout_seconds // apt_lock_retry_delay_seconds) | int }}"
+    ansible_python_interpreter: /usr/bin/python3
+  tags:
+    - upgrade
+    - upgrade_from_2X
+    - upgrade_debian13
+  block:
+    - name: UPGRADE_2X Crear directorio para backups de configuración
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: UPGRADE_2X Respaldar /etc y metadatos de paquetes (Paso 4.1.1)
+      community.general.archive:
+        path:
+          - /etc
+          - /var/lib/dpkg
+          - /var/lib/apt/extended_states
+        dest: "{{ backup_dir }}/pre_upgrade_backup_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
+
+    - name: UPGRADE_2X Ejecutar operaciones APT sin interferencia automática
+      block:
+        - name: UPGRADE_2X Detener servicios automáticos de APT durante el upgrade
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - unattended-upgrades.service
+            - apt-daily.service
+            - apt-daily-upgrade.service
+
+        - name: UPGRADE_2X Detener timers automáticos de APT durante el upgrade
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - apt-daily.timer
+            - apt-daily-upgrade.timer
+
+        - name: UPGRADE_2X Esperar liberación de locks reales de APT/dpkg
+          ansible.builtin.shell: |
+            set -euo pipefail
+            lock_files=(
+              /var/lib/dpkg/lock-frontend
+              /var/lib/dpkg/lock
+              /var/lib/apt/lists/lock
+              /var/cache/apt/archives/lock
+            )
+
+            if command -v fuser >/dev/null 2>&1; then
+              set +e
+              for lock_file in "${lock_files[@]}"; do
+                if [ -e "$lock_file" ] && fuser "$lock_file" >/dev/null 2>&1; then
+                  exit 1
+                fi
+              done
+              exit 0
+            fi
+
+            if command -v lsof >/dev/null 2>&1; then
+              set +e
+              for lock_file in "${lock_files[@]}"; do
+                if [ -e "$lock_file" ] && lsof -t "$lock_file" >/dev/null 2>&1; then
+                  exit 1
+                fi
+              done
+              exit 0
+            fi
+
+            echo "Neither fuser nor lsof is available to inspect APT/dpkg locks." >&2
+            exit 2
+          args:
+            executable: /bin/bash
+          register: apt_lock_wait
+          changed_when: false
+          failed_when: apt_lock_wait.rc == 2
+          retries: "{{ apt_lock_wait_retries }}"
+          delay: "{{ apt_lock_retry_delay_seconds }}"
+          until: apt_lock_wait.rc == 0
+
+        - name: UPGRADE_2X Actualizar Bookworm al último point release (Paso 4.2.2)
+          ansible.builtin.apt:
+            update_cache: yes
+            upgrade: dist
+            autoremove: yes
+            lock_timeout: "{{ apt_lock_timeout_seconds }}"
+
+        - name: UPGRADE_2X Limpiar archivos legacy de APT (Paso 4.3)
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/apt/sources.list
+            - /etc/apt/sources.list.d/backports.list
+
+        - name: UPGRADE_2X Desplegar nuevos repositorios de Trixie en formato deb822 (Paso 4.3.1)
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/debian.sources
+            content: |
+              Types: deb
+              URIs: https://deb.debian.org/debian
+              Suites: trixie trixie-updates
+              Components: main non-free-firmware
+              Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+              Types: deb
+              URIs: https://security.debian.org/debian-security
+              Suites: trixie-security
+              Components: main non-free-firmware
+              Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: UPGRADE_2X Actualizar caché de APT para Trixie
+          ansible.builtin.apt:
+            update_cache: yes
+            lock_timeout: "{{ apt_lock_timeout_seconds }}"
+
+        - name: UPGRADE_2X Actualización mínima del sistema (Paso 4.4.5)
+          ansible.builtin.apt:
+            upgrade: safe
+            lock_timeout: "{{ apt_lock_timeout_seconds }}"
+          # En Ansible, 'safe' equivale a apt-get upgrade --with-new-pkgs,
+          # lo cual actualiza paquetes sin eliminar nada, resolviendo los conflictos iniciales.
+
+        - name: UPGRADE_2X Actualización completa del sistema (Paso 4.4.6)
+          ansible.builtin.apt:
+            upgrade: dist
+            dpkg_options: "force-confold,force-confdef"
+            lock_timeout: "{{ apt_lock_timeout_seconds }}"
+          # 'dist' ejecuta el full-upgrade. Las opciones de dpkg evitan que el prompt
+          # interactivo frene la ejecución al encontrar archivos de configuración modificados.
+
+        - name: UPGRADE_2X Purgar paquetes obsoletos e instalados automáticamente (Paso 4.8 y 4.9.1)
+          ansible.builtin.apt:
+            autoremove: yes
+            purge: yes
+            lock_timeout: "{{ apt_lock_timeout_seconds }}"
+      always:
+        - name: UPGRADE_2X Reactivar timers automáticos de APT
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - apt-daily.timer
+            - apt-daily-upgrade.timer
+
+    - name: UPGRADE_2X Comprobar si se requiere un reinicio por actualización de Kernel
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    # Tras el dist-upgrade Bookworm -> Trixie cambian /etc/os-release, base-files y el
+    # intérprete Python del sistema (3.11 -> 3.13). El ControlMaster SSH y los facts
+    # gatherados al inicio del play quedan inconsistentes con el sistema real, lo que hace
+    # que la llamada interna a `setup` que ejecuta el action plugin de
+    # `ansible.builtin.reboot` devuelva ansible_facts sin `ansible_distribution` y
+    # falle con: "Failed to get distribution information. Missing ansible_distribution".
+    - name: UPGRADE_2X Resetear conexión SSH tras dist-upgrade a Trixie
+      ansible.builtin.meta: reset_connection
+
+    - name: UPGRADE_2X Re-gather facts mínimos tras dist-upgrade a Trixie
+      ansible.builtin.setup:
+        gather_subset:
+          - "min"
+
+    - name: UPGRADE_2X Reiniciar el servidor (Paso 4.1.2 / 4.6.1)
+      ansible.builtin.reboot:
+        msg: "Ansible: Reiniciando el nodo para aplicar el nuevo Kernel de Debian Trixie."
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
+      when: reboot_required_file.stat.exists
+
+    - name: UPGRADE_2X Re-gather facts tras reboot a Trixie
+      ansible.builtin.setup:
+      when: reboot_required_file.stat.exists

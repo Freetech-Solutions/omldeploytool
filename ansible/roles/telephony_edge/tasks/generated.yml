@@ -1,0 +1,141 @@
+
+- name: TELEPHONY-EDGE Compute enabled services
+  ansible.builtin.set_fact:
+    telephony_edge_enabled_services: >-
+      {{
+        [
+          'rtpengine.service' if not (rtpengine_out | default(false)) else '',
+          'kamailio_pstn.service' if not (kamailio_pstn_out | default(false)) else '',
+          'kamailio_webrtc.service' if not (kamailio_webrtc_out | default(false)) else ''
+        ]
+        | reject('equalto', '')
+        | list
+      }}
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: TELEPHONY-EDGE Set environment variables
+  ansible.builtin.template:
+    src: "{{ item.env_template }}"
+    dest: "/etc/default/{{ item.name }}.env"
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: telephony_edge_env_files
+  notify: Restart telephony_edge services
+  loop:
+    - name: rtpengine
+      env_template: rtpengine.env
+      enabled: "{{ not (rtpengine_out | default(false)) }}"
+    - name: kamailio_pstn
+      env_template: kamailio_pstn.env
+      enabled: "{{ not (kamailio_pstn_out | default(false)) }}"
+    - name: kamailio_webrtc
+      env_template: kamailio_webrtc.env
+      enabled: "{{ not (kamailio_webrtc_out | default(false)) }}"
+  when:
+    - item.enabled | bool
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: TELEPHONY-EDGE Copy Quadlet file
+  ansible.builtin.template:
+    src: "{{ item.service_template }}"
+    dest: "/etc/containers/systemd/{{ item.name }}.container"
+    mode: "0644"
+  register: telephony_edge_quadlet_units
+  notify: Restart telephony_edge services
+  loop:
+    - { name: rtpengine, service_template: rtpengine.service, enabled: "{{ not (rtpengine_out | default(false)) }}" }
+    - { name: kamailio_pstn, service_template: kamailio_pstn.service, enabled: "{{ not (kamailio_pstn_out | default(false)) }}" }
+    - { name: kamailio_webrtc, service_template: kamailio_webrtc.service, enabled: "{{ not (kamailio_webrtc_out | default(false)) }}" }
+  when:
+    - item.enabled | bool
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: TELEPHONY-EDGE Reload systemd after Quadlet changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: telephony_edge_quadlet_units is changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: TELEPHONY-EDGE Determine changed services
+  ansible.builtin.set_fact:
+    telephony_edge_changed_services: >-
+      {{
+        (
+          (
+            telephony_edge_enabled_services
+            if telephony_edge_env_files is changed else []
+          )
+          +
+          (
+            telephony_edge_quadlet_units.results | default([])
+            | selectattr('changed', 'equalto', true)
+            | map(attribute='dest')
+            | map('basename')
+            | map('replace', '.container', '.service')
+            | list
+          )
+        )
+        | unique
+        | list
+      }}
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+# Workaround para race con podman 5.x (Debian Trixie): cuando recién se generan
+# los Quadlets, el primer container que arranca dispara el start del pod, pero
+# el pod queda en estado inestable (--exit-policy=stop + --network host) y los
+# starts subsiguientes (kamailio_pstn / kamailio_webrtc) fallan con
+# "Job for <svc> canceled." porque el .pod.service se desactiva.
+# Reiniciar el pod una vez deja la infra estable antes de los starts secuenciales.
+- name: TELEPHONY-EDGE Reinit telephony_edge pod (workaround podman 5.x)
+  ansible.builtin.systemd:
+    name: "{{ telephony_edge_pod_systemd_unit | default('telephony_edge-pod.service') }}"
+    state: restarted
+  when: telephony_edge_quadlet_units is changed
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: TELEPHONY-EDGE Ensure telephony_edge pod is active
+  ansible.builtin.systemd:
+    name: "{{ telephony_edge_pod_systemd_unit | default('telephony_edge-pod.service') }}"
+    state: started
+    enabled: yes
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: TELEPHONY-EDGE Enable and start service
+  ansible.builtin.systemd:
+    name: "{{ item.name }}.service"
+    state: started
+    enabled: yes
+  loop:
+    - { name: rtpengine, enabled: "{{ not (rtpengine_out | default(false)) }}" }
+    - { name: kamailio_pstn, enabled: "{{ not (kamailio_pstn_out | default(false)) }}" }
+    - { name: kamailio_webrtc, enabled: "{{ not (kamailio_webrtc_out | default(false)) }}" }
+  when:
+    - item.enabled | bool
+  tags:
+    - install
+    - upgrade
+    - update

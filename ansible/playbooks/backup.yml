@@ -1,0 +1,2 @@
+---
+- import_playbook: ../components/backup_restore/backup.yml

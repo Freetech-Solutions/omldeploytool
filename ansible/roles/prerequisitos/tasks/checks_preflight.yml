@@ -1,0 +1,44 @@
+---
+- name: CHECKS Print omni_distribution
+  ansible.builtin.debug:
+    msg: "omni_distribution es {{ ansible_os_family }}"
+  changed_when: false
+  tags:
+    - always
+
+- name: CHECKS Validate supported distribution family
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family in ["Debian", "Rocky", "AlmaLinux", "RedHat"]
+    fail_msg: "omni_distribution con valor {{ ansible_os_family }} es invalida"
+  changed_when: false
+  tags:
+    - always
+
+- name: CHECKS Check if exists /etc/omnileads
+  ansible.builtin.stat:
+    path: /etc/omnileads
+  register: etc_omnileads
+  tags:
+    - install
+
+- name: CHECKS Check if exists /var/lib/omnileads
+  ansible.builtin.stat:
+    path: /var/lib/omnileads
+  register: var_lib_omnileads
+  tags:
+    - install
+
+- name: CHECKS Check if exists /var/lib/omnileads/minio
+  ansible.builtin.stat:
+    path: /var/lib/omnileads/minio
+  register: var_lib_omnileads_minio
+  tags:
+    - install
+
+- name: CHECKS Check if exists /var/lib/omnileads/pgsql
+  ansible.builtin.stat:
+    path: /var/lib/omnileads/pgsql
+  register: var_lib_omnileads_pgsql
+  tags:
+    - install

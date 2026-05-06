@@ -1,0 +1,65 @@
+
+- name: SENTIMENTAL_ANALYSIS environment variables
+  template:
+    src: "sentiment_analysis.env"
+    dest: /etc/default/sentiment_analysis.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: SENTIMENTAL_ANALYSIS Copy systemd service file
+  template:
+    src: "sentiment_analysis.service"
+    dest: /etc/systemd/system/sentiment_analysis.service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: SENTIMENTAL_ANALYSIS Pull image
+  command: podman image exists {{ sentiment_analysis_img }}
+  register: sentiment_image_cache
+  changed_when: false
+  failed_when: sentiment_image_cache.rc not in [0, 1]
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: SENTIMENTAL_ANALYSIS Pull image when missing or forced
+  command: podman pull --quiet {{ sentiment_analysis_img }}
+  register: sentiment_pull
+  retries: 3
+  delay: 5
+  until: sentiment_pull is success
+  when: force_image_pull | bool or sentiment_image_cache.rc != 0
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: SENTIMENTAL_ANALYSIS Enable and start systemd service
+  systemd:
+    name: sentiment_analysis.service
+    state: started
+    enabled: yes
+  tags:
+    - install
+    - upgrade
+
+- name: SENTIMENTAL_ANALYSIS ReStart systemd service
+  systemd:
+    name: sentiment_analysis.service
+    state: restarted
+    enabled: yes
+  tags:
+    - upgrade
+    - restart
+    - restart_sentiment_analysis
+    - restart_core
+  when:       
+    - oml_is_compute | default(false)

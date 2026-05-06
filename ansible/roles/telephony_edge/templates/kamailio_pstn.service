@@ -1,0 +1,25 @@
+[Unit]
+Description=OMniLeads Kamailio-PSTN container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=kamailio-pstn-server
+Image={{ KAMAILIO_IMG }}
+Pod=telephony_edge.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/kamailio_pstn.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+Volume={{ certs_location | default(certs_location) }}:{{ kamailio_certs_location | default(certs_location) }}
+PodmanArgs=--entrypoint=/entrypoint_pstn.sh
+
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

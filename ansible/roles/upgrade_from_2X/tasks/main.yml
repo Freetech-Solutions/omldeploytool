@@ -1,0 +1,6 @@
+---
+- name: UPGRADE_2X Dispatch phase {{ upgrade_from_2X_phase }}
+  ansible.builtin.include_tasks: "{{ upgrade_from_2X_phase }}.yml"
+  when: upgrade_from_2X | default(false) | bool
+  tags:
+    - upgrade_from_2X

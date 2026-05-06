@@ -1,0 +1,14 @@
+---
+component_haproxy_enabled: false
+haproxy_http_port: 80
+haproxy_https_port: 443
+# Backend nginx: HAProxy hace SSL re-encrypt al 443 de nginx para evitar
+# el redirect 301 -> https del server block de nginx en puerto 80, que
+# generaba un bucle de redirecciones (HAProxy termina TLS, nginx :80
+# redirige a https, el cliente vuelve a HAProxy, ...).
+haproxy_backend_port: 443
+haproxy_backend_ssl: true
+haproxy_backend_ssl_verify: none
+haproxy_pem_dir: /etc/omnileads/haproxy
+haproxy_pem_file: "{{ haproxy_pem_dir }}/oml.pem"
+haproxy_sticky_cookie: SRVID

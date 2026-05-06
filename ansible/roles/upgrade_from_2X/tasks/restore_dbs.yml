@@ -1,0 +1,208 @@
+---
+
+- name: UPGRADE_2X Restore sólo en hosts app/AIO
+  when: (group_names | intersect(upgrade_from_2X_target_host_groups)) | length > 0
+  block:
+    - name: UPGRADE_2X Assert variables requeridas para restore
+      ansible.builtin.assert:
+        that:
+          - backup_filename is defined
+          - backup_filename | length > 0
+          - BACKUP_RESTORE_IMG is defined
+          - BACKUP_RESTORE_IMG | length > 0
+          - backup_bucket_url is defined
+        fail_msg: >-
+          Para upgrade_from_2X (restore) defina backup_filename, backup_bucket_* y BACKUP_RESTORE_IMG
+          en el inventario. El archivo /etc/default/backup.env debe poder generarse (misma convención
+          que backups automáticos). backup_filename_OMD es opcional: si no se define o queda vacío,
+          se omite el restore de la base omnidialer.
+
+    - name: UPGRADE_2X Comprobar que existe backup.env
+      ansible.builtin.stat:
+        path: /etc/default/backup.env
+      register: upgrade_from_2x_backup_env
+
+    - name: UPGRADE_2X Fallar si falta /etc/default/backup.env
+      ansible.builtin.fail:
+        msg: >-
+          No existe /etc/default/backup.env. Ejecute el rol prerequisitos (install/upgrade) con
+          backup_bucket_url definido en este host, o cree el env-file antes del restore.
+      when: not upgrade_from_2x_backup_env.stat.exists
+
+    # postgresql.container declara Pod=data_statefull.pod; MinIO también. El restore debe correr
+    # cuando el pod ya está desplegado (roles/pods). Esto refuerza el orden si se usan
+    # tags parciales y cubre AIO/HA (local) vs cluster (delegación al nodo omnileads_data).
+    - name: UPGRADE_2X Asegurar pod data_statefull activo en este host (AIO / HA en aio)
+      ansible.builtin.systemd:
+        name: data_statefull-pod.service
+        state: started
+        enabled: true
+        daemon_reload: true
+      when:
+        - not postgres_out | bool
+        - "'omnileads_aio' in group_names"
+        - oml_is_aio_only | default(false) | bool
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Asegurar pod data_statefull activo en nodo de datos (cluster compute en aio u omnileads_nodes)
+      ansible.builtin.systemd:
+        name: data_statefull-pod.service
+        state: started
+        enabled: true
+        daemon_reload: true
+      delegate_to: "{{ (groups['omnileads_data'] | default([])) | first }}"
+      when:
+        - not postgres_out | bool
+        - (group_names | intersect(['omnileads_aio', 'omnileads_nodes'])) | length > 0
+        - not (oml_is_aio_only | default(true) | bool)
+        - groups['omnileads_data'] | default([]) | length > 0
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Esperar a que PostgreSQL acepte conexiones
+      ansible.builtin.set_fact:
+        upgrade_from_2x_postgres_host: >-
+          {{ (omni_ip_lan | trim) if (oml_is_aio_only | default(false) | bool) else (postgres_host | trim) }}
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Esperar readiness real de PostgreSQL con pg_isready
+      ansible.builtin.command:
+        argv:
+          - pg_isready
+          - -h
+          - "{{ upgrade_from_2x_postgres_host }}"
+          - -p
+          - "{{ postgres_port | string }}"
+          - -U
+          - "{{ postgres_user }}"
+      register: upgrade_from_2x_pg_isready
+      changed_when: false
+      failed_when: false
+      retries: 45
+      delay: 4
+      until: upgrade_from_2x_pg_isready.rc == 0
+      when: postgres_out | bool
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Esperar a que PostgreSQL abra el puerto local (pod interno)
+      ansible.builtin.wait_for:
+        host: "{{ upgrade_from_2x_postgres_host }}"
+        port: "{{ postgres_port | int }}"
+        connect_timeout: 5
+        sleep: 2
+        delay: 5
+        timeout: 240
+        msg: "PostgreSQL no acepto conexiones en {{ upgrade_from_2x_postgres_host }}:{{ postgres_port }} dentro del timeout."
+      when: not postgres_out | bool
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    # omnileads siempre se restaura. omnidialer es opcional: solo se agrega a la lista
+    # cuando backup_filename_OMD está definido y no vacío. Así, omitir esa variable en el
+    # inventario hace que las tareas posteriores (drop/create/restore) iteren únicamente
+    # sobre omnileads, sin tocar la base omnidialer del cluster destino.
+    - name: UPGRADE_2X Definir lista base de bases a restaurar (omnileads)
+      ansible.builtin.set_fact:
+        upgrade_from_2x_db_restores:
+          - name: omnileads
+            backup_file: "{{ backup_filename }}"
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Agregar omnidialer a la lista si backup_filename_OMD está definido
+      ansible.builtin.set_fact:
+        upgrade_from_2x_db_restores: >-
+          {{
+            upgrade_from_2x_db_restores
+            + [{'name': 'omnidialer', 'backup_file': backup_filename_OMD}]
+          }}
+      when:
+        - backup_filename_OMD is defined
+        - (backup_filename_OMD | default('') | length) > 0
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Informar omisión de restore omnidialer
+      ansible.builtin.debug:
+        msg: >-
+          backup_filename_OMD no fue definido en el inventario; se omite el restore de la
+          base omnidialer.
+      when:
+        - (backup_filename_OMD is not defined) or ((backup_filename_OMD | default('') | length) == 0)
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Eliminar base {{ item.name }} (si existe)
+      postgresql_db:
+        name: "{{ item.name }}"
+        login_host: "{{ upgrade_from_2x_postgres_host }}"
+        login_password: "{{ postgres_password }}"
+        login_user: "{{ postgres_user }}"
+        port: "{{ postgres_port }}"
+        maintenance_db: "{{ postgres_maintenance_db }}"
+        state: absent
+        force: true
+      loop: "{{ upgrade_from_2x_db_restores }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Crear base vacía {{ item.name }}
+      postgresql_db:
+        name: "{{ item.name }}"
+        login_host: "{{ upgrade_from_2x_postgres_host }}"
+        login_password: "{{ postgres_password }}"
+        login_user: "{{ postgres_user }}"
+        port: "{{ postgres_port }}"
+        maintenance_db: "{{ postgres_maintenance_db }}"
+        state: present
+      loop: "{{ upgrade_from_2x_db_restores }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags:
+        - upgrade
+        - upgrade_from_2X
+
+    - name: UPGRADE_2X Restaurar dump en {{ item.name }} desde S3
+      ansible.builtin.command:
+        argv:
+          - podman
+          - run
+          - --rm
+          - --name
+          - "pgsql_restore_{{ item.name }}_{{ ansible_date_time.epoch | int }}"
+          - --network=host
+          - --env-file
+          - /etc/default/backup.env
+          - -e
+          - "BACKUP_FILENAME={{ item.backup_file }}"
+          - -e
+          - "SQL_DATABASE={{ item.name }}"
+          - -e
+          - RESTORE_NO_OWNER=true
+          - -e
+          - RESTORE_NO_PRIVILEGES=true
+          - "{{ BACKUP_RESTORE_IMG }}"
+          - python
+          - restore.py
+      loop: "{{ upgrade_from_2x_db_restores }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: upgrade_from_2x_restore_runs
+      changed_when: true
+      tags:
+        - upgrade
+        - upgrade_from_2X

@@ -1,5 +1,0 @@
-{% if ha_role == "main" %}
-{{ aio_2 }}:{{ postgres_port }}:repmgr:repmgr:{{ postgres_password }}
-{% elif ha_role == "backup" %}
-{{ aio_1 }}:{{ postgres_port }}:repmgr:repmgr:{{ postgres_password }}
-{% endif %}

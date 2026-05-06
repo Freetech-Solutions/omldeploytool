@@ -1,0 +1,10 @@
+- name: Restart interaction_processor services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ interaction_processor_changed_services | default([]) }}"
+  when: (interaction_processor_changed_services | default([]) | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update

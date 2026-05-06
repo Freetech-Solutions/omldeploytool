@@ -1,76 +1,168 @@
-services:
 
+services:
   prometheus:
-    image: prom/prometheus:${prometheus_img_tag}
-    container_name: oml-prometheus
+    image: ${PROMETHEUS_IMG}
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=2GB'
       - '--web.enable-lifecycle'
     restart: unless-stopped
     ports:
-      - 9090:9090
+      - "9090:9090"
     networks:
-      - oml_omnileads
+      - observability
+      - omnileads
     labels:
       org.label-schema.group: "monitoring"
     logging:
+      driver: "json-file"
       options:
         max-size: "50m"
+        max-file: "3"
     volumes:
-      - ./prometheus.yml/:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
 
   nodeexporter:
-    image: prom/node-exporter:${prometheus_node_exporter_img_tag}
-    container_name: oml-nodeexporter
+    image: ${PROMETHEUS_NODE_EXPORTER_IMG}
     user: root
     privileged: true
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
     networks:
-      - oml_omnileads
+      - observability
     labels:
       org.label-schema.group: "monitoring"
     logging:
+      driver: "json-file"
       options:
         max-size: "50m"
+        max-file: "3"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: oml-cadvisor
+    image: ${CADVISOR_IMG}
+    restart: unless-stopped
     networks:
-      - oml_omnileads
+      - observability
+    labels:
+      org.label-schema.group: "monitoring"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
     volumes:
-    - /:/rootfs:ro
-    - /var/run:/var/run:rw
-    - /sys:/sys:ro
-    - /var/lib/docker/:/var/lib/docker:ro
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  promtail:
+    image: ${PROMTAIL_IMG}
+    user: root
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - observability
+    command: -config.file=/etc/promtail/config.yml
+    environment:
+      - TENANT_NAME=${TENANT_NAME}
+      - TZ=${TZ}
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail.yml:/etc/promtail/config.yml:ro
+      - promtail_positions:/var/lib/promtail
 
   redis-exporter:
-    image: oliver006/redis_exporter
-    container_name: oml-redis-exp
-    networks:
-      - oml_omnileads
+    image: ${REDIS_EXPORTER_IMG}
     restart: unless-stopped
+    networks:
+      - observability
+      - omnileads
+    labels:
+      org.label-schema.group: "monitoring"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
     environment:
-      - REDIS_ADDR=${REDIS_HOSTNAME}:6379
-      - REDIS_USER=null
-      - REDIS_PASSWORD=null
+      - REDIS_ADDR=${REDIS_HOSTNAME}:${REDIS_PORT}
+
+  postgres-exporter:
+    image: ${POSTGRES_EXPORTER_IMG}
+    restart: unless-stopped
+    networks:
+      - observability
+      - omnileads
+    labels:
+      org.label-schema.group: "monitoring"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    environment:
+      - DATA_SOURCE_URI=${POSTGRES_HOSTNAME}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+      - DATA_SOURCE_USER=${POSTGRES_USER}
+      - DATA_SOURCE_PASS=${POSTGRES_PASSWORD}
+
+  gearman-exporter:
+    image: ${GEARMAN_EXPORTER_IMG}
+    restart: unless-stopped
+    networks:
+      - observability
+      - omnileads
+    labels:
+      org.label-schema.group: "monitoring"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    command:
+      - "--addr=0.0.0.0:9418"
+      - "--gearmand=gearman:4730"
+
+  uwsgi-exporter:
+    image: ${UWSGI_EXPORTER_IMG}
+    restart: unless-stopped
+    networks:
+      - observability
+      - omnileads
+    labels:
+      org.label-schema.group: "monitoring"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    command:
+      - --stats.uri=http://django-app:9191
 
 volumes:
   prometheus_data:
+  promtail_positions:
 
 networks:
-  oml_omnileads:
+  observability:
+    driver: bridge
+  omnileads:
     external: true
+    name: ${OMNILEADS_NETWORK_NAME}

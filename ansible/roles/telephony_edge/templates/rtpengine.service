@@ -1,0 +1,22 @@
+[Unit]
+Description=OMniLeads RTPengine container
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=rtpengine-server
+Image={{ RTPENGINE_IMG }}
+Pod=telephony_edge.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/rtpengine.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

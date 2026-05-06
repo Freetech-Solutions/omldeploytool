@@ -1,0 +1,52 @@
+---
+# Tags: group_vars/all/runtime.yml (`pods_role_tags`); si no existe, roles/pods/defaults `pods_role_tags_default`.
+- name: MAIN Resolve pods for this host topology
+  ansible.builtin.set_fact:
+    pods_quadlets: >-
+      {{
+        (
+          (pods_topology.data if ((oml_is_data | default(false) | bool) or (oml_is_aio | default(false) | bool)) else []) +
+          (pods_topology.edge if ((oml_is_edge | default(false) | bool) or (oml_is_aio | default(false) | bool)) else []) +
+          (pods_topology.nodes if ((oml_is_nodes | default(false) | bool) or (oml_is_aio | default(false) | bool)) else [])
+        ) | unique | list
+      }}
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Copy Quadlet pod files
+  ansible.builtin.template:
+    src: "templates/{{ item }}.pod.j2"
+    dest: "/etc/containers/systemd/{{ item }}.pod"
+    mode: "0644"
+  loop: "{{ pods_quadlets }}"
+  loop_control:
+    label: "{{ item }}"
+  register: pods_quadlets_render
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+# Siempre recargar: con loop, a veces `register is changed` no refleja bien el agregado, y sin reload
+# systemd no genera las unidades <pod>-pod.service desde los .pod (Quadlet).
+- name: MAIN Reload systemd to generate Quadlet pod services
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Enable and start Pod services
+  ansible.builtin.systemd:
+    name: "{{ item }}-pod.service"
+    state: started
+    enabled: true
+  loop: "{{ pods_quadlets }}"
+  loop_control:
+    label: "{{ item }}"
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+# Tras un cambio en el .pod, hace falta reiniciar el pod para aplicar la definición (started no recarga).
+- name: MAIN Restart Pod services whose Quadlet definition changed
+  ansible.builtin.systemd:
+    name: "{{ item.item }}-pod.service"
+    state: restarted
+  loop: "{{ pods_quadlets_render.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item | default('?') }}"
+  when: item.changed | default(false)
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"

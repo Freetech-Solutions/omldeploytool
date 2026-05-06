@@ -1,0 +1,11 @@
+- name: Restart observability services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ observability_changed_services | default([]) }}"
+  when: (observability_changed_services | default([]) | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update
+    - observability

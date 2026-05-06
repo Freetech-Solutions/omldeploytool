@@ -1,296 +1,219 @@
 #!/bin/bash
-set -e
-set -e
-set -e
-set -e
-set -e
-set -e
-set -e
+set -euo pipefail
 
+ANSIBLE_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEFAULT_ACTION="install"
 
-set -e
-
-GREEN='\033[0;32m' # Green
-RED='\033[0;31m' # Red
-YELLOW='\033[1;33m' # Yellow
-NC='\033[0m' # No color
-current_directory=`pwd`
-
-#############################################################################
-#############################################################################
-AnsibleExec() {
-
-
-echo "***************************** filter ********************************* "
-echo "***************************** filter ********************************* "
-
-case ${oml_action} in
-  install)
-    echo "deploy: $oml_action"
-  ;;
-  upgrade)
-    echo "deploy: $oml_action"
-  ;;
-  restart)
-    echo "deploy: $oml_action"
-  ;;
-  backup)
-    echo "deploy: $oml_action"
-  ;;
-  restore)
-    echo "deploy: $oml_action"
-  ;;
-  app)
-    echo "deploy: $oml_action"
-  ;;
-  voice)
-    echo "deploy: $oml_action"
-  ;;
-  postgres)
-    echo "deploy: $oml_action"
-  ;;
-  observability)
-    echo "deploy: $oml_action"
-  ;;
-  haproxy)
-    echo "deploy: $oml_action"
-  ;;
-  cron)
-    echo "deploy: $oml_action"
-  ;;
-  minio)
-    echo "deploy: $oml_action"
-  ;;
-  redis)
-    echo "deploy: $oml_action"
-  ;;
-  keepalived)
-    echo "deploy: $oml_action"
-  ;;
-  kamailio)
-    echo "deploy: $oml_action"
-  ;;
-  rtpengine)
-    echo "deploy: $oml_action"
-  ;;
-  asterisk)
-    echo "deploy: $oml_action"
-  ;;
-  sentinel)
-    echo "deploy: $oml_action"
-  ;;
-  pgsql_node_recovery_main)
-    echo "deploy: $oml_action"
-  ;;
-  pgsql_node_recovery_backup)
-    echo "deploy: $oml_action"
-  ;;
-  pgsql_node_takeover_main)
-    echo "deploy: $oml_action"
-  ;;
-  redis_node_takeover_main)
-    echo "deploy: $oml_action"
-  ;;
-  recycle)
-    echo "deploy: $oml_action"
-  ;;
-  *)
-    echo "deploy: $oml_action";
-
-  ;;
-esac
-
-echo "************************ Exec ANSIBLE matrix *************************"
-echo "************************ Exec ANSIBLE matrix *************************"
-
-cp instances/$oml_tenant/inventory.yml .inventory.yml
-sleep 1
-
-case ${oml_action} in
-  pgsql_node_recovery_main)
-    ansible-playbook ./components/postgresql/recovery_main_node.yml --extra-vars \
-    "pgsql_repo_path=$(pwd)/components/postgresql/
-    tenant_folder=$oml_tenant \
-    commit="$(git rev-parse HEAD)" " \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  pgsql_node_takeover_main)
-    ansible-playbook ./components/postgresql/takeover_main_node.yml --extra-vars \
-    "pgsql_repo_path=$(pwd)/components/postgresql/
-    tenant_folder=$oml_tenant \
-    commit="$(git rev-parse HEAD)" " \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  pgsql_node_recovery_backup)
-    ansible-playbook ./components/postgresql/recovery_backup_node.yml --extra-vars \
-    "pgsql_repo_path=$(pwd)/components/postgresql/
-    tenant_folder=$oml_tenant \
-    commit="$(git rev-parse HEAD)" " \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  redis_node_takeover_main)
-    ansible-playbook ./components/sentinel/takeover_main_node.yml --extra-vars \
-    "pgsql_repo_path=$(pwd)/components/postgresql/
-    tenant_folder=$oml_tenant \
-    commit="$(git rev-parse HEAD)" " \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  backup)
-    ansible-playbook ./components/backup_restore/backup.yml --extra-vars \
-    "tenant_folder=$oml_tenant \
-    file_timestamp=$(date +%s) " \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  restore)
-    ansible-playbook ./components/backup_restore/restore.yml --extra-vars \
-    "tenant_folder=$oml_tenant" \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  recycle)
-    ansible-playbook ./components/recycle/playbook.yml --extra-vars \
-    "tenant_folder=$oml_tenant" \
-    --tags $oml_action \
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-  *)
-    ansible-playbook matrix.yml --extra-vars \
-    "django_repo_path=$(pwd)/components/django/ \
-    redis_repo_path=$(pwd)/components/redis/ \
-    gearman_repo_path=$(pwd)/components/gearman/ \
-    pgsql_repo_path=$(pwd)/components/postgresql/ \
-    kamailio_repo_path=$(pwd)/components/kamailio/ \
-    asterisk_repo_path=$(pwd)/components/asterisk/ \
-    docker_compose_repo_path=$(pwd)/components/docker_compose/ \
-    rtpengine_repo_path=$(pwd)/components/rtpengine/ \
-    fastagi_repo_path=$(pwd)/components/fastagi/ \
-    ami_repo_path=$(pwd)/components/ami/ \
-    websockets_repo_path=$(pwd)/components/websockets/ \
-    nginx_repo_path=$(pwd)/components/nginx/ \
-    interaction_processor_repo_path=$(pwd)/components/interaction_processor/ \
-    sentiment_analysis_repo_path=$(pwd)/components/sentiment_analysis/ \
-    minio_repo_path=$(pwd)/components/minio/ \
-    haproxy_repo_path=$(pwd)/components/haproxy/ \
-    cron_repo_path=$(pwd)/components/cron/ \
-    sentinel_repo_path=$(pwd)/components/sentinel/ \
-    daphne_repo_path=$(pwd)/components/daphne/ \
-    dialer_repo_path=$(pwd)/components/dialer/ \
-    keepalived_repo_path=$(pwd)/components/keepalived/ \
-    qa_repo_path=$(pwd)/components/qa/ \
-    call_logger_repo_path=$(pwd)/components/call_logger/ \
-    addons_repo_path=$(pwd)/components/addons/ \
-    observability_repo_path=$(pwd)/components/observability/ \
-    rebrand=false \
-    tenant_folder=$oml_tenant \
-    commit="$(git rev-parse HEAD)" \
-    omnileads_release="$(git describe --tags --exact-match)" \
-    build_date=\"$(env LC_hosts=C LC_TIME=C date)\"" \
-    --tags "$oml_action"\
-    -i .inventory.yml
-    Banner `echo $?`
-  ;;
-esac
-
-}
-
-Banner () {
-if [ $1 == 0 ];then
-  echo "
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@////@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@/@@@@/@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@/@/@////@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@/@@@/@@@/@@@@@@@/@@@@/@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@/@@@/@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@/@@@@@@@@@@@@@
-  @@@@@@/@@@/@@@/@@@@@@@/@@@@/@@@@@@@//@@@@@/@@@///@@@@@&//@@@@@@@@@@@@@@@@/@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@/@@@@@@@@@@@@@
-  @@@@@@@@/@/@@@&/@@//@@@(@/@@@@@@@@/@@@@@@@@/@@////@@@@/@/@@@//@@@/@@@/@@@/@@@@@@@//@@@/@@@/@@@/@@@//@@@///@@/@@@/@@@@@@
-  @@@@@@@@/@@/&//%//@/@//@@/@@@@@@@@/@@@@@@@@/%@//@//@@/@@/@@@/@@@@//@@/@@@/@@@@@@/@@@//@@@@@/////@/@@@@@@#/@@///@@@@@@@@
-  @@@@@@@////@/@@////@@/@///@@@@@@@@//@@@@@@//@@//@@/@/@@@/@@@/@@@@//@@/@@@/@@@@@@///@@@@/@/@@@@@/@@/@@@@@//@@@@@@/@@@@@@
-  @@@@@@/@@@//@//@@@@/@@/@@@@/@@@@@@@@//////@@@@//@@@/@@@@/@@@/@@@@//@@/@@@///////@@////@@@@////@/@@@/////@/@@/////@@@@@@
-  @@@@@@/@@@//@@@@@@/@@@//@@/@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@/@@@//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@/@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                                          The Open Source Contact Center Solution
-                                           Copyright (C) 2025 Freetech Solutions"
-  echo ""
-  echo "#############################################################"
-  echo "#         OMniLeads installation ended successfully         #"
-  echo "#############################################################"
-  echo ""
-else
-  echo ""
-  echo "#######################################################################################"
-  echo "#         OMniLeads installation failed. Check what happened and try it again         #"
-  echo "#######################################################################################"
-  echo ""
-fi
-}
-
-for i in "$@"
-do
-  case $i in
-    --action=upgrade|--action=install|--action=backup|--action=restore|--action=voice|\
-    --action=app|--action=observability|--action=postgres|--action=haproxy|--action=cron|\
-    --action=keepalived|--action=kamailio|--action=rtpengine|--action=asterisk|--action=sentinel|\
-    --action=redis|--action=pgsql_node_recovery_main|--action=pgsql_node_takeover_main|\
-    --action=redis_node_takeover_main|--action=pgsql_node_recovery_backup|--action=minio|\
-    --action=restart|--action=restart_django|--action=restart_asterisk|--action=restart_core|--action=recycle|\
-    --action=update)
-      oml_action="${i#*=}"
-      shift
-    ;;
-    --tenant=*)
-      oml_tenant="${i#*=}"
-      shift
-    ;;
-    --help|-h)
-      echo "
+print_help() {
+  cat <<'EOF'
 How to use it:
 
-./deploy.sh --action= --tenant=
+./deploy.sh --action=<action> --tenant=<tenant>
+./deploy.sh --action=<action> --inventory=/abs/path/to/inventory.yml
 
---action=
-        install
-        upgrade
-        backup
-        voice
-        app
-        observability
-        postgres
-        sentinel
-        redis
-        pgsql_node_recovery_main
-        pgsql_node_takeover_main
-        redis_node_takeover_main
-        pgsql_node_recovery_backup
---tenant=
-        Name of tenant instances folder.
-"
-      shift
-      exit 1
-    ;;
+With --inventory only, tenant_folder for instances/<tenant>/ files (certs, keys) is
+derived from the inventory filename (e.g. /path/prod.yml -> tenant_folder=prod).
+You can still set --tenant=<name> explicitly to override.
+
+Primary actions:
+  install
+  upgrade
+  update
+  restart
+  prerequisitos
+  voice
+  omlapp
+  omlapp-workers
+  observability
+  postgres
+  redis
+  minio
+  kamailio
+  telephony-edge
+  acd
+
+Layout validation then full site.yml (use matching topology for your inventory):
+  layout-cluster   -> playbooks/cluster.yml
+  layout-aio       -> playbooks/aio.yml
+
+Operational playbooks (require real content under ansible/components/; see ansible/components/README.md):
+  backup
+  restore
+  recycle
+
+Legacy component actions (ansible/components/):
+  haproxy
+  sentinel
+
+prerequisitos runs the full prerequisitos role (packages, Podman quadlets base, checks,
+os_configuration) without other components; use for base OS prep or re-applying prerequisites.
+
+Partial actions (voice, postgres, redis, …) assume a working node or a prior install.
+They run only tasks tagged for that action; Podman + omnileads network are included for
+component tags via the prerequisitos role. For brand-new servers, run install first.
+
+update is the recommended action for repeated deploys after the first install. It keeps the
+deployment reconciled without re-running the full bootstrap path unless relevant inputs changed.
+
+Ansible log (ansible.cfg log_path): directory ANSIBLE_LOG_DIR (default /tmp/oml_install_logs)
+is created before each run; log file ansible.log inside that directory.
+EOF
+}
+
+banner() {
+  local rc="$1"
+  if [ "$rc" -eq 0 ]; then
+    echo "#############################################################"
+    echo "#         OMniLeads installation ended successfully         #"
+    echo "#############################################################"
+  else
+    echo "#######################################################################################"
+    echo "#         OMniLeads installation failed. Check what happened and try it again         #"
+    echo "#######################################################################################"
+  fi
+}
+
+resolve_inventory() {
+  if [ -n "${inventory_file:-}" ]; then
+    printf '%s\n' "$inventory_file"
+    return
+  fi
+
+  if [ -z "${oml_tenant:-}" ]; then
+    echo "Missing inventory source. Use --tenant or --inventory." >&2
+    exit 1
+  fi
+
+  printf '%s/instances/%s/inventory.yml\n' "$ANSIBLE_DIR" "$oml_tenant"
+}
+
+# When using a custom inventory path, derive tenant_folder from the filename if --tenant omitted.
+derive_tenant_folder() {
+  if [ -n "${oml_tenant}" ] || [ -z "${inventory_file:-}" ]; then
+    return 0
+  fi
+  local base
+  base="$(basename "${inventory_file}")"
+  oml_tenant="${base%.yml}"
+  oml_tenant="${oml_tenant%.yaml}"
+}
+
+release_value() {
+  git -C "$ANSIBLE_DIR" describe --tags --exact-match 2>/dev/null || git -C "$ANSIBLE_DIR" rev-parse --short HEAD
+}
+
+build_date_value() {
+  git -C "$ANSIBLE_DIR" log -1 --date=iso-strict --format=%cd 2>/dev/null || LC_ALL=C date
+}
+
+run_playbook() {
+  local playbook="$1"
+  shift
+  local inventory_path
+  inventory_path="$(resolve_inventory)"
+
+  mkdir -p /tmp/ansible-local /tmp/ansible-remote "${ANSIBLE_LOG_DIR:-/tmp/oml_install_logs}"
+
+  ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" \
+  ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}" \
+  ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-/tmp/ansible-remote}" \
+  ANSIBLE_LOG_PATH="${ANSIBLE_LOG_PATH:-/tmp/oml_install_logs}" \
+  ansible-playbook "$playbook" -i "$inventory_path" "$@"
+}
+
+oml_action="$DEFAULT_ACTION"
+oml_tenant=""
+inventory_file=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --action=*)
+      oml_action="${arg#*=}"
+      ;;
+    --tenant=*)
+      oml_tenant="${arg#*=}"
+      ;;
+    --inventory=*)
+      inventory_file="${arg#*=}"
+      ;;
+    --help|-h)
+      print_help
+      exit 0
+      ;;
     *)
-      echo "One or more invalid options. For more information, execute: ./deploy.sh -h or ./deploy.sh --help."
+      echo "Invalid option: $arg" >&2
+      print_help
       exit 1
-    ;;
+      ;;
   esac
 done
 
-AnsibleExec
-    
+derive_tenant_folder
+
+common_extra_vars=(
+  --extra-vars "tenant_folder=${oml_tenant}"
+  --extra-vars "commit=$(git -C "$ANSIBLE_DIR" rev-parse HEAD)"
+  --extra-vars "omnileads_release=$(release_value)"
+  --extra-vars "build_date=$(build_date_value)"
+)
+
+rc=0
+case "$oml_action" in
+  backup)
+    run_playbook "$ANSIBLE_DIR/playbooks/backup.yml" \
+      --tags "$oml_action" \
+      --extra-vars "file_timestamp=$(date +%s)" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  restore|recycle)
+    run_playbook "$ANSIBLE_DIR/playbooks/${oml_action}.yml" \
+      --tags "$oml_action" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  haproxy)
+    run_playbook "$ANSIBLE_DIR/components/haproxy/playbook.yml" \
+      --tags "$oml_action" \
+      --extra-vars "haproxy_repo_path=$ANSIBLE_DIR/components/haproxy/" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  sentinel)
+    run_playbook "$ANSIBLE_DIR/components/sentinel/playbook.yml" \
+      --tags "$oml_action" \
+      --extra-vars "sentinel_repo_path=$ANSIBLE_DIR/components/sentinel/" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  layout-cluster)
+    run_playbook "$ANSIBLE_DIR/playbooks/cluster.yml" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  layout-aio)
+    run_playbook "$ANSIBLE_DIR/playbooks/aio.yml" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  omlapp-workers)
+    # Role tag must match; gather_facts is otherwise skipped when filtering by --tags
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "omlapp-workers,gather_facts" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  observability)
+    # Incluye gather_facts; Promtail sin loki_host en inventario vía oml_observability_deploy
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "observability,gather_facts" \
+      --extra-vars "oml_observability_deploy=true" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  prerequisitos)
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "prerequisitos,gather_facts" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  *)
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "$oml_action" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+esac
+
+banner "$rc"
+exit "$rc"

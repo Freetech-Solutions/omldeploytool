@@ -1,0 +1,9 @@
+[Unit]
+Description=OMniLeads Podman Network
+
+[Network]
+NetworkName=omnileads
+Driver=bridge
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Quadlet interaction_processor container
+Wants=network-online.target
+
+[Container]
+Image={{ CALLREC_TRANSCRIBER_IMG }}
+ContainerName=callrec-transcriptor
+Pod=callrec_processor.pod
+EnvironmentFile=/etc/default/callrec_processor.env
+Label=tier=telephony
+LogDriver=journald
+# Pasamos la directiva como argumento seguro de Podman y eliminamos SDNotify
+PodmanArgs=--cgroups=no-conmon
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

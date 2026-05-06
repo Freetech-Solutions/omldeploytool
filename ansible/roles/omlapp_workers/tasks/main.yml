@@ -1,0 +1,3 @@
+---
+- name: DJANGO Load standard generated tasks
+  ansible.builtin.import_tasks: generated.yml

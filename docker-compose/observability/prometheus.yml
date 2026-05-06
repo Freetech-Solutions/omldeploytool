@@ -1,43 +1,56 @@
 global:
-  scrape_interval: 10s
+  scrape_interval:     10s
   evaluation_interval: 10s
 
-scrape_configs:
+scrape_configs:  
 
-  - job_name: 'omnileads_host'
+
+
+  - job_name: 'Konecta_Verloop_host'
     static_configs:
       - targets: ['nodeexporter:9100']
         labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
-          component: 'aio_os'
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'aio_host'
 
-  - job_name: 'omnileads_redis'
+  - job_name: 'Konecta_Verloop_cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'cadvisor'
+
+  - job_name: 'Konecta_Verloop_redis'
     static_configs:
       - targets: ['redis-exporter:9121']
         labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
+          tenant: 'Konecta_Verloop_AIO'
           component: 'redis'
-
-  - job_name: 'omnileads_asterisk'
-    static_configs:
-      - targets: ['acd:7088']
-        labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
-          component: 'asterisk'
-
-  - job_name: 'omnileads_postgres'
+ 
+  - job_name: 'Konecta_Verloop_postgres'
     static_configs:
       - targets: ['postgres-exporter:9187']
         labels:
-          tenant: 'omnileads'
-          arq: 'docker-compose'
+          tenant: 'Konecta_Verloop_AIO'
           component: 'postgres'
-
-  - job_name: cadvisor
-    scrape_interval: 5s
+ 
+  - job_name: 'Konecta_Verloop_gearman'
     static_configs:
-    - targets:
-      - cadvisor:8080
+      - targets: ['gearman-exporter:9418']
+        labels:
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'gearman'
+
+  - job_name: 'Konecta_Verloop_uwsgi'
+    static_configs:
+      - targets: ['uwsgi-exporter:9117']
+        labels:
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'uwsgi'
+
+  - job_name: 'Konecta_Verloop_ACD'
+    static_configs:
+      - targets:  ['acd-server:7088']
+        labels:
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'acd-server'
