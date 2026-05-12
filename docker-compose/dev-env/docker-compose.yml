@@ -62,7 +62,7 @@ x-depends-on-postgres-redis-minio: &depends-on-postgres-redis-minio
 
 # Django common template
 x-django-common: &django-common
-  image: ${OML_APP_IMG}
+  image: ${APP_IMG}
   dns: 8.8.8.8
   networks:
     - omnileads
@@ -91,7 +91,7 @@ x-django-common: &django-common
     KAMAILIO_HOSTNAME: ${KAMAILIO_WEBRTC_HOSTNAME}
     KAMAILIO_PORT: ${KAMAILIO_WEBRTC_SIP_PORT}
     LOGIN_FAILURE_LIMIT: ${LOGIN_FAILURE_LIMIT}
-    OML_BUILD_DATE: ${OML_APP_IMG}
+    OML_BUILD_DATE: ${APP_IMG}
     OMNILEADS_HOSTNAME: ${NGINX_HOSTNAME}
     OML_OMNIDIALER_SECRET: ${DIALER_PASSWORD}
     OMNIDIALER_HOST: ${DIALER_API_HOST}
@@ -168,7 +168,7 @@ x-dialer-worker-common: &dialer-worker-common
 
 # ACD common template
 x-acd-common: &acd-common
-  image: ${OML_ACD_IMG}
+  image: ${ACD_IMG}
   platform: ${DOCKER_PLATFORM:-linux/amd64}
   networks:
     - omnileads
@@ -187,8 +187,8 @@ x-acd-ari-env: &acd-ari-env
   ASTERISK_HOST: ${ACD_HOSTNAME}
   ASTERISK_PORT: ${ACD_ARI_PORT}
   ASTERISK_USER: ${ACD_AMI_USER}  
-  ACD_WEBHOOK_TRANSFER_TTL: ${ACD_WEBHOOK_TRANSFER_TTL}
   ASTERISK_PASS: ${ACD_AMI_PASSWORD}
+  ACD_WEBHOOK_TRANSFER_TTL: ${ACD_WEBHOOK_TRANSFER_TTL}
   ARI_URL: http://${ACD_HOSTNAME}:${ACD_ARI_PORT}
   ARI_USER: ${ACD_AMI_USER}
   ARI_PASSWORD: ${ACD_AMI_PASSWORD}
@@ -244,10 +244,19 @@ x-asterisk-server-env: &asterisk-server-env
   HOMERPORT: ${HOMER_PORT}
   LOG_LEVEL: ${ACD_LOG_LEVEL}
   NODE_ID: ${ACD_HOSTNAME}
+  POSTGRES_HOSTNAME: ${POSTGRES_HOSTNAME}
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_PORT: ${POSTGRES_PORT}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   RTP_PORT_MAX: ${ACD_RTP_PORT_MAX}
   RTP_PORT_MIN: ${ACD_RTP_PORT_MIN}
   SCALE: ${ACD_SCALE}
+  VOIP_PROXY_HOSTNAME: ${KAMAILIO_PSTN_HOSTNAME:-kamailio-pstn}
+  VOIP_PROXY_PORT: ${KAMAILIO_PSTN_UDP_PORT:-5060}
   TZ: ${TZ}
+  WEBRTC_PROXY_HOSTNAME: ${KAMAILIO_WEBRTC_HOSTNAME:-kamailio-webrtc}
+  WEBRTC_PROXY_PORT: ${KAMAILIO_WEBRTC_UDP_PORT:-10060}
 
 # Asterisk Conf Generator common template
 x-asterisk-conf-generator-common: &asterisk-conf-generator-common
@@ -343,8 +352,8 @@ volumes:
   asterisk_sounds:
   asterisk_conf:
   dialer_postgresql:
-  redis_redisinsight:
   faster_whisper_cache:
+  redis_redisinsight:
   pgadmin:
 
 # ============================================================================
@@ -478,7 +487,7 @@ services:
     build:
       context: ./$REPO_PATH/nginx/
       dockerfile: Dockerfile
-    image: ${OML_NGINX_IMG}
+    image: ${NGINX_IMG}
     depends_on:
       omlapp:
         condition: service_healthy
@@ -517,13 +526,13 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
-      # - ../.custom_conf/certs/:/etc/omnileads/certs:ro
+      - ../.custom_conf/certs/:/etc/omnileads/certs:ro
 
   omlapp:
     build:
       context: ./$REPO_PATH/django/
       dockerfile: Dockerfile
-    image: ${OML_APP_IMG}
+    image: ${APP_IMG}
     <<: *django-web-common
     depends_on:
       postgresql:
@@ -534,6 +543,8 @@ services:
         condition: service_healthy
       acd-server:
         condition: service_healthy
+      vue-build:
+        condition: service_completed_successfully
     environment:
       <<: *django-env
       UWSGI_CUSTOM: True
@@ -542,7 +553,7 @@ services:
       UWSGI_LISTEN_QUEUE_SIZE: ${UWSGI_LISTEN_QUEUE_SIZE}
       UWSGI_WORKER_RELOAD_MERCY: ${UWSGI_WORKER_RELOAD_MERCY}
       UWSGI_EVIL_RELOAD_ON_RSS: ${UWSGI_EVIL_RELOAD_ON_RSS}
-    command: /opt/omnileads/bin/init_uwsgi.sh
+    command: /opt/omnileads/bin/init_devenv.sh
     healthcheck:
       test: [ "CMD-SHELL", "curl -fsSL -o /dev/null http://${DJANGO_HOSTNAME}:${DJANGO_PORT:-8099}/ || exit 1" ]
       <<: *healthcheck-http
@@ -550,6 +561,48 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_media:/opt/omnileads/media_root
+      - ${REPO_PATH}/django/:/opt/omnileads/ominicontacto/
+
+  vue-cli:
+    #build:
+    #  context: ./$REPO_PATH/django/omnileads_ui/
+    #  dockerfile: Dockerfile
+    image: freetechsolutions/vue-cli:develop
+    tty: true
+    ports:
+      - 8081:8080
+    networks:
+      - omnileads
+    working_dir: /home/oml_frontend
+    volumes:
+      - ${REPO_PATH}/django/omnileads_ui/:/home/oml_frontend/
+
+  vue-build:
+    image: freetechsolutions/vue-cli:develop
+    networks:
+      - omnileads
+    logging: *default-logging
+    restart: "no"
+    working_dir: /home/oml_frontend
+    volumes:
+      - ${REPO_PATH}/django/omnileads_ui/:/home/oml_frontend/
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - |
+        set -e
+        if [ ! -x node_modules/.bin/vue-cli-service ]; then
+          echo "==> [vue-build] installing npm dependencies (npm ci)"
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+        else
+          echo "==> [vue-build] node_modules ok, skipping install"
+        fi
+        if [ ! -f dist/index.html ]; then
+          echo "==> [vue-build] running npm run build"
+          npm run build
+        else
+          echo "==> [vue-build] dist/ already built, skipping (run: docker compose run --rm vue-build npm run build to force)"
+        fi
 
   django-commands:
     <<: *django-common
@@ -586,7 +639,7 @@ services:
       context: ./$REPO_PATH/websocket-server/
       target: run
       dockerfile: ./etc/fts/oml/services/websockets/dockerfile
-    image: ${OML_WS_IMG}
+    image: ${WS_IMG}
     depends_on:
       - redis
     environment:
@@ -606,17 +659,17 @@ services:
     build:
       context: ./$REPO_PATH/kamailio
       dockerfile: Dockerfile
-    image: ${OML_KAM_IMG}
+    image: ${KAMAILIO_IMG}
     entrypoint: [ "/bin/sh", "-c", "kamailio -DD -E -m ${SHM_SIZE} -M ${PKG_SIZE} -f /etc/kamailio/kamailio_webrtc.cfg" ]
     depends_on:
       redis:
         condition: service_healthy
     environment:
-      ACD_NET_ADDR: ${ACD_NET_ADDR:-${SUBNET}}
+      ACD_NET_ADDR: ${ACD_SERVER_IP}
       AUTHEPH_SK: ${AUTHEPH_SK}
-      ASTERISK_HOSTNAME: ${ACD_HOSTNAME}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
       KAMAILIO_HOSTNAME: ${KAMAILIO_WEBRTC_HOSTNAME}
+      KAMAILIO_IFACE: ${KAMAILIO_WEBRTC_IFACE}
       REDIS_HOSTNAME: ${REDIS_HOSTNAME}
       RTPENGINE_HOSTNAME: ${RTPENGINE_HOSTNAME}
       SHM_SIZE: ${SHM_SIZE}
@@ -669,7 +722,7 @@ services:
     build:
       context: ./$REPO_PATH/acd/
       dockerfile: Dockerfile
-    image: ${OML_ACD_IMG}
+    image: ${ACD_IMG}
     platform: ${DOCKER_PLATFORM:-linux/amd64}
     <<: *acd-worker-common
     entrypoint: [ "python", "logger.py" ]
@@ -681,7 +734,7 @@ services:
       PGDATABASE: ${POSTGRES_DB}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PYTHON_LOGLEVEL: ${ACD_LOG_LEVEL}
-      REDIS_HOSTNAME: ${REDIS_HOSTNAME}
+      REDIS_HOST: ${REDIS_HOSTNAME}
       REDIS_PORT: ${REDIS_PORT}
       TZ: ${TZ}
 
@@ -692,7 +745,7 @@ services:
     build:
       context: ./$REPO_PATH/kamailio
       dockerfile: Dockerfile
-    image: ${OML_KAM_IMG}
+    image: ${KAMAILIO_IMG}
     entrypoint: [ "/entrypoint_pstn.sh" ]
     depends_on:
       redis:
@@ -702,8 +755,9 @@ services:
     environment:
       ACD_NODES: ${ACD_NODES}
       FQDN: ${FQDN}
-      IPADDR: ${KAMAILIO_PSTN_HOSTNAME}
-      DOMAIN: ${DOMAIN}
+      IPADDR_PUBLIC: ${KAMAILIO_PSTN_HOSTNAME}
+      IPADDR_PRIVATE: ${KAMAILIO_PSTN_HOSTNAME}
+      ITSP_NODES: ${PSTN_EMULATOR_IP}
       RTPENGINE_SOCKET: udp:${RTPENGINE_HOSTNAME}:${RTPENGINE_BIND_UDP_PORT}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
     dns: 8.8.8.8
@@ -718,7 +772,7 @@ services:
     build:
       context: ./$REPO_PATH/rtpengine/
       dockerfile: Dockerfile
-    image: ${OML_RTPENGINE_IMG}
+    image: ${RTPENGINE_IMG}
     environment:
       ENV: ${RTPENGINE_ENV}
       NG_BIND_UDP_PORT: ${RTPENGINE_BIND_UDP_PORT}
@@ -746,7 +800,7 @@ services:
     build:
       context: ./$REPO_PATH/fastagi/
       dockerfile: Dockerfile
-    image: ${OML_FASTAGI_IMG}
+    image: ${FASTAGI_IMG}
     <<: *base-service-common
     depends_on:
       postgresql:
@@ -777,6 +831,9 @@ services:
 
   acd-server:
     <<: *asterisk-server-common
+    networks:
+      omnileads:
+        ipv4_address: ${ACD_SERVER_IP}
     environment:
       <<: *asterisk-server-env
     #volumes:
@@ -806,7 +863,7 @@ services:
     build:
       context: ./$REPO_PATH/postcall_actions/callrec_compressor/
       dockerfile: Dockerfile
-    image: ${OML_CALLREC_COMPRESSOR_IMG}
+    image: ${CALLREC_COMPRESSOR_IMG}
     <<: *callrec-service-common
     environment:
       <<: *callrec-env-base
@@ -816,7 +873,7 @@ services:
     build:
       context: ./$REPO_PATH/postcall_actions/callrec_transcriber/
       dockerfile: Dockerfile
-    image: ${OML_CALLREC_TRANSCRIBER_IMG}
+    image: ${CALLREC_TRANSCRIBER_IMG}
     <<: *callrec-service-common
     environment:
       <<: *callrec-env-base
@@ -982,8 +1039,8 @@ services:
   pbxemulator:
     image: ${PSTNEMULATOR_IMG}
     build:
-      context: ./$REPO_PATH/omlqa/pstn_emulator/
-    <<: *optional-service-common
+      context: ./$REPO_PATH/omlqa/pstn_emulator/    
+    # <<: *optional-service-common 
     hostname: pbxemulator
     environment:
       INBOUND_CALL_MODE: ${PSTN_EMULATOR_MODE}
@@ -996,8 +1053,27 @@ services:
       - "4569:4569/udp"
     stdin_open: true
     tty: true
+    networks:
+      omnileads:
+        ipv4_address: ${PSTN_EMULATOR_IP}
+
     #volumes:
     #  - ../.custom_conf/pstn_extensions.conf:/etc/asterisk/extensions.conf
+
+  nginxcgi:
+    image: ${NGINX_QA_IMG}
+    build:
+      context: ./$REPO_PATH/omlqa/nginx/
+    <<: *optional-service-common
+    environment:
+      PGHOST: ${POSTGRES_HOSTNAME}
+      PGPORT: ${POSTGRES_PORT}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      PSTN_HOSTNAME: pbxemulator
+    ports:
+      - 8888:8808
 
   redisinsight:
     image: redis/redisinsight:latest
