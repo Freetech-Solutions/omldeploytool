@@ -119,9 +119,14 @@ Finally, we have the section where the hosts should be grouped by deployment arc
 * **omnileads_aio**: instancias **todo-en-uno (AIO)**.
 * **omnileads_data**: Postgres, Redis, MinIO, Gearman (estado y servicios de datos del cluster).
 * **omnileads_edge**: telefonía de borde (Kamailio, RTPengine, etc.).
-* **omnileads_nodes**: **cómputo** del cluster (omlapp, ACD, dialer, nginx, websockets, workers, interaction_processor, Prometheus del stack, etc.). En cluster, este grupo sustituye el antiguo patrón de poner esos servicios bajo `omnileads_aio`; deje `omnileads_aio` vacío o sin hosts para ese tenant.
+* **omnileads_nodes**: **cómputo monolítico** del cluster (pods `acd`, `omlapp_web`, `omlapp_workers`, `dialer_workers`, `callrec_processor`, `observability`, etc.). Es el modo **legacy** compatible con inventarios anteriores: un host (o varios) con todo el cómputo en `omnileads_nodes`.
+* **omnileads_web** (opcional): cómputo **capa web/app** — pods `omlapp_web` y `observability` (Django/Daphne, websockets, nginx, dialer API, addons, Prometheus…).
+* **omnileads_workers** (opcional): cómputo **workers** — pods `dialer_workers`, `omlapp_workers`, `callrec_processor` y `observability`.
+* **omnileads_acd** (opcional): **ACD** — pod `acd` y `observability`.
 
-El play de instalación/actualización de cluster (`ansible/playbooks/site.yml`, `cluster.yml` y `deploy.sh` con layout cluster) incluye **`omnileads_data:omnileads_edge:omnileads_nodes:omnileads_aio`** en `hosts`.
+Para un mismo tenant de cluster usá **o** `omnileads_nodes` (todo el cómputo junto) **o** la combinación `omnileads_web` + `omnileads_workers` + `omnileads_acd` (cómputo segregado), más `omnileads_data` y `omnileads_edge`; no mezclés el mismo host en `omnileads_nodes` y a la vez en web/workers/acd con roles duplicados.
+
+El play de instalación/actualización de cluster (`ansible/playbooks/site.yml`, `cluster.yml` y `deploy.sh` con layout cluster) incluye **`omnileads_data:omnileads_edge:omnileads_web:omnileads_workers:omnileads_acd:omnileads_nodes:omnileads_aio`** en `hosts` (los grupos vacíos se omiten en la práctica).
 
 
 ```
@@ -130,7 +135,7 @@ omnileads_aio:
     #tenant_example_1:
     #tenant_example_2:
 
-##################### Cluster (data / edge / nodes) ###########################
+##################### Cluster (data / edge / nodes o split web+workers+acd) ###########################
 
 omnileads_data:
   hosts:
@@ -141,6 +146,18 @@ omnileads_edge:
   hosts:
     #tenant_example_5_edge:
     #tenant_example_6_edge:
+
+omnileads_web:
+  hosts:
+    # tenant_example_split_web:
+
+omnileads_workers:
+  hosts:
+    # tenant_example_split_workers:
+
+omnileads_acd:
+  hosts:
+    # tenant_example_split_acd:
 
 omnileads_nodes:
   hosts:
@@ -243,7 +260,7 @@ Then in the vars section, we have all the parameters that omnileads expects to w
     ....
 ```
 
-In the last section of the file, list each host under the group that matches its role: **omnileads_aio** for AIO, or for cluster **omnileads_data**, **omnileads_edge**, and **omnileads_nodes** (cómputo).
+In the last section of the file, list each host under the group that matches its role: **omnileads_aio** for AIO, or for cluster **omnileads_data**, **omnileads_edge**, and **omnileads_nodes** (cómputo monolítico) and/or **omnileads_web**, **omnileads_workers**, **omnileads_acd** (cómputo segregado).
 
 ```
 #############################################################################################################
@@ -373,7 +390,7 @@ Below are the Firewall rules to be applied on All In One instance:
 
 * 40000/50000 UDP: VoIP RTP Asterisk: this port range can be opened to the entire Internet.
 
-* 9090/tcp Prometheus metrics: This is where the connections coming from the monitoring center. This port can be opened by restricting by origin in the IP of the monitoring center.
+* 9090/tcp Prometheus: on compute / AIO hosts (`omlapp_web` / `omnileads_aio`), Prometheus is published on `omni_ip_lan:9090` (Podman `PublishPort`). External access is recommended via HAProxy on the edge host at `https://<fqdn>/prom`, with source IP restriction using inventory variable `haproxy_prom_allowed_src` (list of CIDRs). If `haproxy_prom_allowed_src` is empty, `/prom` is denied by default. You may still open `9090/tcp` only to your monitoring center on the LAN if you prefer direct scrape.
 
 
 ## Systemd & Podman 🔧 <a name="podman-systemd"></a>
@@ -737,6 +754,73 @@ By setting the scale_uwsgi value on the host or group, you enable the ability to
     # rtpengine_final_timeout: 3600
 ```
 
+### Cluster mínimo: AIO + Edge (2 hosts)
+
+Para un despliegue con **solo dos máquinas** (cómputo + datos en un host, telefonía de borde en otro), el inventario usa el mismo modelo de grupos que un cluster estándar, pero el host “AIO” debe aparecer en **`omnileads_data` y `omnileads_nodes` a la vez** (Postgres, Redis, MinIO, Gearman, ACD, omlapp, dialer, nginx, etc.). **No** lo declares en `omnileads_aio`: si estuviera ahí, el rol `pods` también desplegaría el pod de borde en ese host.
+
+El segundo host va solo en **`omnileads_edge`** (Kamailio, RTPengine, HAProxy hacia nginx en el host de cómputo).
+
+Ejemplo en `inventory.yml` (ver `tenant_example_aio_edge` en `cluster_instances` y en la sección final `omnileads_*`):
+
+```
+omnileads_aio:
+  hosts:
+
+omnileads_data:
+  hosts:
+    tenant_example_aio_edge_aio:
+
+omnileads_edge:
+  hosts:
+    tenant_example_aio_edge_edge:
+
+omnileads_nodes:
+  hosts:
+    tenant_example_aio_edge_aio:
+```
+
+`data_host`, `edge_host` y `aio_host` se infieren con el rol `topology_normalize`. Despliegue: `./deploy.sh --action=install --tenant=<carpeta>`; validación de layout de cluster: `./deploy.sh --action=layout-cluster --tenant=<carpeta>`.
+
+Comprobación rápida tras el despliegue: en el host AIO deben figurar entre otras `data_statefull-pod.service`, `data_stateless-pod.service`, `acd-pod.service`, `dialer_workers-pod.service`, `omlapp_web-pod.service`, `omlapp_workers-pod.service`, `callrec_processor-pod.service`, `observability-pod.service`, y **no** `telephony_edge-pod.service`. En el Edge: `telephony_edge-pod.service`, `observability-pod.service` y `haproxy.service` activos.
+
+Conectividad: HAProxy en Edge debe alcanzar nginx en el AIO por `omni_ip_lan` del AIO (puerto 443 de backend); el ACD en el AIO publica 5060/udp hacia la LAN (accesible al Kamailio del Edge según `kamailio_pstn_out` en `acd.pod.j2`).
+
+### Cluster en 5 hosts (data + edge + web + workers + acd)
+
+Alternativa al cómputo monolítico en `omnileads_nodes`: cinco máquinas — datos, borde, capa web (`omlapp_web`), workers (`dialer_workers`, `omlapp_workers`, `callrec_processor`) y ACD. Cada uno de esos hosts de cómputo lleva además el pod `observability`.
+
+Ejemplo de tenant en `inventory.yml` (`tenant_example_split` bajo `cluster_instances` y asignación final):
+
+```
+omnileads_aio:
+  hosts:
+
+omnileads_data:
+  hosts:
+    tenant_example_split_data:
+
+omnileads_edge:
+  hosts:
+    tenant_example_split_edge:
+
+omnileads_web:
+  hosts:
+    tenant_example_split_web:
+
+omnileads_workers:
+  hosts:
+    tenant_example_split_workers:
+
+omnileads_acd:
+  hosts:
+    tenant_example_split_acd:
+
+omnileads_nodes:
+  hosts:
+```
+
+Dejá **`omnileads_nodes` vacío** para este layout. El rol `topology_normalize` infiere `nginx_host` / `dialer_host` desde el host en `omnileads_web` y `acd_host` / `fastagi_host` desde `omnileads_acd`.
+
 # Install on Cluster Instances (data, edge & nodes). 🚀 <a name="ait-deploy"></a>
 
 You must have four Linux instances with Internet access and **your public key (ssh) available**, since
@@ -776,9 +860,9 @@ Then you should work on the inventory.yml tenant file.
 ```
 The parameter ansible_host refers to the IP or FQDN used to establish an SSH connection. The omni_ip_lan parameter refers to the private IP (LAN) that will be used when opening certain ports for components and when they connect with each other.
 
-> Note: `data_host`, `edge_host` and `aio_host` are inferred automatically by the `topology_normalize` role from the membership of each host in the `omnileads_data`, `omnileads_edge` and `omnileads_nodes` groups (intersected with the tenant group). You only need to declare them under `vars:` if you want to override the inferred value.
+> Note: `data_host`, `edge_host` and `aio_host` are inferred automatically by the `topology_normalize` role from the membership of each host in the `omnileads_data`, `omnileads_edge`, `omnileads_nodes` and/or `omnileads_web`, `omnileads_workers`, `omnileads_acd` groups (intersected with the tenant group). You only need to declare them under `vars:` if you want to override the inferred value.
 
-In the last section, assign hosts to **omnileads_data**, **omnileads_edge**, and **omnileads_nodes**. Leave **omnileads_aio** empty for this cluster tenant.
+In the last section, assign hosts to **omnileads_data**, **omnileads_edge**, and either **omnileads_nodes** (legacy full compute) or **omnileads_web** + **omnileads_workers** + **omnileads_acd** (split). Leave **omnileads_aio** empty for this cluster tenant.
 
 ```
 omnileads_aio:

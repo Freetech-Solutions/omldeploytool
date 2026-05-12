@@ -13,15 +13,11 @@ LogDriver=journald
 EnvironmentFile=/etc/default/postgres.env
 Label=tier=backend
 PodmanArgs=--cgroups=no-conmon
-PodmanArgs=--shm-size=1g
+PodmanArgs=--shm-size={{ postgres_shm | default("1g") }}
 Volume=oml_postgres_data:/var/lib/postgresql
-Volume=/etc/omnileads/omnidialer.sql:/docker-entrypoint-initdb.d/init.sql
-{% if scale_postgres is defined and scale_postgres %}
+Volume=/etc/omnileads/omnidialer.sql:/docker-entrypoint-initdb.d/init.sql:ro
 Volume=/etc/omnileads/postgresql.conf:/etc/postgresql/postgresql.conf
 Exec=postgres -c config_file=/etc/postgresql/postgresql.conf
-{% else %}
-Exec=postgres
-{% endif %}
 
 [Service]
 Restart=on-failure

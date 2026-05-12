@@ -10,6 +10,8 @@ pods_role_tags_default:
   - data
   - edge
   - nodes
+  - web
+  - workers
   - voice
   - app
   - postgres
@@ -30,20 +32,5 @@ pods_role_tags_default:
   - addons
   - qa
 
-# Quadlets .pod por topología (omnileads_data / omnileads_edge / omnileads_nodes).
-# AIO: unión en runtime en tasks/main.yml. Cada entrada requiere templates/<nombre>.pod.j2.
-pods_topology:
-  data:
-    - data_statefull
-    - data_stateless
-    - observability
-  edge:
-    - telephony_edge
-    - observability
-  nodes:
-    - acd
-    - callrec_processor
-    - dialer_workers
-    - omlapp_web
-    - omlapp_workers
-    - observability
+# Quadlets .pod: membresía en grupos pod del inventario (topology_normalize -> oml_runs_*).
+# Cada entrada requiere templates/<nombre>.pod.j2 en este rol.

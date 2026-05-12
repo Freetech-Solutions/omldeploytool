@@ -2,164 +2,66 @@ global:
   scrape_interval:     10s
   evaluation_interval: 10s
 
-scrape_configs:  
+scrape_configs:
 
-{% if oml_is_aio_only | default(false) %}
-
-  - job_name: '{{ tenant_id }}_host'
+  - job_name: '{{ tenant_id }}_node'
     static_configs:
-      - targets: ['127.0.0.1:9100']
+{% for h in oml_tenant_hosts %}
+      - targets: ['{{ hostvars[h].omni_ip_lan | default(omni_ip_lan) }}:9100']
         labels:
           tenant: '{{ tenant_id }}'
-          arq: 'aio'
-          component: 'aio_os'
-
-  - job_name: '{{ tenant_id }}_redis'
-    static_configs:
-      - targets: ['{{ omni_ip_lan }}:9121']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'aio'
-          component: 'redis'
-
-  - job_name: '{{ tenant_id }}_asterisk'
-    static_configs:
-      - targets: ['127.0.0.1:7088']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'aio'
-          component: 'asterisk'
-
-  - job_name: '{{ tenant_id }}_postgres'
-    static_configs:
-      - targets: ['{{ omni_ip_lan }}:9187']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'aio'
-          component: 'postgres'  
+          component: 'os'
+          host: '{{ h }}'
+{% endfor %}
 
   - job_name: '{{ tenant_id }}_podman'
     static_configs:
-      - targets: ['{{ omni_ip_lan }}:9882']
+{% for h in oml_tenant_hosts %}
+      - targets: ['{{ hostvars[h].omni_ip_lan | default(omni_ip_lan) }}:9882']
         labels:
           tenant: '{{ tenant_id }}'
-          arq: 'aio'
           component: 'podman'
-
-  - job_name: '{{ tenant_id }}_gearman'
-    static_configs:
-      - targets: ['{{ omni_ip_lan }}:9418']
-        labels:
-          tenant: '{{ tenant_id }}'
-          component: 'gearman'
-
-  - job_name: '{{ tenant_id }}_uwsgi'
-    static_configs:
-      - targets: ['{{ omni_ip_lan }}:9117']
-        labels:
-          tenant: '{{ tenant_id }}'
-          component: 'uwsgi'
-
-  - job_name: '{{ tenant_id }}_rtpengine'
-    static_configs:
-      - targets: ['{{ omni_ip_lan }}:22223']
-        labels:
-          tenant: '{{ tenant_id }}'
-          component: 'rtpengine'
-
-{% else %}
+          host: '{{ h }}'
+{% endfor %}
 
   - job_name: '{{ tenant_id }}_postgres'
     static_configs:
-      - targets: ['{{ data_host }}:9187']
+      - targets: ['{{ postgres_host | trim }}:9187']
         labels:
           tenant: '{{ tenant_id }}'
-          arq: 'cluster'
           component: 'postgres'
-  
-  - job_name: '{{ tenant_id }}_aio_compute_host'
-    static_configs:
-      - targets: ['{{ aio_host }}:9100']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'os_aio'
-
-  - job_name: '{{ tenant_id }}_edge_host'
-    static_configs:
-      - targets: ['{{ edge_host }}:9100']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'os_edge'
-
-  - job_name: '{{ tenant_id }}_data_host'
-    static_configs:
-      - targets: ['{{ data_host }}:9100']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'os_data'
-
-  - job_name: '{{ tenant_id }}_aio_podman'
-    static_configs:
-      - targets: ['{{ aio_host }}:9882']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'podman_aio'
-
-  - job_name: '{{ tenant_id }}_edge_podman'
-    static_configs:
-      - targets: ['{{ edge_host }}:9882']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'podman_edge'
-
-  - job_name: '{{ tenant_id }}_data_podman'
-    static_configs:
-      - targets: ['{{ data_host }}:9882']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'podman_data'
 
   - job_name: '{{ tenant_id }}_redis'
     static_configs:
-      - targets: ['{{ data_host }}:9121']
+      - targets: ['{{ redis_host | trim }}:9121']
         labels:
           tenant: '{{ tenant_id }}'
-          arq: 'cluster'
           component: 'redis'
-
-  - job_name: '{{ tenant_id }}_asterisk'
-    static_configs:
-      - targets: ['{{ aio_host }}:7088']
-        labels:
-          tenant: '{{ tenant_id }}'
-          arq: 'cluster'
-          component: 'asterisk'
 
   - job_name: '{{ tenant_id }}_gearman'
     static_configs:
-      - targets: ['{{ data_host }}:9418']
+      - targets: ['{{ gearman_host | trim }}:9418']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'gearman'
 
   - job_name: '{{ tenant_id }}_uwsgi'
     static_configs:
-      - targets: ['{{ aio_host }}:9117']
+      - targets: ['{{ nginx_host | trim }}:9117']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'uwsgi'
 
+  - job_name: '{{ tenant_id }}_asterisk'
+    static_configs:
+      - targets: ['{{ acd_host | trim }}:7088']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'asterisk'
+
   - job_name: '{{ tenant_id }}_rtpengine'
     static_configs:
-      - targets: ['{{ edge_host }}:22223']
+      - targets: ['{{ rtpengine_host | trim }}:22223']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'rtpengine'
-
-{% endif %}

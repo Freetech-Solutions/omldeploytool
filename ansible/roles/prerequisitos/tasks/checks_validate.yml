@@ -1,12 +1,38 @@
 ---
+# Validación de variables declaradas en inventory.yml + group_vars.
+# - Bloque "REQUIRED": fallan el deploy si faltan (rompen los roles aguas abajo).
+# - Bloque "PER-HOST": variables que cada host del inventario debe declarar.
+# - Bloque "COMPONENT": fallan sólo si el componente está habilitado por topology_normalize.
+# - Bloque "WARNINGS": no fallan, solo emiten un debug recordando declarar las variables
+#   recomendadas (tienen defaults, pero se sugiere declararlas explícitamente).
+#
+# Cualquier extensión nueva debería seguir este orden y mantener tags: [always] para que
+# corra incluso con --tags acotados.
+
 - name: CHECKS Validate required global variables
   ansible.builtin.assert:
     that:
-      - TZ is defined
-      - certs is defined
-      - postgres_user is defined
-      - postgres_password is defined
+      - TZ is defined and (TZ | string | length) > 0
+      - certs is defined and (certs | string | length) > 0
+      - ansible_user is defined and (ansible_user | string | length) > 0
+      # PostgreSQL (cliente, siempre necesario aunque postgres sea externo)
+      - postgres_user is defined and (postgres_user | string | length) > 0
+      - postgres_password is defined and (postgres_password | string | length) > 0
       - postgres_port is defined
+      - postgres_database is defined and (postgres_database | string | length) > 0
+      - postgres_maintenance_db is defined and (postgres_maintenance_db | string | length) > 0
+      # Bucket S3 (cliente, siempre necesario aunque MinIO sea externo)
+      - bucket_name is defined and (bucket_name | string | length) > 0
+      - bucket_access_key is defined and (bucket_access_key | string | length) > 0
+      - bucket_secret_key is defined and (bucket_secret_key | string | length) > 0
+      - bucket_region is defined and (bucket_region | string | length) > 0
+      # Django / web tuning
+      - SCA is defined
+      - ECCTL is defined
+      - LOGIN_FAILURE_LIMIT is defined
+      # Dialer base (siempre se renderiza la env, aunque no haya workers locales)
+      - dialer_engine is defined and (dialer_engine | string | length) > 0
+      # Imágenes de contenedores (group_vars/all/images.yml)
       - APP_IMG is defined
       - NGINX_IMG is defined
       - WS_IMG is defined
@@ -23,28 +49,25 @@
       - MINIO_IMG is defined
       - MINIO_MC_IMG is defined
       - GEARMAN_IMG is defined
-    fail_msg: "Faltan variables globales requeridas en el inventario o group_vars (incluidas imágenes en group_vars/all/images.yml)."
+      - HAPROXY_IMG is defined
+      # Vault (autheph_sk se referencia desde runtime.yml -> vault_autheph_sk)
+      - autheph_sk is defined and (autheph_sk | string | length) > 0
+    fail_msg: >-
+      Faltan variables globales requeridas en el inventario, group_vars/all/images.yml
+      o group_vars/all/vault.yml. Revisá el inventario de referencia
+      (ansible/inventory.yml) y la guía ANSIBLE_BOOTSTRAP.md.
+    success_msg: "Variables globales requeridas: OK"
   tags:
     - always
 
-- name: CHECKS Validate AMI credentials when component is enabled
+- name: CHECKS Validate required per-host variables
   ansible.builtin.assert:
     that:
-      - ami_user is defined
-      - ami_password is defined
-    fail_msg: "ami_user y ami_password son requeridos cuando el componente AMI está habilitado."
-  when: component_ami_enabled | default(false)
-  tags:
-    - always
-
-- name: CHECKS Validate bucket credentials when internal MinIO is enabled
-  ansible.builtin.assert:
-    that:
-      - bucket_access_key is defined
-      - bucket_secret_key is defined
-      - bucket_name is defined
-    fail_msg: "bucket_access_key, bucket_secret_key y bucket_name son requeridos cuando MinIO interno está habilitado."
-  when: component_minio_enabled | default(false)
+      - ansible_host is defined and (ansible_host | string | length) > 0
+      - omni_ip_lan is defined and (omni_ip_lan | string | length) > 0
+    fail_msg: >-
+      El host '{{ inventory_hostname }}' no declara ansible_host y/o omni_ip_lan.
+      Cada host del inventario debe definir ambos (ver instances/test_3.0/inventory.yml).
   tags:
     - always
 
@@ -52,7 +75,191 @@
   ansible.builtin.assert:
     that:
       - omni_ip_lan is match('^\\d+\\.\\d+\\.\\d+\\.\\d+$')
-    fail_msg: "The private IP is wrong"
+    fail_msg: "omni_ip_lan='{{ omni_ip_lan }}' en '{{ inventory_hostname }}' no es una IPv4 válida."
+  tags:
+    - always
+
+- name: CHECKS Validate cert files when certs == 'custom'
+  ansible.builtin.assert:
+    that:
+      - cert_file_name is defined and (cert_file_name | string | length) > 0
+      - key_file_name is defined and (key_file_name | string | length) > 0
+    fail_msg: >-
+      Con certs=custom hay que declarar cert_file_name y key_file_name (y copiarlos
+      bajo instances/<tenant>/). Ver ANSIBLE_BOOTSTRAP.md > Certificados TLS por tenant.
+  when: (certs | default('selfsigned')) == 'custom'
+  tags:
+    - always
+
+- name: CHECKS Validate certbot prerequisites when certs == 'certbot'
+  ansible.builtin.assert:
+    that:
+      - fqdn is defined and (fqdn | string | length) > 0
+      - notification_email is defined
+      - notification_email != 'your_email@domain.com'
+    fail_msg: >-
+      Con certs=certbot necesitás declarar fqdn y notification_email (con un email
+      real, no el placeholder 'your_email@domain.com').
+  when: (certs | default('selfsigned')) == 'certbot'
+  tags:
+    - always
+
+- name: CHECKS Validate AMI credentials when ACD component is enabled
+  ansible.builtin.assert:
+    that:
+      - ami_user is defined and (ami_user | string | length) > 0
+      - ami_password is defined and (ami_password | string | length) > 0
+      - acd_rtp_port_min is defined
+      - acd_rtp_port_max is defined
+      - acd_log_level is defined
+    fail_msg: >-
+      El componente ACD está habilitado (acd / omnileads_aio) pero faltan ami_user,
+      ami_password y/o los rangos RTP/log de Asterisk en el inventario.
+  when: component_acd_enabled | default(false) | bool
+  tags:
+    - always
+
+- name: CHECKS Validate bucket and MinIO admin when internal MinIO is enabled
+  ansible.builtin.assert:
+    that:
+      - s3_http_admin_user is defined and (s3_http_admin_user | string | length) > 0
+      - s3_http_admin_pass is defined and (s3_http_admin_pass | string | length) > 0
+    fail_msg: >-
+      MinIO interno está habilitado (no se declaró bucket_url externo) y faltan
+      s3_http_admin_user / s3_http_admin_pass para crear el admin del bucket.
+  when: component_minio_enabled | default(false) | bool
+  tags:
+    - always
+
+- name: CHECKS Validate dialer credentials when omnidialer is enabled
+  ansible.builtin.assert:
+    that:
+      - dialer_password is defined and (dialer_password | string | length) > 0
+      - dialer_caps is defined
+      - dialer_log_level is defined
+    fail_msg: >-
+      El dialer omnidialer está habilitado pero faltan dialer_password / dialer_caps /
+      dialer_log_level en el inventario.
+  when: component_dialer_enabled | default(false) | bool
+  tags:
+    - always
+
+- name: CHECKS Validate telephony edge variables when edge component is enabled
+  ansible.builtin.assert:
+    that:
+      - kamailio_certs_location is defined and (kamailio_certs_location | string | length) > 0
+      - kamailio_log_level is defined
+      - kamailio_pstn_port is defined
+      - kamailio_webrtc_iface is defined and (kamailio_webrtc_iface | string | length) > 0
+      - itsp_nodes is defined and (itsp_nodes | string | length) > 0
+      - rtpengine_env is defined and (rtpengine_env | string | length) > 0
+      - rtpengine_rtp_port_min is defined
+      - rtpengine_rtp_port_max is defined
+      - rtpengine_log_level is defined
+      - rtpengine_ctl_port is defined
+    fail_msg: >-
+      El edge telefónico está habilitado pero faltan variables de Kamailio/RTPengine
+      (kamailio_webrtc_iface, itsp_nodes, rtpengine_env, etc.). Revisar la sección
+      'TELEPHONY EDGE PROXY' del inventario de referencia.
+  when: component_telephony_edge_enabled | default(false) | bool
+  tags:
+    - always
+
+- name: CHECKS Validate rtpengine custom net config when rtpengine_env == 'custom'
+  ansible.builtin.assert:
+    that:
+      - rtpengine_custom_net_cfg is defined and (rtpengine_custom_net_cfg | string | length) > 0
+    fail_msg: >-
+      rtpengine_env='custom' requiere rtpengine_custom_net_cfg
+      (ej: 'internal/${RTPENGINE_HOSTNAME};external/${PUBLIC_IP}').
+  when:
+    - component_telephony_edge_enabled | default(false) | bool
+    - (rtpengine_env | default('')) == 'custom'
+  tags:
+    - always
+
+- name: CHECKS Validate Loki host when promtail is enabled
+  ansible.builtin.assert:
+    that:
+      - loki_host is defined and (loki_host | string | length) > 0
+    fail_msg: >-
+      Promtail está habilitado (oml_observability_deploy=true o loki_host declarado)
+      pero loki_host quedó vacío.
+  when: component_observability_promtail_enabled | default(false) | bool
+  tags:
+    - always
+
+- name: CHECKS Validate backup variables when backup_filename* is set
+  ansible.builtin.assert:
+    that:
+      - backup_bucket_url is defined or bucket_url is defined
+      - backup_bucket_name is defined
+      - backup_bucket_access_key is defined or bucket_access_key is defined
+      - backup_bucket_secret_key is defined or bucket_secret_key is defined
+    fail_msg: >-
+      Se declaró backup_filename / backup_filename_OMD pero falta el bucket de backup
+      (backup_bucket_url, backup_bucket_name y credenciales). Sin estas variables el
+      restore no puede descargar el dump.
+  when: (backup_filename is defined) or (backup_filename_OMD is defined)
+  tags:
+    - always
+
+# ---------------------------------------------------------------------------
+# WARNINGS (no bloquean): variables recomendadas pero con valor por defecto.
+# Se acumulan en una lista y se imprimen una sola vez por host con el listado
+# completo de hallazgos. Para silenciar una advertencia: declarar la variable
+# en el inventario.
+# ---------------------------------------------------------------------------
+- name: CHECKS Build inventory recommendations checklist
+  ansible.builtin.set_fact:
+    _oml_inventory_warnings: >-
+      {{
+        []
+        + (['fqdn (recomendado para producción / certbot / HAProxy edge)']
+           if (fqdn is not defined) or ((fqdn | default('') | string | length) == 0) else [])
+        + (['notification_email (sigue con el placeholder por defecto)']
+           if (notification_email | default('')) in ['', 'your_email@domain.com'] else [])
+        + (['swap_space (recomendado fijar el swap del SO, p.ej. 4G)']
+           if swap_space is not defined else [])
+        + (['tenant_id (declarar por host o por grupo del cluster)']
+           if tenant_id is not defined else [])
+        + (['google_api_key (vacío -> se desactivan integraciones Google)']
+           if (google_api_key | default('') | string | length) == 0
+              or (google_api_key | default('') | string) == 'NULL' else [])
+        + (['google_maps_api_key (vacío -> mapa CRM deshabilitado)']
+           if (google_maps_api_key | default('') | string) in ['', 'NULL'] else [])
+        + (['callrec_transcriber_api_key (transcripciones STT no funcionarán)']
+           if (callrec_transcriber_api_key | default('') | string | length) == 0 else [])
+        + (['haproxy_prom_allowed_src (vacío -> /prom denegado en HAProxy edge)']
+           if ('edge' in group_names)
+              and ((haproxy_prom_allowed_src | default([])) | length == 0) else [])
+        + (['kamailio_pstn_host (declarar si usás un PSTN externo al edge)']
+           if (oml_runs_omlapp_web | default(false)
+               or oml_runs_omlapp_workers | default(false)
+               or oml_runs_dialer_workers | default(false)
+               or oml_runs_acd | default(false)
+               or oml_runs_callrec_processor | default(false))
+              and ('edge' not in group_names)
+              and (groups['edge'] | default([]) | length == 0)
+              and (kamailio_pstn_host is not defined) else [])
+        + (['ansible_become / ansible_become_method (escalamiento de privilegios)']
+           if (ansible_user | default('')) != 'root'
+              and (ansible_become | default(false) | bool) is false else [])
+        + (['upgrade_from_2X (declarar true sólo si migrás desde 2.X)']
+           if upgrade_from_2X is not defined else [])
+      }}
+  changed_when: false
+  tags:
+    - always
+
+- name: CHECKS Warn about missing recommended inventory variables
+  ansible.builtin.debug:
+    msg:
+      - "[ADVERTENCIA] Inventario incompleto en '{{ inventory_hostname }}': {{ _oml_inventory_warnings | length }} variable(s) recomendada(s) sin declarar."
+      - "{{ _oml_inventory_warnings }}"
+      - "Estas variables tienen defaults razonables, pero se recomienda declararlas en inventory.yml para evitar comportamiento inesperado en producción."
+  when: _oml_inventory_warnings | length > 0
+  changed_when: false
   tags:
     - always
 
@@ -65,4 +272,3 @@
     - install
     - upgrade
     - update
-

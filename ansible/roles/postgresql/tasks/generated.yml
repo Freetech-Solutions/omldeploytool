@@ -24,6 +24,19 @@
     - upgrade
     - update
 
+- name: POSTGRESQL Render postgresql.conf on host
+  ansible.builtin.template:
+    src: postgres.conf
+    dest: /etc/omnileads/postgresql.conf
+    mode: "0644"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  notify: Restart postgresql service
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: POSTGRESQL Copy Quadlet file
   ansible.builtin.template:
     src: "postgresql.service"

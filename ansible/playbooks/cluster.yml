@@ -1,6 +1,7 @@
 ---
 - name: Validate cluster inventory layout
-  hosts: omnileads_data:omnileads_edge:omnileads_nodes:omnileads_aio
+  hosts: >-
+    data_statefull:data_stateless:edge:omlapp_web:omlapp_workers:dialer_workers:acd:callrec_processor:omnileads_aio
   gather_facts: true
   pre_tasks:
     - name: Load normalized topology for cluster validation
@@ -12,5 +13,22 @@
         that:
           - oml_layout == "cluster"
         fail_msg: "Este playbook espera un inventario cluster sin HA."
+
+    - name: Assert critical pod groups are populated
+      ansible.builtin.assert:
+        that:
+          - (groups['data_statefull'] | default([]) | length > 0) or (postgres_host is defined)
+          - >-
+            (groups['data_stateless'] | default([]) | length > 0)
+            or ((redis_host is defined) and (gearman_host is defined))
+          - >-
+            (groups['edge'] | default([]) | length > 0)
+            or ((rtpengine_host is defined) and (kamailio_pstn_host is defined))
+          - (groups['omlapp_web'] | default([]) | length > 0)
+          - (groups['acd'] | default([]) | length > 0)
+        fail_msg: >-
+          Faltan hosts en grupos pod obligatorios (data_statefull, data_stateless, edge,
+          omlapp_web, acd) o variables externas equivalentes (postgres_host, redis_host,
+          gearman_host, rtpengine_host, kamailio_pstn_host).
 
 - import_playbook: site.yml

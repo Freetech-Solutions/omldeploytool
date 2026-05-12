@@ -9,4 +9,4 @@ upgrade_from_2X_phase: cleanup_systemd
 # Hosts donde corre el restore (misma convención que backup.env en prerequisitos).
 upgrade_from_2X_target_host_groups:
   - omnileads_aio
-  - omnileads_nodes
+  - omlapp_web

@@ -4,9 +4,10 @@
     haproxy_nginx_peers: >-
       {{
         (
-          (groups[haproxy_tenant_group] | default([]))
-          if (haproxy_tenant_group | length > 0) else []
-        ) | intersect(groups['omnileads_nodes'] | default([])) | list
+          haproxy_web_peers
+          if (haproxy_web_peers | length > 0)
+          else haproxy_nodes_peers
+        )
       }}
   vars:
     haproxy_structural_groups:
@@ -14,10 +15,31 @@
       - aio_instances
       - cluster_instances
       - omnileads_aio
-      - omnileads_data
-      - omnileads_edge
-      - omnileads_nodes
+      - data_statefull
+      - data_stateless
+      - edge
+      - omlapp_web
+      - omlapp_workers
+      - dialer_workers
+      - acd
+      - callrec_processor
     haproxy_tenant_group: "{{ (group_names | difference(haproxy_structural_groups)) | first | default('') }}"
+    haproxy_tenant_hosts: >-
+      {{
+        (groups[haproxy_tenant_group] | default([]))
+        if (haproxy_tenant_group | length > 0) else []
+      }}
+    haproxy_web_peers: "{{ haproxy_tenant_hosts | intersect(groups['omlapp_web'] | default([])) | list }}"
+    haproxy_nodes_peers: "{{ haproxy_tenant_hosts | intersect(groups['omnileads_aio'] | default([])) | list }}"
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: HAPROXY Set Prometheus backend peers (mismo tier que nginx)
+  ansible.builtin.set_fact:
+    haproxy_prometheus_peers: "{{ haproxy_nginx_peers }}"
   changed_when: false
   tags:
     - install
@@ -29,8 +51,9 @@
     that:
       - haproxy_nginx_peers | length > 0
     fail_msg: >-
-      HAProxy en edge requiere al menos un host en omnileads_nodes del mismo
-      tenant (interseccion con el grupo del tenant). Revisa el inventario.
+      HAProxy en edge requiere al menos un host backend de nginx del mismo
+      tenant: primero busca en omlapp_web y, si no hay, usa omnileads_aio.
+      Revisa el inventario.
   tags:
     - install
     - upgrade

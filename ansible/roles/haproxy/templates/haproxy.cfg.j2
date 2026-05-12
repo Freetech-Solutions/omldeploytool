@@ -24,9 +24,21 @@ frontend http_in
     http-request redirect scheme https code 301
 
 frontend https_in
-    bind *:{{ haproxy_https_port }} ssl crt {{ haproxy_pem_file }} alpn h2,http/1.1
+    bind *:{{ haproxy_https_port }} ssl crt {{ haproxy_pem_file }} alpn http/1.1
     http-request set-header X-Forwarded-Proto https
     http-request set-header X-Forwarded-Port %[dst_port]
+{% set _pp = haproxy_prom_path_prefix %}
+    acl path_prom_exact path {{ _pp }}
+    acl path_prom_prefix path_beg {{ _pp }}/
+{% if haproxy_prom_allowed_src | length > 0 %}
+    acl prom_allowed src {{ haproxy_prom_allowed_src | join(' ') }}
+    http-request deny if path_prom_exact !prom_allowed
+    http-request deny if path_prom_prefix !prom_allowed
+{% else %}
+    http-request deny if path_prom_exact
+    http-request deny if path_prom_prefix
+{% endif %}
+    use_backend prometheus_cluster if path_prom_exact or path_prom_prefix
     default_backend nginx_cluster
 
 backend nginx_cluster
@@ -35,4 +47,10 @@ backend nginx_cluster
 {% set _ssl_opts = (' ssl verify ' ~ (haproxy_backend_ssl_verify | default('none'))) if (haproxy_backend_ssl | default(false)) else '' %}
 {% for h in haproxy_nginx_peers %}
     server srv{{ loop.index0 }} {{ hostvars[h]['omni_ip_lan'] }}:{{ haproxy_backend_port }} check{{ _ssl_opts }} cookie srv{{ loop.index0 }}
+{% endfor %}
+
+backend prometheus_cluster
+    balance roundrobin
+{% for h in haproxy_prometheus_peers %}
+    server prom{{ loop.index0 }} {{ hostvars[h]['omni_ip_lan'] }}:{{ haproxy_prom_backend_port }} check
 {% endfor %}

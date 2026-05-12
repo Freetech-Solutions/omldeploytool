@@ -96,6 +96,8 @@ pods_role_tags:
   - data
   - edge
   - nodes
+  - web
+  - workers
   - voice
   - app
   # componentes con .container que usan Pod=

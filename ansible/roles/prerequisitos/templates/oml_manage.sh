@@ -56,7 +56,7 @@ KNOWN_CONTAINERS=(
   dialer-scheduler dialer-send-reports callrec-compressor callrec-transcriptor
 )
 
-# Pods Quadlet (alineado con ansible/roles/pods/defaults/main.yml -> pods_topology).
+# Pods Quadlet (membresía en grupos pod del inventario; ver roles/pods/tasks/main.yml).
 # Cada nombre genera la unidad systemd "<nombre>-pod.service" desde su .pod.
 KNOWN_PODS=(
   acd

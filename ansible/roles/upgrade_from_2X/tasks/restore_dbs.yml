@@ -31,7 +31,7 @@
 
     # postgresql.container declara Pod=data_statefull.pod; MinIO también. El restore debe correr
     # cuando el pod ya está desplegado (roles/pods). Esto refuerza el orden si se usan
-    # tags parciales y cubre AIO/HA (local) vs cluster (delegación al nodo omnileads_data).
+    # tags parciales y cubre AIO/HA (local) vs cluster (delegación al nodo data_statefull).
     - name: UPGRADE_2X Asegurar pod data_statefull activo en este host (AIO / HA en aio)
       ansible.builtin.systemd:
         name: data_statefull-pod.service
@@ -46,18 +46,18 @@
         - upgrade
         - upgrade_from_2X
 
-    - name: UPGRADE_2X Asegurar pod data_statefull activo en nodo de datos (cluster compute en aio u omnileads_nodes)
+    - name: UPGRADE_2X Asegurar pod data_statefull activo en nodo de datos (cluster: delegar a data_statefull)
       ansible.builtin.systemd:
         name: data_statefull-pod.service
         state: started
         enabled: true
         daemon_reload: true
-      delegate_to: "{{ (groups['omnileads_data'] | default([])) | first }}"
+      delegate_to: "{{ (groups['data_statefull'] | default([])) | first }}"
       when:
         - not postgres_out | bool
-        - (group_names | intersect(['omnileads_aio', 'omnileads_nodes'])) | length > 0
+        - (group_names | intersect(['omnileads_aio', 'omlapp_web'])) | length > 0
         - not (oml_is_aio_only | default(true) | bool)
-        - groups['omnileads_data'] | default([]) | length > 0
+        - groups['data_statefull'] | default([]) | length > 0
       tags:
         - upgrade
         - upgrade_from_2X

@@ -1,7 +1,7 @@
 ---
 
 # --- OMniLeads images WEB
-APP_IMG: docker.io/freetechsolutions/omlapp:20260506-832941a2
+APP_IMG: docker.io/freetechsolutions/omlapp:20260508-4af06dd0-enterprise
 NGINX_IMG: docker.io/freetechsolutions/nginx:20260403-72e1ff68
 WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
 
@@ -24,7 +24,7 @@ MINIO_IMG: docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 MINIO_MC_IMG: docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG: docker.io/artefactual/gearmand:1.1.21.2-alpine
 
-# --- Edge HTTP(S) load balancer (Quadlet en omnileads_edge)
+# --- Edge HTTP(S) load balancer (Quadlet en hosts del grupo edge)
 HAPROXY_IMG: docker.io/library/haproxy:3.3
 
 # --- Observability (Prometheus stack; alineado con docker-compose/observability/.env)

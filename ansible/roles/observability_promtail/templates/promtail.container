@@ -18,7 +18,7 @@ Volume=/run/log/journal/:/var/log/journal/:ro
 Volume=/etc/machine-id:/etc/machine-id:ro
 Label=tenant={{ tenant_id }}
 Label=service=promtail
-Label=node_type={{ 'aio' if (oml_is_aio | default(false)) else 'nodes' if (oml_is_nodes | default(false)) else 'data' if (oml_is_data | default(false)) else 'edge' if (oml_is_edge | default(false)) else 'standalone' }}
+Label=node_type={{ 'aio' if (oml_is_aio | default(false)) else ('data_statefull' if ('data_statefull' in group_names) else 'data_stateless' if ('data_stateless' in group_names) else 'edge' if ('edge' in group_names) else 'web' if ('omlapp_web' in group_names) else 'workers' if ('omlapp_workers' in group_names) else 'dialer' if ('dialer_workers' in group_names) else 'acd' if ('acd' in group_names) else 'callrec' if ('callrec_processor' in group_names) else 'standalone') }}
 Exec=-config.file=/etc/promtail/config.yml -config.expand-env=true
 LogDriver=journald
 PodmanArgs=--cgroups=no-conmon --cpus=1 --cpu-shares=256

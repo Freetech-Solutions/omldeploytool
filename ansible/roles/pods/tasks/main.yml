@@ -5,9 +5,27 @@
     pods_quadlets: >-
       {{
         (
-          (pods_topology.data if ((oml_is_data | default(false) | bool) or (oml_is_aio | default(false) | bool)) else []) +
-          (pods_topology.edge if ((oml_is_edge | default(false) | bool) or (oml_is_aio | default(false) | bool)) else []) +
-          (pods_topology.nodes if ((oml_is_nodes | default(false) | bool) or (oml_is_aio | default(false) | bool)) else [])
+          (['data_statefull'] if (oml_runs_data_statefull | default(false) | bool) else []) +
+          (['data_stateless'] if (oml_runs_data_stateless | default(false) | bool) else []) +
+          (['telephony_edge'] if (oml_runs_edge | default(false) | bool) else []) +
+          (['omlapp_web'] if (oml_runs_omlapp_web | default(false) | bool) else []) +
+          (['omlapp_workers'] if (oml_runs_omlapp_workers | default(false) | bool) else []) +
+          (['dialer_workers'] if (oml_runs_dialer_workers | default(false) | bool) else []) +
+          (['acd'] if (oml_runs_acd | default(false) | bool) else []) +
+          (['callrec_processor'] if (oml_runs_callrec_processor | default(false) | bool) else []) +
+          (
+            ['observability']
+            if (
+              (oml_runs_data_statefull | default(false) | bool)
+              or (oml_runs_data_stateless | default(false) | bool)
+              or (oml_runs_edge | default(false) | bool)
+              or (oml_runs_omlapp_web | default(false) | bool)
+              or (oml_runs_omlapp_workers | default(false) | bool)
+              or (oml_runs_dialer_workers | default(false) | bool)
+              or (oml_runs_acd | default(false) | bool)
+              or (oml_runs_callrec_processor | default(false) | bool)
+            ) else []
+          )
         ) | unique | list
       }}
   tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"

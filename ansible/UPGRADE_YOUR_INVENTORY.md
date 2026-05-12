@@ -54,6 +54,36 @@ La forma en que se agrupan los nodos y clústeres ha cambiado sustancialmente.
     *   Cambie `omnileads_voice` por `omnileads_edge`.
     *   Combine o reemplace los grupos `omnileads_app` y `omnileads_dialer` utilizando el nuevo grupo `omnileads_nodes`.
 
+### Modelo actual: grupos pod (1 grupo = 1 Quadlet `.pod`)
+
+> [!WARNING]
+> **Compatibilidad rota:** los grupos `omnileads_data`, `omnileads_edge`, `omnileads_web`, `omnileads_workers`, `omnileads_acd` y `omnileads_nodes` **ya no** controlan el despliegue. Debés migrar al modelo por **grupos pod** listados abajo. Si un mismo host debe albergar varios pods, incluilo en **varios** de estos grupos (misma convención que antes con el host repetido en `omnileads_data` + `omnileads_nodes`).
+
+| Grupo inventario | Contenido (Podman Quadlet) |
+|--------------------|----------------------------|
+| `data_statefull` | `data_statefull.pod` (PostgreSQL, MinIO) |
+| `data_stateless` | `data_stateless.pod` (Redis, Gearman) |
+| `edge` | `telephony_edge.pod` + HAProxy (sólo hosts en este grupo) |
+| `omlapp_web` | `omlapp_web.pod` (Django/uWSGI, Daphne, websockets, nginx, …) |
+| `omlapp_workers` | `omlapp_workers.pod` + interaction processor |
+| `dialer_workers` | `dialer_workers.pod` |
+| `acd` | `acd.pod` |
+| `callrec_processor` | `callrec_processor.pod` |
+| `omnileads_aio` | Todos los anteriores en un solo host (stack completo) |
+
+**Mapeo desde el modelo anterior (referencia rápida):**
+
+| Antes | Ahora |
+|-------|--------|
+| `omnileads_data` (todo en un nodo) | Mismo host en `data_statefull` **y** `data_stateless` (o separar en dos hosts) |
+| `omnileads_edge` | `edge` |
+| `omnileads_web` | `omlapp_web` |
+| `omnileads_workers` | Uno o más de: `omlapp_workers`, `dialer_workers`, `callrec_processor` según segregación deseada |
+| `omnileads_acd` | `acd` |
+| `omnileads_nodes` (cómputo monolítico) | Mismo host en `omlapp_web`, `omlapp_workers`, `dialer_workers`, `acd`, `callrec_processor` (y observabilidad se añade automáticamente con esos pods) |
+
+**Ejemplos canónicos** (ver `instances/test_3.0/inventory.yml`): `tenant_example_A` (2 hosts, cómputo+datos colocalizados), `tenant_example_B`–`E` con distinto grado de split.
+
 *Ejemplo de estructura 3.X:*
 ```yaml
 cluster_instances:

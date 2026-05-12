@@ -11,7 +11,7 @@ Image={{ PROMETHEUS_IMG }}
 Pod=observability.pod
 Volume=/etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
 Volume=prometheus_data:/prometheus
-Exec=--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.console.libraries=/etc/prometheus/console_libraries --web.console.templates=/etc/prometheus/consoles --storage.tsdb.retention.time=30d --web.enable-lifecycle
+Exec=--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.console.libraries=/etc/prometheus/console_libraries --web.console.templates=/etc/prometheus/consoles --storage.tsdb.retention.time=30d --web.enable-lifecycle --web.route-prefix=/prom --web.external-url=https://{{ fqdn }}/prom
 PodmanArgs=--cgroups=no-conmon
 LogDriver=journald
 Label=tier=observability

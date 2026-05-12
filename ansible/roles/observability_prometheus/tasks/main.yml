@@ -11,7 +11,7 @@
     - upgrade
     - observability
 
-- name: OBSERVABILITY Normalize prometheus_host for compute tier (AIO, HA o omnileads_nodes)
+- name: OBSERVABILITY Normalize prometheus_host for compute tier (AIO o hosts de cómputo / pod)
   ansible.builtin.set_fact:
     prometheus_host: "127.0.0.1"
   changed_when: false
@@ -36,6 +36,32 @@
     - upgrade
     - observability
 
+- name: OBSERVABILITY Derive Quadlets and envs per topology tier
+  ansible.builtin.set_fact:
+    observability_render_prometheus_yml: "{{ oml_runs_omlapp_web | default(false) | bool }}"
+    observability_quadlets: >-
+      {{
+        (
+          ['prometheus_node_exporter.container', 'prometheus_podman_exporter.container']
+          + (['prometheus.container', 'prometheus_uwsgi.container'] if (oml_runs_omlapp_web | default(false) | bool) else [])
+          + (['prometheus_postgres.container'] if (oml_runs_data_statefull | default(false) | bool) else [])
+          + (['prometheus_redis.container', 'prometheus_gearman.container'] if (oml_runs_data_stateless | default(false) | bool) else [])
+        )
+      }}
+    observability_envs: >-
+      {{
+        (
+          (['prometheus_postgres.env'] if (oml_runs_data_statefull | default(false) | bool) else [])
+          + (['prometheus_redis.env'] if (oml_runs_data_stateless | default(false) | bool) else [])
+        )
+      }}
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+    - observability
+
 - name: OBSERVABILITY Render Prometheus configuration
   ansible.builtin.template:
     src: prometheus.yml
@@ -45,6 +71,7 @@
     mode: "0644"
   register: observability_prometheus_config
   notify: Restart observability services
+  when: observability_render_prometheus_yml | bool
   tags:
     - install
     - upgrade
@@ -59,14 +86,8 @@
     mode: "0644"
   register: observability_quadlet_units
   notify: Restart observability services
-  loop:
-    - prometheus.container
-    - prometheus_uwsgi.container
-    - prometheus_podman_exporter.container
-    - prometheus_postgres.container
-    - prometheus_redis.container
-    - prometheus_node_exporter.container
-    - prometheus_gearman.container
+  loop: "{{ observability_quadlets }}"
+  when: observability_quadlets | length > 0
   tags:
     - install
     - upgrade
@@ -75,7 +96,9 @@
 - name: OBSERVABILITY Reload systemd after Quadlet changes
   ansible.builtin.systemd:
     daemon_reload: true
-  when: observability_quadlet_units is changed
+  when:
+    - observability_quadlet_units is defined
+    - observability_quadlet_units is changed
   tags:
     - install
     - upgrade
@@ -90,9 +113,8 @@
     mode: "0640"
   register: observability_exporter_envs
   notify: Restart observability services
-  loop:
-    - prometheus_postgres.env
-    - prometheus_redis.env
+  loop: "{{ observability_envs }}"
+  when: observability_envs | length > 0
   tags:
     - install
     - upgrade
@@ -105,11 +127,16 @@
         (
           (
             ['prometheus.service']
-            if observability_prometheus_config.changed else []
+            if (
+              observability_render_prometheus_yml | default(false) | bool
+              and observability_prometheus_config is defined
+              and observability_prometheus_config is changed
+            )
+            else []
           )
           +
           (
-            observability_quadlet_units.results | default([])
+            (observability_quadlet_units | default({'results': []})).results
             | selectattr('changed', 'equalto', true)
             | map(attribute='dest')
             | map('basename')
@@ -118,7 +145,7 @@
           )
           +
           (
-            observability_exporter_envs.results | default([])
+            (observability_exporter_envs | default({'results': []})).results
             | selectattr('changed', 'equalto', true)
             | map(attribute='dest')
             | map('basename')
@@ -140,14 +167,14 @@
     name: "{{ item }}"
     state: started
     enabled: true
-  loop:
-    - prometheus.service
-    - prometheus_uwsgi.service
-    - prometheus_podman_exporter.service
-    - prometheus_postgres.service
-    - prometheus_redis.service
-    - prometheus_node_exporter.service
-    - prometheus_gearman.service
+    daemon_reload: true
+  loop: >-
+    {{
+      observability_quadlets
+      | map('replace', '.container', '.service')
+      | list
+    }}
+  when: observability_quadlets | length > 0
   tags:
     - install
     - upgrade

@@ -1,0 +1,71 @@
+---
+# Renderiza prometheus.yml sin cargar group_vars (evita vault). Útil para CI / smoke test.
+- name: Smoke test — plantilla Prometheus (hosts múltiples)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    tenant_id: tenant_smoke_multi
+    omni_ip_lan: 10.0.0.1
+    oml_tenant_hosts:
+      - mock_node_a
+      - mock_node_b
+    postgres_host: 10.0.1.1
+    redis_host: 10.0.1.2
+    gearman_host: 10.0.1.2
+    nginx_host: 10.0.1.3
+    acd_host: 10.0.1.4
+    rtpengine_host: 10.0.1.5
+  tasks:
+    - name: Inventario en memoria para hostvars en el template
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        omni_ip_lan: "{{ item.ip }}"
+        groups: mock_tenant_hosts
+      loop:
+        - { name: mock_node_a, ip: 172.16.10.1 }
+        - { name: mock_node_b, ip: 172.16.10.2 }
+
+    - name: Renderizar prometheus.yml
+      ansible.builtin.template:
+        src: ../roles/observability_prometheus/templates/prometheus.yml
+        dest: /tmp/oml_prometheus_smoke.yml
+        mode: "0644"
+
+    - name: Comprobar YAML válido
+      ansible.builtin.set_fact:
+        _smoke_parsed: "{{ lookup('file', '/tmp/oml_prometheus_smoke.yml') | from_yaml }}"
+      changed_when: false
+
+- name: Smoke test — un solo host (equivalente AIO)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    tenant_id: tenant_smoke_aio
+    omni_ip_lan: 10.0.0.50
+    oml_tenant_hosts:
+      - mock_aio_only
+    postgres_host: 10.0.0.50
+    redis_host: 10.0.0.50
+    gearman_host: 10.0.0.50
+    nginx_host: 10.0.0.50
+    acd_host: 10.0.0.50
+    rtpengine_host: 10.0.0.50
+  tasks:
+    - name: Host mock AIO
+      ansible.builtin.add_host:
+        name: mock_aio_only
+        omni_ip_lan: 10.0.0.50
+        groups: mock_aio
+
+    - name: Renderizar prometheus.yml (AIO)
+      ansible.builtin.template:
+        src: ../roles/observability_prometheus/templates/prometheus.yml
+        dest: /tmp/oml_prometheus_smoke_aio.yml
+        mode: "0644"
+
+    - name: Comprobar YAML válido
+      ansible.builtin.set_fact:
+        _smoke_parsed_aio: "{{ lookup('file', '/tmp/oml_prometheus_smoke_aio.yml') | from_yaml }}"
+      changed_when: false

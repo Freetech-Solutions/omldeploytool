@@ -12,3 +12,8 @@ haproxy_backend_ssl_verify: none
 haproxy_pem_dir: /etc/omnileads/haproxy
 haproxy_pem_file: "{{ haproxy_pem_dir }}/oml.pem"
 haproxy_sticky_cookie: SRVID
+# Prometheus detrás de HAProxy (path /prom → omni_ip_lan:9090 en omlapp_web / AIO).
+haproxy_prom_path_prefix: /prom
+haproxy_prom_backend_port: 9090
+# Lista de CIDRs permitidos como origen para /prom; vacío = denegar /prom (403).
+haproxy_prom_allowed_src: []

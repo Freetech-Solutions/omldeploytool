@@ -4,6 +4,9 @@ Description=OmniLeads Observability Pod
 
 [Pod]
 Network={{ oml_network }}
+{% if oml_runs_omlapp_web | default(false) | bool %}
+PublishPort={{ omni_ip_lan }}:9090:9090
+{% endif %}
 
 [Install]
 WantedBy=multi-user.target

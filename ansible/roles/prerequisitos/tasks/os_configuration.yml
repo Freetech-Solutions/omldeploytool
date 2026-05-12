@@ -280,7 +280,7 @@
   tags:
     - upgrade
   when:
-    - oml_is_data | default(false) or oml_is_aio | default(false)
+    - oml_runs_data_statefull | default(false) | bool or oml_is_aio | default(false) | bool
     - postgresql_host_ha is not defined
     - not (postgres_out | default(false) | bool)
     - upgrade_from_2X is not defined

@@ -104,8 +104,8 @@
 
     podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
       alias set MINIO http://{{ omni_ip_lan }}:9000 \
-      {{ minio_root_user | default('omnileads') }} \
-      {{ minio_root_password | default('jdhsgahkdgaskdasdhe2h4231hg4jjhgHJKG') }} >/dev/null
+      {{ s3_http_admin_user | quote }} \
+      {{ s3_http_admin_pass | quote }} >/dev/null
 
     set +e
     podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
@@ -113,7 +113,7 @@
     bucket_rc=$?
 
     podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
-      admin user info MINIO {{ minio_user | default('Hghjkdghjkdhasjdasdsada') }} >/dev/null 2>&1
+      admin user info MINIO {{ bucket_access_key | quote }} >/dev/null 2>&1
     user_rc=$?
     set -e
 
@@ -138,7 +138,9 @@
     # Reintentos por si MinIO tarda un poco más en levantar
     ALIAS_OK=0
     for _ in $(seq 1 15); do
-      if podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} alias set MINIO http://{{ omni_ip_lan }}:9000 {{ minio_root_user | default('omnileads') }} {{ minio_root_password | default('jdhsgahkdgaskdasdhe2h4231hg4jjhgHJKG') }}; then
+      if podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
+          alias set MINIO http://{{ omni_ip_lan }}:9000 \
+          {{ s3_http_admin_user | quote }} {{ s3_http_admin_pass | quote }}; then
         ALIAS_OK=1
         break
       fi
@@ -150,9 +152,12 @@
       exit 1
     fi
 
-    podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} mb MINIO/omnileads || true
-    podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} admin user add MINIO {{ minio_user | default('Hghjkdghjkdhasjdasdsada') }} {{ minio_password | default('jknkjhkjh4523kjhcksjdhkjfdhKJHHKJGKJh786876876NBVJHB') }} || true
-    podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} admin policy attach MINIO readwrite --user {{ minio_user | default('Hghjkdghjkdhasjdasdsada') }} || true
+    podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
+      mb MINIO/omnileads || true
+    podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
+      admin user add MINIO {{ bucket_access_key | quote }} {{ bucket_secret_key | quote }} || true
+    podman run --rm -v "$MC_HOME:/root/.mc" --network=host {{ minio_mc_container_image }} \
+      admin policy attach MINIO readwrite --user {{ bucket_access_key | quote }} || true
   args:
     executable: /bin/bash
   when: minio_env_file.changed or minio_quadlet_file.changed or minio_bootstrap_state.rc != 0

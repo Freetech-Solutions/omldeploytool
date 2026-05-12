@@ -1,8 +1,8 @@
 ---
-# Invocado desde site.yml con vars: oml_play_hosts: omnileads_data|omnileads_edge|omnileads_nodes|omnileads_aio
-# para ejecutar por capas (data → edge → nodos → AIO). Si se ejecuta solo, usa el patrón completo.
-- name: "OMniLeads site deployment ({{ oml_play_hosts | default('omnileads_data:omnileads_edge:omnileads_nodes:omnileads_aio') }})"
-  hosts: "{{ oml_play_hosts | default('omnileads_data:omnileads_edge:omnileads_nodes:omnileads_aio') }}"
+# Invocado desde site.yml con vars: oml_play_hosts (grupos pod + omnileads_aio).
+# Si se ejecuta solo, usa el patrón completo.
+- name: "OMniLeads site deployment ({{ oml_play_hosts | default('data_statefull:data_stateless:edge:omlapp_web:omlapp_workers:dialer_workers:acd:callrec_processor:omnileads_aio') }})"
+  hosts: "{{ oml_play_hosts | default('data_statefull:data_stateless:edge:omlapp_web:omlapp_workers:dialer_workers:acd:callrec_processor:omnileads_aio') }}"
   gather_facts: true
   gather_subset:
     - "!hardware"
