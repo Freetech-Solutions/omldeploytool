@@ -23,7 +23,7 @@ GATEWAY=10.22.72.254
 ###################################################################################################
 
 # --- OMniLeads images WEB
-APP_IMG=docker.io/freetechsolutions/omlapp:20260505-be6c047c
+APP_IMG=docker.io/freetechsolutions/omlapp:20260512-bef97fc2
 NGINX_IMG=docker.io/freetechsolutions/nginx:20260403-72e1ff68
 WS_IMG=docker.io/freetechsolutions/websockets:20260306-13838d19
 
