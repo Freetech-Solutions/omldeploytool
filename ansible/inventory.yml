@@ -317,6 +317,8 @@ all:
     # stasis_idle_timeout_sec = 120
     # stasis_max_size = 60
 
+    # voicebot integration: 
+    # voicebot_headers_vars: X-Verloop-callID: business_id|X-Verloop-customerID: id_customer|X-Verloop-CampID: camp_id
     #####################################################################################################
     #                                       REDIS                                                       #
     #####################################################################################################

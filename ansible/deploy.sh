@@ -2,7 +2,25 @@
 set -euo pipefail
 
 ANSIBLE_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ -f "$ANSIBLE_DIR/venv/bin/activate" ]; then
+  # shellcheck source=/dev/null
+  source "$ANSIBLE_DIR/venv/bin/activate"
+fi
+
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+  echo "ansible-playbook not found. Complete bootstrap first (see ANSIBLE_BOOTSTRAP.md)." >&2
+  exit 1
+fi
+
 DEFAULT_ACTION="install"
+VAULT_FILE="$ANSIBLE_DIR/group_vars/all/vault.yml"
+
+ask_vault_pass=false
+oml_action="$DEFAULT_ACTION"
+oml_tenant=""
+inventory_file=""
+vault_args=()
 
 print_help() {
   cat <<'EOF'
@@ -10,50 +28,43 @@ How to use it:
 
 ./deploy.sh --action=<action> --tenant=<tenant>
 ./deploy.sh --action=<action> --inventory=/abs/path/to/inventory.yml
+./deploy.sh --action=<action> --tenant=<tenant> --ask-vault-pass
 
-With --inventory only, tenant_folder for instances/<tenant>/ files (certs, keys) is
-derived from the inventory filename (e.g. /path/prod.yml -> tenant_folder=prod).
-You can still set --tenant=<name> explicitly to override.
+Ansible Vault (required before any run):
+  Set ANSIBLE_VAULT_PASSWORD_FILE to a local password file, uncomment vault_password_file
+  in ansible.cfg, or pass --ask-vault-pass. See ANSIBLE_BOOTSTRAP.md.
 
-Primary actions:
-  install
-  upgrade
-  update
-  restart
+With --inventory only, tenant_folder for instances/<tenant>/ files (certs, keys) is derived:
+  - instances/<tenant>/inventory.yml  -> tenant_folder=<tenant>
+  - /path/to/prod.yml                 -> tenant_folder=prod
+Pass --tenant=<name> to override.
+
+Primary actions (playbooks/site.yml unless noted):
+  install, upgrade, update
   prerequisitos
-  voice
-  omlapp
-  omlapp-workers
+  voice, telephony-edge, acd, interaction_processor
+  omlapp, omlapp-workers, nginx, websockets, dialer, qa, addons
   observability
-  postgres
-  redis
-  minio
-  kamailio
-  telephony-edge
-  acd
+  postgres, redis, minio, gearman
+  haproxy, edge
+  data
+  kamailio          (alias for telephony-edge)
 
-Layout validation then full site.yml (use matching topology for your inventory):
+Layout validation then full site.yml (match topology to your inventory):
   layout-cluster   -> playbooks/cluster.yml
   layout-aio       -> playbooks/aio.yml
-
-Operational playbooks (require real content under ansible/components/; see ansible/components/README.md):
-  backup
-  restore
-  recycle
-
-Legacy component actions (ansible/components/):
-  haproxy
-  sentinel
 
 prerequisitos runs the full prerequisitos role (packages, Podman quadlets base, checks,
 os_configuration) without other components; use for base OS prep or re-applying prerequisites.
 
-Partial actions (voice, postgres, redis, …) assume a working node or a prior install.
-They run only tasks tagged for that action; Podman + omnileads network are included for
-component tags via the prerequisitos role. For brand-new servers, run install first.
+Partial actions assume a working node or a prior install. They run only tasks tagged for
+that action; Podman + omnileads network are included for component tags via prerequisitos.
+For brand-new servers, run install first.
 
-update is the recommended action for repeated deploys after the first install. It keeps the
-deployment reconciled without re-running the full bootstrap path unless relevant inputs changed.
+update is the recommended action for repeated deploys after the first install.
+
+Removed in 3.X (use oml_manage on the host for backup/restore operations):
+  backup, restore, recycle, sentinel, restart
 
 Ansible log (ansible.cfg log_path): directory ANSIBLE_LOG_DIR (default /tmp/oml_install_logs)
 is created before each run; log file ansible.log inside that directory.
@@ -73,6 +84,75 @@ banner() {
   fi
 }
 
+parse_vault_password_file_from_cfg() {
+  local line path
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    case "$line" in
+      vault_password_file=*)
+        path="${line#vault_password_file=}"
+        path="${path#"${path%%[![:space:]]*}"}"
+        path="${path%"${path##*[![:space:]]}"}"
+        path="${path%\"}"
+        path="${path#\"}"
+        path="${path%\'}"
+        path="${path#\'}"
+        if [ -n "$path" ]; then
+          printf '%s\n' "$path"
+          return 0
+        fi
+        ;;
+    esac
+  done < "$ANSIBLE_DIR/ansible.cfg"
+  return 1
+}
+
+resolve_vault_args() {
+  vault_args=()
+
+  if [ "$ask_vault_pass" = true ]; then
+    vault_args=(--ask-vault-pass)
+    return 0
+  fi
+
+  if [ -n "${ANSIBLE_VAULT_PASSWORD_FILE:-}" ] && [ -f "${ANSIBLE_VAULT_PASSWORD_FILE}" ]; then
+    vault_args=(--vault-password-file "${ANSIBLE_VAULT_PASSWORD_FILE}")
+    return 0
+  fi
+
+  local cfg_vault_file
+  if cfg_vault_file="$(parse_vault_password_file_from_cfg)"; then
+    if [ -f "$cfg_vault_file" ]; then
+      vault_args=(--vault-password-file "$cfg_vault_file")
+      return 0
+    fi
+  fi
+
+  cat >&2 <<EOF
+Ansible Vault password not configured.
+
+Set ANSIBLE_VAULT_PASSWORD_FILE to a local password file, uncomment vault_password_file
+in ansible.cfg, or pass --ask-vault-pass.
+
+See ANSIBLE_BOOTSTRAP.md for bootstrap steps.
+EOF
+  exit 1
+}
+
+preflight_vault() {
+  if [ ! -f "$VAULT_FILE" ]; then
+    echo "Missing vault file: $VAULT_FILE (see ANSIBLE_BOOTSTRAP.md)." >&2
+    exit 1
+  fi
+
+  if ! ansible-vault view "$VAULT_FILE" "${vault_args[@]}" >/dev/null 2>&1; then
+    echo "Cannot decrypt $VAULT_FILE. Check your Vault password (see ANSIBLE_BOOTSTRAP.md)." >&2
+    exit 1
+  fi
+}
+
 resolve_inventory() {
   if [ -n "${inventory_file:-}" ]; then
     printf '%s\n' "$inventory_file"
@@ -87,15 +167,49 @@ resolve_inventory() {
   printf '%s/instances/%s/inventory.yml\n' "$ANSIBLE_DIR" "$oml_tenant"
 }
 
-# When using a custom inventory path, derive tenant_folder from the filename if --tenant omitted.
 derive_tenant_folder() {
-  if [ -n "${oml_tenant}" ] || [ -z "${inventory_file:-}" ]; then
+  if [ -n "${oml_tenant}" ]; then
     return 0
   fi
-  local base
+
+  if [ -z "${inventory_file:-}" ]; then
+    return 0
+  fi
+
+  local base dir
   base="$(basename "${inventory_file}")"
-  oml_tenant="${base%.yml}"
-  oml_tenant="${oml_tenant%.yaml}"
+  dir="$(dirname "${inventory_file}")"
+
+  case "$base" in
+    inventory.yml|inventory.yaml)
+      oml_tenant="$(basename "$dir")"
+      ;;
+    *)
+      oml_tenant="${base%.yml}"
+      oml_tenant="${oml_tenant%.yaml}"
+      ;;
+  esac
+}
+
+validate_inventory() {
+  local inventory_path
+  inventory_path="$(resolve_inventory)"
+
+  if [ ! -f "$inventory_path" ]; then
+    if [ -n "${oml_tenant:-}" ] && [ -z "${inventory_file:-}" ]; then
+      echo "Inventory not found: instances/${oml_tenant}/inventory.yml" >&2
+    else
+      echo "Inventory not found: $inventory_path" >&2
+    fi
+    exit 1
+  fi
+}
+
+unsupported_action() {
+  local action="$1"
+  echo "Action '$action' is not available in deploy.sh 3.X." >&2
+  echo "Use oml_manage on the target host for backup/restore operations." >&2
+  exit 1
 }
 
 release_value() {
@@ -118,12 +232,8 @@ run_playbook() {
   ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}" \
   ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-/tmp/ansible-remote}" \
   ANSIBLE_LOG_PATH="${ANSIBLE_LOG_PATH:-/tmp/oml_install_logs}" \
-  ansible-playbook "$playbook" -i "$inventory_path" "$@"
+  ansible-playbook "$playbook" -i "$inventory_path" "${vault_args[@]}" "$@"
 }
-
-oml_action="$DEFAULT_ACTION"
-oml_tenant=""
-inventory_file=""
 
 for arg in "$@"; do
   case "$arg" in
@@ -135,6 +245,9 @@ for arg in "$@"; do
       ;;
     --inventory=*)
       inventory_file="${arg#*=}"
+      ;;
+    --ask-vault-pass)
+      ask_vault_pass=true
       ;;
     --help|-h)
       print_help
@@ -149,6 +262,16 @@ for arg in "$@"; do
 done
 
 derive_tenant_folder
+validate_inventory
+
+case "$oml_action" in
+  backup|restore|recycle|sentinel|restart)
+    unsupported_action "$oml_action"
+    ;;
+esac
+
+resolve_vault_args
+preflight_vault
 
 common_extra_vars=(
   --extra-vars "tenant_folder=${oml_tenant}"
@@ -159,27 +282,9 @@ common_extra_vars=(
 
 rc=0
 case "$oml_action" in
-  backup)
-    run_playbook "$ANSIBLE_DIR/playbooks/backup.yml" \
-      --tags "$oml_action" \
-      --extra-vars "file_timestamp=$(date +%s)" \
-      "${common_extra_vars[@]}" || rc=$?
-    ;;
-  restore|recycle)
-    run_playbook "$ANSIBLE_DIR/playbooks/${oml_action}.yml" \
-      --tags "$oml_action" \
-      "${common_extra_vars[@]}" || rc=$?
-    ;;
-  haproxy)
-    run_playbook "$ANSIBLE_DIR/components/haproxy/playbook.yml" \
-      --tags "$oml_action" \
-      --extra-vars "haproxy_repo_path=$ANSIBLE_DIR/components/haproxy/" \
-      "${common_extra_vars[@]}" || rc=$?
-    ;;
-  sentinel)
-    run_playbook "$ANSIBLE_DIR/components/sentinel/playbook.yml" \
-      --tags "$oml_action" \
-      --extra-vars "sentinel_repo_path=$ANSIBLE_DIR/components/sentinel/" \
+  kamailio)
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "telephony-edge" \
       "${common_extra_vars[@]}" || rc=$?
     ;;
   layout-cluster)
@@ -191,13 +296,11 @@ case "$oml_action" in
       "${common_extra_vars[@]}" || rc=$?
     ;;
   omlapp-workers)
-    # Role tag must match; gather_facts is otherwise skipped when filtering by --tags
     run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
       --tags "omlapp-workers,gather_facts" \
       "${common_extra_vars[@]}" || rc=$?
     ;;
   observability)
-    # Incluye gather_facts; Promtail sin loki_host en inventario vía oml_observability_deploy
     run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
       --tags "observability,gather_facts" \
       --extra-vars "oml_observability_deploy=true" \
@@ -208,10 +311,15 @@ case "$oml_action" in
       --tags "prerequisitos,gather_facts" \
       "${common_extra_vars[@]}" || rc=$?
     ;;
-  *)
+  install|upgrade|update|voice|telephony-edge|acd|interaction_processor|omlapp|nginx|websockets|dialer|qa|addons|postgres|redis|minio|gearman|haproxy|edge|data)
     run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
       --tags "$oml_action" \
       "${common_extra_vars[@]}" || rc=$?
+    ;;
+  *)
+    echo "Unknown action: $oml_action" >&2
+    print_help
+    exit 1
     ;;
 esac
 

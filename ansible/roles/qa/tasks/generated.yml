@@ -1,5 +1,5 @@
 - name: QA PSTN_EULATOR Pull image
-  command: podman image exists {{ pstn_emulator_img }}
+  command: podman image exists {{ PSTN_EMULATOR_IMG }}
   register: qa_pstn_image_cache
   changed_when: false
   failed_when: qa_pstn_image_cache.rc not in [0, 1]
@@ -8,7 +8,7 @@
     - upgrade
 
 - name: QA PSTN_EULATOR Pull image when missing or forced
-  command: podman pull --quiet {{ pstn_emulator_img }}
+  command: podman pull --quiet {{ PSTN_EMULATOR_IMG }}
   register: qa_pstn_pull
   retries: 3
   delay: 5
@@ -29,34 +29,35 @@
     - install
     - upgrade
 
-- name: QA PSTN_EMULATOR Copy systemd service
+- name: QA PSTN_EMULATOR Remove legacy systemd unit (pre-Quadlet)
+  ansible.builtin.file:
+    path: /etc/systemd/system/pstn.service
+    state: absent
+  register: qa_pstn_legacy_unit
+  tags:
+    - install
+    - upgrade
+
+- name: QA PSTN_EMULATOR Copy Quadlet file
   template:
     src: "pstn.service"
-    dest: /etc/systemd/system/pstn.service
-  register: qa_pstn_service_unit
+    dest: /etc/containers/systemd/pstn.container
+    mode: "0644"
+  register: qa_pstn_quadlet_unit
   tags:
     - install
     - upgrade
 
-- name: QA PSTN_EMULATOR systemd daemon-reload after unit file
+- name: QA PSTN_EMULATOR Reload systemd after Quadlet changes
   ansible.builtin.systemd:
     daemon_reload: true
-  when: qa_pstn_service_unit is changed
-  tags:
-    - install
-    - upgrade
-
-- name: QA PSTN_EMULATOR start
-  systemd:
-    name: pstn.service
-    state: restarted
-    enabled: yes
+  when: qa_pstn_quadlet_unit is changed or qa_pstn_legacy_unit is changed
   tags:
     - install
     - upgrade
 
 - name: QA NGINX_CGI Pull image
-  command: podman image exists {{ nginxcgi_img }}
+  command: podman image exists {{ NGINX_QA_IMG }}
   register: qa_nginxcgi_image_cache
   changed_when: false
   failed_when: qa_nginxcgi_image_cache.rc not in [0, 1]
@@ -65,7 +66,7 @@
     - upgrade
 
 - name: QA NGINX_CGI Pull image when missing or forced
-  command: podman pull --quiet {{ nginxcgi_img }}
+  command: podman pull --quiet {{ NGINX_QA_IMG }}
   register: qa_nginxcgi_pull
   retries: 3
   delay: 5
@@ -86,30 +87,61 @@
     - install
     - upgrade
 
-- name: QA MYSQL environment variables for this installation
-  template:
-    src: "mysql.env"
-    dest: /etc/default/mysql.env
-    mode: "0640"
-    owner: "{{ usuario }}"
-    group: "{{ usuario }}"
+- name: QA NGINX_CGI Remove legacy systemd unit (pre-Quadlet)
+  ansible.builtin.file:
+    path: /etc/systemd/system/nginx_qa.service
+    state: absent
+  register: qa_nginx_qa_legacy_unit
   tags:
     - install
     - upgrade
 
-- name: QA NGINX_CGI Copy systemd service
+- name: QA NGINX_CGI Copy Quadlet file
   template:
     src: "nginx_qa.service"
-    dest: /etc/systemd/system/nginx_qa.service
-  register: qa_nginx_qa_service_unit
+    dest: /etc/containers/systemd/nginx_qa.container
+    mode: "0644"
+  register: qa_nginx_qa_quadlet_unit
   tags:
     - install
     - upgrade
 
-- name: QA NGINX_CGI systemd daemon-reload after unit file
+- name: QA NGINX_CGI Reload systemd after Quadlet changes
   ansible.builtin.systemd:
     daemon_reload: true
-  when: qa_nginx_qa_service_unit is changed
+  when: qa_nginx_qa_quadlet_unit is changed or qa_nginx_qa_legacy_unit is changed
+  tags:
+    - install
+    - upgrade
+
+# Workaround para race con podman 5.x (Debian Trixie): cuando recién se generan
+# los Quadlets, el primer container que arranca dispara el start del pod, pero
+# el pod queda inestable y los starts subsiguientes (nginx_qa tras pstn) fallan
+# con "Job for <svc> canceled." porque el .pod.service se desactiva.
+# Reiniciar el pod una vez deja la infra estable antes de los starts secuenciales.
+- name: QA Reinit qa pod (workaround podman 5.x)
+  ansible.builtin.systemd:
+    name: "{{ qa_pod_systemd_unit | default('qa-pod.service') }}"
+    state: restarted
+  when: qa_pstn_quadlet_unit is changed or qa_nginx_qa_quadlet_unit is changed
+  tags:
+    - install
+    - upgrade
+
+- name: QA Ensure qa pod is active
+  ansible.builtin.systemd:
+    name: "{{ qa_pod_systemd_unit | default('qa-pod.service') }}"
+    state: started
+    enabled: yes
+  tags:
+    - install
+    - upgrade
+
+- name: QA PSTN_EMULATOR start
+  systemd:
+    name: pstn.service
+    state: restarted
+    enabled: yes
   tags:
     - install
     - upgrade
@@ -123,64 +155,59 @@
     - install
     - upgrade
 
-- name: QA init environment
-  shell: podman exec -it oml-uwsgi-server python3 /opt/omnileads/ominicontacto/manage.py inicializar_entorno 
-  tags:
-    - install
-
-- name: QA WOMBAT Pull image
-  command: podman image exists {{ wombat_img }}
-  register: qa_wombat_image_cache
+- name: QA Wait for django uwsgi container
+  ansible.builtin.command:
+    cmd: podman ps -q --filter name=^{{ omlapp_uwsgi_container_name }}$ --filter status=running
+  register: qa_uwsgi_wait
+  until: qa_uwsgi_wait.stdout | trim | length > 0
+  retries: 40
+  delay: 3
   changed_when: false
-  failed_when: qa_wombat_image_cache.rc not in [0, 1]
+  failed_when: false
   tags:
     - install
-    - upgrade
 
-- name: QA WOMBAT Pull image when missing or forced
-  command: podman pull --quiet {{ wombat_img }}
-  register: qa_wombat_pull
-  retries: 3
-  delay: 5
-  until: qa_wombat_pull is success
-  when: force_image_pull | bool or qa_wombat_image_cache.rc != 0
+- name: QA Require django uwsgi for environment init
+  ansible.builtin.fail:
+    msg: >-
+      El contenedor {{ omlapp_uwsgi_container_name }} no está en ejecución;
+      verifique omnileads.service antes de inicializar el entorno QA.
+  when: qa_uwsgi_wait.stdout | trim | length == 0
   tags:
     - install
-    - upgrade
 
-- name: QA WOMBAT environment variables for this installation
-  template:
-    src: "wombat.env"
-    dest: /etc/default/wombat.env
-    mode: "0640"
-    owner: "{{ usuario }}"
-    group: "{{ usuario }}"
+- name: QA Check if test environment is already initialized
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ omlapp_uwsgi_container_name }}"
+      - python3
+      - /opt/omnileads/ominicontacto/manage.py
+      - shell
+      - -c
+      - >-
+        from ominicontacto_app.models import Campana;
+        import sys;
+        sys.exit(0 if Campana.objects.filter(nombre='inbound-1').exists() else 1)
+  register: qa_env_already_initialized
+  changed_when: false
+  failed_when: false
+  when: qa_uwsgi_wait.stdout | trim | length > 0
   tags:
     - install
-    - upgrade
 
-- name: QA WOMBAT Copy systemd service
-  template:
-    src: "wombat.service"
-    dest: /etc/systemd/system/wombat.service
-  register: qa_wombat_service_unit
+- name: QA init environment
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ omlapp_uwsgi_container_name }}"
+      - python3
+      - /opt/omnileads/ominicontacto/manage.py
+      - inicializar_entorno
+  when:
+    - qa_uwsgi_wait.stdout | trim | length > 0
+    - qa_env_already_initialized.rc | default(1) != 0
   tags:
     - install
-    - upgrade
-
-- name: QA WOMBAT systemd daemon-reload after unit file
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: qa_wombat_service_unit is changed
-  tags:
-    - install
-    - upgrade
-
-- name: QA WOMBAT start
-  systemd:
-    name: wombat.service
-    state: restarted
-    enabled: yes
-  tags:
-    - install
-    - upgrade

@@ -20,6 +20,8 @@ docker-compose/prod-env/oml_manage.sh
 docker-compose/test-env/oml_manage.sh
 docker-compose/dev-env/oml_manage.sh
 docker-compose/dev-env/.env
+docker-compose/dev-env/gitlab/
+docker-compose/dev-env/gitlab-runner/config/config.toml
 docker-compose/prod-env/.env
 docker-compose/test-env/.env
 docker-compose/observability/.env

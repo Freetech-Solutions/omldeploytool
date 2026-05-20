@@ -14,7 +14,9 @@ Label=tier=telephony
 PodmanArgs=--cgroups=no-conmon
 Volume={{ certs_location | default(certs_location) }}:{{ kamailio_certs_location | default(certs_location) }}
 PodmanArgs=--entrypoint=/entrypoint_pstn.sh
-
+{% if kamailio_pstn_custom | default(false) | bool %}
+Volume=/etc/omnileads/kamailio_pstn.cfg:/etc/kamailio/kamailio_pstn.cfg:ro
+{% endif %}
 
 [Service]
 Restart=on-failure

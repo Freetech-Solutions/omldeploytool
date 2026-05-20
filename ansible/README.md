@@ -82,7 +82,8 @@ Typical parameters:
 
 * `--action=<action>` (default `install`). Supported actions are listed below.
 * `--tenant=<tenant-folder>` to use `instances/<tenant>/inventory.yml`.
-* `--inventory=/abs/path/to/inventory.yml` to point at an inventory outside `instances/`. If you omit `--tenant`, `tenant_folder` (used to locate certs/keys under `instances/<tenant>/`) is derived from the inventory filename. Pass `--tenant=` to override.
+* `--inventory=/abs/path/to/inventory.yml` to point at an inventory outside `instances/`. If you omit `--tenant`, `tenant_folder` (used to locate certs/keys under `instances/<tenant>/`) is derived from the inventory path: `instances/<tenant>/inventory.yml` → `<tenant>`, or the filename without extension for other paths (e.g. `/srv/inventories/prod.yml` → `prod`). Pass `--tenant=` to override.
+* `--ask-vault-pass` to prompt for the Vault password interactively (otherwise `deploy.sh` uses `ANSIBLE_VAULT_PASSWORD_FILE` or `vault_password_file` from `ansible.cfg`; see [ANSIBLE_BOOTSTRAP.md](ANSIBLE_BOOTSTRAP.md)).
 
 ### Supported actions
 
@@ -91,19 +92,22 @@ Typical parameters:
 | `install` | `playbooks/site.yml` | First-time deploy on fresh hosts. Required before partial actions. |
 | `update` | `playbooks/site.yml` | Reconcile a deployed tenant without re-running the full bootstrap path. Recommended for routine re-deploys. |
 | `upgrade` | `playbooks/site.yml` | Apply a new release / image bump. |
-| `restart` | `playbooks/site.yml` | Restart-tagged tasks. |
 | `prerequisitos` | `playbooks/site.yml` (tags `prerequisitos,gather_facts`) | OS packages, Podman + `omnileads` network, swap, journald, base Quadlet, certs. |
 | `voice` | `playbooks/site.yml` | Telephony tasks (`telephony_edge`, `acd`, `interaction_processor`). |
 | `omlapp` | `playbooks/site.yml` | Django/uWSGI + Daphne + Nginx + websockets. |
 | `omlapp-workers` | `playbooks/site.yml` (tags `omlapp-workers,gather_facts`) | Workers of the omlapp pod. |
 | `observability` | `playbooks/site.yml` (tags `observability,gather_facts`, `oml_observability_deploy=true`) | Prometheus + exporters + Promtail. |
-| `postgres` / `redis` / `minio` | `playbooks/site.yml` | Single data role re-run. |
-| `kamailio` / `telephony-edge` | `playbooks/site.yml` | Edge-only roles. |
-| `acd` | `playbooks/site.yml` | ACD-only role. |
+| `postgres` / `redis` / `minio` / `gearman` | `playbooks/site.yml` | Single data role re-run. |
+| `data` | `playbooks/site.yml` | All data roles (postgres, redis, minio, gearman). |
+| `telephony-edge` | `playbooks/site.yml` | Edge telephony role (`rtpengine`, Kamailio WebRTC/PSTN). |
+| `kamailio` | `playbooks/site.yml` | Alias for `telephony-edge` (compatibility). |
+| `haproxy` | `playbooks/site.yml` | HAProxy on the edge host (role in `site_core.yml`). |
+| `edge` | `playbooks/site.yml` | Edge layer (`haproxy` + `telephony-edge`). |
+| `acd` / `interaction_processor` / `nginx` / `websockets` / `dialer` / `qa` / `addons` | `playbooks/site.yml` | Single role re-run. |
 | `layout-aio` | `playbooks/aio.yml` | Assert AIO layout, then run `site.yml`. |
 | `layout-cluster` | `playbooks/cluster.yml` | Assert cluster layout (`oml_layout == "cluster"`, mandatory pod groups), then run `site.yml`. |
 
-> **Legacy / operational actions** — `backup`, `restore`, `recycle`, `haproxy` and `sentinel` still exist as switches in `deploy.sh`, but they expect content under `ansible/components/*` that was removed in 3.X. Run them only after restoring/maintaining the matching components tree (see `ansible/components/README.md`).
+> **Removed in 3.X** — `backup`, `restore`, `recycle`, `sentinel` and `restart` are no longer available in `deploy.sh`. Use `oml_manage` on the target host for backup/restore operations.
 
 `prerequisitos` reconciles base OS prep (packages, Quadlet base, swap, certs, `os_configuration`, Podman + `omnileads` network) without touching components. Partial actions (`voice`, `postgres`, …) assume `install` already ran on the host: they only run tasks tagged for that action and rely on `prerequisitos` to bring up Podman/network when needed.
 
@@ -160,7 +164,7 @@ Cluster example:
 For every host the role computes, based on its group membership:
 
 * `oml_layout` (`aio` or `cluster`).
-* Service endpoints used by the templates: `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host`, `fastagi_host`, `dialer_host`.
+* Service endpoints used by the templates: `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host`, `dialer_host`.
 * External service overrides (`postgres_host`, `bucket_url`, `rtpengine_host`, `kamailio_pstn_host`) when you declare them in the inventory.
 * The per-component switches (`component_postgresql_enabled`, `component_acd_enabled`, `component_haproxy_enabled`, …) that gate the roles in `playbooks/site_core.yml`.
 
@@ -574,11 +578,7 @@ When the block above is filled the deploy installs a CRON entry on the data host
 
 ### On-demand backups
 
-```
-./deploy.sh --action=backup --tenant=<tenant>
-```
-
-> The `backup`, `restore`, `recycle`, `haproxy` and `sentinel` actions in `deploy.sh` are **legacy operational playbooks** under `ansible/components/`. The 3.X branch keeps them as switches but the `components/` tree may be empty in your clone (see `ansible/components/README.md`). Make sure the corresponding playbook exists before relying on them.
+Use `oml_manage` on the data host for on-demand backup/restore operations. The `backup`, `restore` and `recycle` actions were removed from `deploy.sh` in 3.X.
 
 ### Backup layout
 
@@ -609,11 +609,7 @@ Then:
 ./deploy.sh --action=install --tenant=algarrobo
 ```
 
-For a **productive** instance, run the dedicated restore action (legacy, see note above):
-
-```
-./deploy.sh --action=restore --tenant=oml_tenants
-```
+For a **productive** instance, use `oml_manage` on the target host for restore operations (the `restore` action was removed from `deploy.sh` in 3.X).
 
 # Upgrades :arrows_counterclockwise: <a name="upgrades"></a>
 
@@ -947,7 +943,7 @@ callrec_processor:
 In this layout `topology_normalize` infers:
 
 * `nginx_host` and `dialer_host` from the host in `omlapp_web`.
-* `acd_host` and `fastagi_host` from the host in `acd`.
+* `acd_host` from the host in `acd` (FastAGI corre dentro del pod `acd`, acd-server lo invoca como `127.0.0.1`).
 * `data_host` from the host(s) in `data_statefull` / `data_stateless`.
 * `edge_host` from the host in `edge`.
 

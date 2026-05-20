@@ -257,7 +257,7 @@ ansible -i instances/<tenant>/inventory.yml all \
 ansible -i instances/<tenant>/inventory.yml all -m ping
 ```
 
-Si los tres comandos responden OK, podés disparar el deploy:
+Si los tres comandos responden OK, podés disparar el deploy. `deploy.sh` activa el venv automáticamente si existe, resuelve la password del Vault desde `ANSIBLE_VAULT_PASSWORD_FILE` (o `vault_password_file` en `ansible.cfg`) y valida `group_vars/all/vault.yml` antes de ejecutar el playbook — no hace falta pasar `--ask-vault-pass` ni `--vault-password-file` manualmente si ya exportaste la variable en el paso 2.1:
 
 ```bash
 ./deploy.sh --action=install --tenant=<tenant>
@@ -269,6 +269,8 @@ O bien, apuntando a un inventario fuera de `instances/`:
 ./deploy.sh --action=install --inventory=/ruta/absoluta/al/inventory.yml
 ```
 
+Para inventarios bajo `instances/<tenant>/inventory.yml`, `deploy.sh` deriva `tenant_folder=<tenant>` sin necesidad de `--tenant=`.
+
 Para la lista completa de acciones, ver `./deploy.sh --help` y la sección
 [Bash Script deploy.sh](./README.md#bash-script-deploysh-) del README.
 
@@ -278,7 +280,8 @@ Para la lista completa de acciones, ver `./deploy.sh --help` y la sección
 
 | Síntoma | Causa probable | Solución |
 | ------- | -------------- | -------- |
-| `ERROR! Attempting to decrypt but no vault secrets found` | No exportaste `ANSIBLE_VAULT_PASSWORD_FILE` ni configuraste `vault_password_file` en `ansible.cfg`. | Reexportar o pasar `--vault-password-file` en la línea de comando. |
+| `ERROR! Attempting to decrypt but no vault secrets found` | No exportaste `ANSIBLE_VAULT_PASSWORD_FILE` ni configuraste `vault_password_file` en `ansible.cfg`. | Reexportar la variable, descomentar `vault_password_file` en `ansible.cfg`, o usar `./deploy.sh --ask-vault-pass`. |
+| `Ansible Vault password not configured` (al invocar `deploy.sh`) | `deploy.sh` no encontró ninguna fuente de password del Vault. | Completar el paso 2.1 (`export ANSIBLE_VAULT_PASSWORD_FILE=...`) o pasar `--ask-vault-pass`. |
 | `ERROR! Decryption failed` | Password incorrecta o archivo cifrado con otra clave. | Validar la password (`ansible-vault view ./group_vars/all//vault.yml`) o re-cifrar con `rekey`. |
 | `Missing inventory source. Use --tenant or --inventory.` | `deploy.sh` invocado sin `--tenant=` ni `--inventory=`. | Pasar uno de los dos. |
 | `instances/<tenant>/inventory.yml: No such file or directory` | El tenant no fue creado o tipeaste mal el nombre. | Revisar `ls instances/`. |

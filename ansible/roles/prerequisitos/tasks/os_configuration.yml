@@ -285,16 +285,30 @@
     - not (postgres_out | default(false) | bool)
     - upgrade_from_2X is not defined
 
-- name: OS_CONF rm Django static_files volume
-  containers.podman.podman_volume:
-    name: django_static
-    state: absent
+- name: OS_CONF Refresh Django static_files volume (upgrade)
   become: true
   tags:
     - upgrade
   when:
     - oml_is_compute | default(false)
-  ignore_errors: true
+  block:
+    - name: OS_CONF Stop omnileads.service before volume refresh
+      ansible.builtin.systemd:
+        name: omnileads.service
+        state: stopped
+      failed_when: false
+
+    - name: OS_CONF Remove stale Django static_files volume
+      containers.podman.podman_volume:
+        name: django_static
+        state: absent
+        force: true
+      failed_when: false
+
+    - name: OS_CONF Recreate empty Django static_files volume
+      containers.podman.podman_volume:
+        name: django_static
+        state: present
 
 - name: OS_CONF Swap file management
   when: swap_space is defined

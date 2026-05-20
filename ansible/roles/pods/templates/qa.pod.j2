@@ -1,0 +1,12 @@
+[Unit]
+StopWhenUnneeded=false
+Description=OmniLeads QA Pod
+
+[Pod]
+Network={{ oml_network }}
+
+PublishPort={{ omni_ip_lan }}:4569:4569/udp
+PublishPort={{ omni_ip_lan }}:8808:8808
+
+[Install]
+WantedBy=multi-user.target

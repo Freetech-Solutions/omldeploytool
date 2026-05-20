@@ -8,6 +8,7 @@ La rama `oml-773-dev-oml-3` transforma el deploy Ansible de OMniLeads hacia una 
 
 ## Nuevas Funcionalidades (Features)
 
+- `deploy.sh` 3.X: integracion obligatoria de Ansible Vault (pre-vuelo `ansible-vault view`, `ANSIBLE_VAULT_PASSWORD_FILE` / `ansible.cfg` / `--ask-vault-pass`), activacion automatica del venv, derivacion correcta de `tenant_folder` desde `instances/<tenant>/inventory.yml`, acciones alineadas con tags de `site_core.yml` (`data`, `edge`, `gearman`, `nginx`, `qa`, …), alias `kamailio` → `telephony-edge`, y eliminacion de acciones legacy (`backup`, `restore`, `recycle`, `sentinel`, `restart`, `components/haproxy`).
 - Deploy por topologia: se agregan `playbooks/site.yml`, `site_core.yml`, `aio.yml` y `cluster.yml`, con validacion explicita de layout antes de desplegar.
 - Inventario 3.X: se introducen grupos `omnileads_data`, `omnileads_edge`, `omnileads_nodes` y `omnileads_aio`, reemplazando el patron anterior de `omnileads_voice`, `omnileads_app` y `omnileads_dialer`.
 - Normalizacion automatica de topologia: el rol `topology_normalize` infiere `data_host`, `edge_host`, `aio_host`, endpoints de servicios y switches de componentes segun el grupo donde vive cada host.

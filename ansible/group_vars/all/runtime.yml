@@ -46,6 +46,9 @@ data_statefull_pod_systemd_unit: data_statefull-pod.service
 # individuales tira la infra del pod y los siguientes starts fallan con
 # "Bound to unit telephony_edge-pod.service, but unit isn't active".
 telephony_edge_pod_systemd_unit: telephony_edge-pod.service
+# Unidad systemd del quadlet qa.pod (pstn emulator + nginx_qa CGI). Debe estar
+# activa al reiniciar contenedores del pod.
+qa_pod_systemd_unit: qa-pod.service
 acd_pod: acd
 dialer_api_pod: dialer
 web_pod: omlapp
@@ -81,6 +84,9 @@ rtpengine_container_name: rtpengine-server
 pstn_qa_container_name: oml-pstn-server
 
 autheph_sk: "{{ vault_autheph_sk }}"
+
+bucket_endpoint: "{{ bucket_url }}"
+bucket_endpoint_internal: "{{ bucket_url }}"
 
 # Tags que disparan el rol 'pods'. Debe correr siempre que corra cualquier rol
 # cuyos .container declaren Pod=<name>.pod / Requires=<name>-pod.service, sino
