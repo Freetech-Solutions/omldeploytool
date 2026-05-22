@@ -1,0 +1,95 @@
+# GitLab CE + GitLab Runner local para pipelines CI (SAST, test, build con DinD).
+# Uso: docker compose -f docker-compose-gitlab.yml up -d
+# Documentación: README-GITLAB.md
+
+name: omnileads-gitlab
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:17.4.2-ce.0
+    container_name: omnileads-gitlab-ce
+    hostname: gitlab.local
+    restart: unless-stopped
+    shm_size: "256m"
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "2222:22"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.local:8080'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['initial_root_password'] = 'rootpassword123'
+        gitlab_rails['initial_root_token'] = 'glpat-oml-local-gitlab-root'
+
+        registry['enable'] = false
+        gitlab_rails['registry_enabled'] = false
+
+        prometheus_monitoring['enable'] = false
+        puma['worker_processes'] = 2
+        sidekiq['max_concurrency'] = 10
+
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+    volumes:
+      - ./gitlab/config:/etc/gitlab
+      - ./gitlab/logs:/var/log/gitlab
+      - ./gitlab/data:/var/opt/gitlab
+    networks:
+      omnileads-gitlab:
+        aliases:
+          - gitlab.local
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/gitlab/bin/gitlab-healthcheck --fail --fast"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
+  gitlab-runner-register:
+    image: alpine:3.20
+    container_name: omnileads-gitlab-runner-register
+    restart: "no"
+    depends_on:
+      gitlab:
+        condition: service_healthy
+    environment:
+      GITLAB_URL: http://gitlab
+      GITLAB_ROOT_TOKEN: glpat-oml-local-gitlab-root
+      RUNNER_CONFIG_DIR: /etc/gitlab-runner
+      RUNNER_DESCRIPTION: local-docker-dind
+      MAX_WAIT: "600"
+    volumes:
+      - ./gitlab-runner/register.sh:/register/register.sh:ro
+      - ./gitlab-runner/config.toml.template:/register/config.toml.template:ro
+      - ./gitlab-runner/config:/etc/gitlab-runner
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache curl >/dev/null
+        exec /register/register.sh
+    networks:
+      - omnileads-gitlab
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:v17.4.1
+    container_name: omnileads-gitlab-runner
+    restart: unless-stopped
+    depends_on:
+      gitlab:
+        condition: service_healthy
+      gitlab-runner-register:
+        condition: service_completed_successfully
+    volumes:
+      - ./gitlab-runner/config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "gitlab.local:host-gateway"
+    networks:
+      - omnileads-gitlab
+
+networks:
+  omnileads-gitlab:
+    name: omnileads-gitlab
+    driver: bridge

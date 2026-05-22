@@ -36,5 +36,9 @@ sed -i "/^BUCKET_ENDPOINT_MINIO=/s/\${OML_HOSTNAME}/minio/" .env
 sed -i "s/DAPHNE_HOSTNAME=daphne/DAPHNE_HOSTNAME=${DJANGO_HOST}/g" .env
 sed -i "s/DAPHNE_PORT=8098/DAPHNE_PORT=8099/g" .env
 sed -i 's/^\(.*\)=docker\.io\/omnileads\/\([^:]*\):.*/\1=\2:latest/' .env
-sed -i 's/^\(.*\)=docker\.io\/freetechsolutions\/\([^:]*\):.*/\1=\2:latest/' .env
+for var in APP_IMG NGINX_IMG WS_IMG ACD_IMG KAMAILIO_IMG RTPENGINE_IMG \
+           CALLREC_COMPRESSOR_IMG CALLREC_TRANSCRIBER_IMG FASTAGI_IMG \
+           DIALER_API_IMG DIALER_WORKER_IMG; do
+  sed -i "s|^${var}=docker\\.io/freetechsolutions/\\([^:]*\\):.*|${var}=\\1:develop|" .env
+done
 sed -i "s/ominicontacto.settings.production/ominicontacto.settings.develop/g" .env

@@ -48,7 +48,7 @@ GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 # --- Images for testing and development
 PSTNEMULATOR_IMG=pstn_emulator:241209.01
 OML_VUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
-OML_NGINX_QA_IMG=nginxqa:latest
+NGINX_QA_IMG=docker.io/freetechsolutions/nginxqa:20260521-e4d691d4
 
 ###################################################################################################
 #                                       DJANGO APP                                                #
@@ -213,7 +213,7 @@ KAMAILIO_DEBUG_ENABLED=true
 KAMAILIO_DEBUG_LEVEL=2
 
 # kamailio-webrtc container interface name
-KAMAILIO_IFACE=eth0
+KAMAILIO_WEBRTC_IFACE=eth0
 
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #

@@ -1,0 +1,28 @@
+# Plantilla para GitLab Runner local (Docker executor + DinD).
+# register.sh sustituye __RUNNER_TOKEN__ por el token glrt-* devuelto por la API.
+
+concurrent = 4
+check_interval = 0
+shutdown_timeout = 0
+
+[session_server]
+  session_timeout = 1800
+
+[[runners]]
+  name = "local-docker-dind"
+  url = "http://gitlab"
+  token = "__RUNNER_TOKEN__"
+  executor = "docker"
+  clone_url = "http://gitlab"
+  [runners.cache]
+    MaxUploadedArchiveSize = 0
+  [runners.docker]
+    tls_verify = false
+    image = "docker:27.5.1-alpine3.21"
+    privileged = true
+    disable_entrypoint_overwrite = false
+    oom_kill_disable = false
+    disable_cache = false
+    volumes = ["/cache", "/certs/client"]
+    shm_size = 0
+    network_mtu = 0
