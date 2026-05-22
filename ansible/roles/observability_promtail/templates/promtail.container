@@ -33,7 +33,7 @@ TimeoutStopSec=70
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=promtail
-MemoryLimit={{ promtail_memory_limit | default('512M') }}
+MemoryMax={{ promtail_memory_limit | default('512M') }}
 CPUQuota={{ promtail_cpu_quota | default('50%') }}
 
 [Install]

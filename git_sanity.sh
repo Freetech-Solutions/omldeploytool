@@ -10,19 +10,23 @@ set -euo pipefail
 
 FIX=0
 CHECK_REMOTES=0
+LIST_SUBMODULES=0
 JOBS=8
 
 usage() {
   cat <<'EOF'
 Uso:
-  oml-sanity.sh [--fix] [--check-remotes] [--jobs N]
+  oml-sanity.sh [--fix] [--check-remotes] [--list-submodules] [--jobs N]
 
 Opciones:
-  --fix            Intenta alinear submódulos a lo que espera el repo padre (equivale a submodule sync/update --force).
-  --check-remotes  Verifica que cada SHA de submódulo exista en el remoto (evita "not our ref").
-  --jobs N         Paralelismo para submodule update (default: 8).
+  --fix              Intenta alinear submódulos a lo que espera el repo padre (equivale a submodule sync/update --force).
+  --check-remotes    Verifica que cada SHA de submódulo exista en el remoto (evita "not our ref").
+  --list-submodules  Lista submódulos (SHA, rama y versión) sin exigir repo limpio ni sincronizado.
+  --jobs N           Paralelismo para submodule update (default: 8).
 
 Salida:
+  Modo sanity: valida repo padre y submódulos; incluye rama y versión (git describe).
+  Modo --list-submodules: solo imprime el estado de submódulos.
   0 = OK
   1 = Problemas detectados
 EOF
@@ -32,6 +36,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --fix) FIX=1; shift ;;
     --check-remotes) CHECK_REMOTES=1; shift ;;
+    --list-submodules) LIST_SUBMODULES=1; shift ;;
     --jobs) JOBS="${2:-8}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Opción desconocida: $1"; usage; exit 2 ;;
@@ -39,6 +44,20 @@ while [[ $# -gt 0 ]]; do
 done
 
 die() { echo "ERROR: $*" >&2; exit 1; }
+
+list_submodules() {
+  if [[ ! -f .gitmodules ]]; then
+    echo "No hay .gitmodules."
+    return 0
+  fi
+
+  echo "Submódulos:"
+  SUBSTAT="$(git submodule status || true)"
+  echo "$SUBSTAT"
+  echo
+  echo "Rama / versión:"
+  git submodule foreach --quiet 'printf "%-45s %-20s %s\n" "$name" "$(git branch --show-current)" "$(git describe --tags --always)"'
+}
 
 # Ensure we're in a git repo (root or inside)
 git rev-parse --show-toplevel >/dev/null 2>&1 || die "No estás dentro de un repositorio Git."
@@ -52,12 +71,17 @@ echo "Branch: $BRANCH"
 echo "HEAD:   $HEAD_SHA"
 echo
 
+if [[ "$LIST_SUBMODULES" -eq 1 ]]; then
+  list_submodules
+  exit 0
+fi
+
 # 1) Root working tree clean?
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "❌ Repo padre: working tree NO limpio"
   git status --short
   echo
-  die "Commit/stash antes de continuar."
+  die "Commit/stash antes de continuar. (Para ver solo submódulos: ./git_sanity.sh --list-submodules)"
 else
   echo "✅ Repo padre: working tree limpio"
 fi
@@ -93,7 +117,6 @@ if [[ ! -f .gitmodules ]]; then
 fi
 
 echo
-echo "Submódulos:"
 
 # Optional fix: sync + update --force
 if [[ "$FIX" -eq 1 ]]; then
@@ -104,8 +127,7 @@ if [[ "$FIX" -eq 1 ]]; then
 fi
 
 # 4) Submodule status aligned?
-SUBSTAT="$(git submodule status || true)"
-echo "$SUBSTAT"
+list_submodules
 
 # Identify problematic prefixes: '+', '-', 'U'
 if echo "$SUBSTAT" | grep -Eq '^[\+\-U]'; then
