@@ -17,3 +17,9 @@ haproxy_prom_path_prefix: /prom
 haproxy_prom_backend_port: 9090
 # Lista de CIDRs permitidos como origen para /prom; vacío = denegar /prom (403).
 haproxy_prom_allowed_src: []
+# Frontend nativo Prometheus (HAProxy 3.x): bind en omni_ip_lan, solo LAN.
+haproxy_metrics_enabled: true
+haproxy_metrics_port: 8404
+# Vacío = permitir scrape desde redes privadas RFC1918. No reutiliza haproxy_prom_allowed_src
+# (ese ACL suele listar IPs públicas para /prom desde Internet).
+haproxy_metrics_allowed_src: []

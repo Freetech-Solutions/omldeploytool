@@ -7,7 +7,7 @@ WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
 
 # --- OMniLeads images TEL
 ACD_IMG: docker.io/freetechsolutions/acd:20260506-c0ce912a
-KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260408-0292f718
+KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260523-43bb5734
 RTPENGINE_IMG: docker.io/freetechsolutions/rtpengine:20260218-4e51bf30
 CALLREC_COMPRESSOR_IMG: docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
 CALLREC_TRANSCRIBER_IMG: docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3

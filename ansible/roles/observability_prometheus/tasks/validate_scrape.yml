@@ -1,0 +1,86 @@
+---
+- name: OBSERVABILITY Build inter-node scrape reachability endpoints
+  ansible.builtin.set_fact:
+    observability_scrape_endpoints: >-
+      {{
+        (
+          (
+            oml_tenant_hosts
+            | map('extract', hostvars, 'omni_ip_lan')
+            | map('regex_replace', '$', ':' ~ (prometheus_node_exporter_port | default(9100) | string))
+            | list
+          )
+          + (
+            oml_tenant_hosts
+            | map('extract', hostvars, 'omni_ip_lan')
+            | map('regex_replace', '$', ':' ~ (prometheus_podman_exporter_port | default(9882) | string))
+            | list
+          )
+          + [
+            (postgres_host | trim) ~ ':' ~ (prometheus_postgres_exporter_port | default(9187) | string),
+            (redis_host | trim) ~ ':' ~ (prometheus_redis_exporter_port | default(9121) | string),
+            (gearman_host | trim) ~ ':' ~ (prometheus_gearman_exporter_port | default(9418) | string),
+            (nginx_host | trim) ~ ':' ~ (prometheus_uwsgi_exporter_port | default(9117) | string),
+            (rtpengine_host | trim) ~ ':' ~ (rtpengine_metrics_port | default(22223) | string),
+            (kamailio_pstn_host | default(edge_host) | trim) ~ ':' ~ (kamailio_pstn_metrics_port | default(9273) | string),
+            (kamailio_host | trim) ~ ':' ~ (kamailio_webrtc_metrics_port | default(9274) | string),
+            (omni_ip_lan | trim) ~ ':' ~ (prometheus_server_port | default(9090) | string)
+          ]
+          + (
+            [(edge_host | trim) ~ ':' ~ (haproxy_metrics_port | default(8404) | string)]
+            if ((oml_tenant_hosts | intersect(groups.get('edge', []))) | length > 0)
+            else []
+          )
+        )
+        | unique
+        | list
+      }}
+  changed_when: false
+  when: observability_render_prometheus_yml | default(false) | bool
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability
+
+- name: OBSERVABILITY Check TCP reachability to scrape targets from Prometheus host
+  ansible.builtin.wait_for:
+    host: "{{ item.split(':')[0] }}"
+    port: "{{ item.split(':')[1] }}"
+    timeout: 5
+    state: started
+  loop: "{{ observability_scrape_endpoints | default([]) }}"
+  register: observability_scrape_reachability
+  failed_when: false
+  when:
+    - observability_render_prometheus_yml | default(false) | bool
+    - observability_scrape_endpoints | default([]) | length > 0
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability
+
+- name: OBSERVABILITY Summarize scrape target reachability
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        'Unreachable scrape targets from ' ~ inventory_hostname ~ ': '
+        ~ (
+          observability_scrape_reachability.results
+          | selectattr('failed', 'equalto', true)
+          | map(attribute='item')
+          | list
+          | join(', ')
+        )
+        if (observability_scrape_reachability.results | selectattr('failed', 'equalto', true) | list | length > 0)
+        else ('All ' ~ (observability_scrape_endpoints | length | string) ~ ' scrape ports reachable on omni_ip_lan from ' ~ inventory_hostname ~ '.')
+      }}
+  when:
+    - observability_render_prometheus_yml | default(false) | bool
+    - observability_scrape_reachability is defined
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability

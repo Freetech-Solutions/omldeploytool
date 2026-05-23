@@ -412,8 +412,27 @@ A well-configured **Cloud Firewall** keeps the attack surface small.
 | `acd_rtp_port_min`–`acd_rtp_port_max` (default 40000–50000) | UDP | Asterisk PSTN RTP | Open to Internet |
 | 5060              | UDP      | Kamailio PSTN / Asterisk SIP    | Restrict to ITSP IP(s)               |
 | 9090              | TCP      | Prometheus (`omlapp_web` / AIO) | LAN-only **or** front by HAProxy at `https://<fqdn>/prom` |
+| 8404              | TCP      | HAProxy metrics (`/metrics`, edge) | LAN-only (RFC1918 scrape)            |
+| 9273              | TCP      | Kamailio PSTN metrics (`/metrics`, edge) | LAN-only                         |
+| 9274              | TCP      | Kamailio WebRTC metrics (`/metrics`, edge) | LAN-only                       |
+| 22223             | TCP      | RTPengine metrics (edge)        | LAN-only                             |
+| 9100              | TCP      | Node exporter (todos los hosts con `observability.pod`) | LAN-only inter-nodo      |
+| 9882              | TCP      | Podman exporter (todos los hosts con `observability.pod`) | LAN-only inter-nodo    |
+| 9187              | TCP      | Postgres exporter (`data_statefull`) | LAN-only inter-nodo           |
+| 9121              | TCP      | Redis exporter (`data_stateless`) | LAN-only inter-nodo              |
+| 9418              | TCP      | Gearman exporter (`data_stateless`) | LAN-only inter-nodo            |
+| 9117              | TCP      | uWSGI exporter (`omlapp_web`)   | LAN-only inter-nodo                  |
 
 Prometheus is published on `omni_ip_lan:9090` by the Podman `PublishPort` of the observability pod. External access is recommended through HAProxy on the edge host, gated by `haproxy_prom_allowed_src` (list of CIDRs allowed at `/prom`). If `haproxy_prom_allowed_src` is empty or undefined, HAProxy **denies `/prom` by default**.
+
+**Cluster inter-node scrape:** the tenant Prometheus runs on `omlapp_web` / AIO and scrapes every peer via `omni_ip_lan`. The `observability.pod` publishes exporter ports on the LAN IP of each host (see [`observability.pod.j2`](roles/pods/templates/observability.pod.j2)). OS firewalls (`ufw`/`firewalld`) are disabled by Ansible; if your cloud provider filters the **private VPC**, allow the ports above **between tenant nodes only** (not from the Internet). After deploy, Ansible runs a TCP reachability check from the Prometheus host (tag `validate`).
+
+```bash
+# From the omlapp_web / AIO host (example PortaVoice)
+for t in 10.10.0.14:9100 10.10.0.15:9187 10.10.0.14:8404; do
+  nc -zv "${t%:*}" "${t#*:}" || echo "FAIL $t"
+done
+```
 
 ## OMniLeads Podman containers (Quadlet) 🔧 <a name="podman-systemd"></a>
 
@@ -680,6 +699,9 @@ Relevant variables:
 * `loki_host`: when set, Promtail is deployed and configured to push to that Loki endpoint.
 * `oml_observability_deploy=true` (passed automatically by `--action=observability`): allows deploying Promtail even when `loki_host` is not set yet (handy for templating in QA).
 * `haproxy_prom_allowed_src`: list of CIDRs allowed at `https://<fqdn>/prom` (defaults to deny-all).
+* `haproxy_metrics_port` / `haproxy_metrics_allowed_src`: HAProxy native Prometheus exporter on the edge (default `:8404/metrics`, LAN-only).
+* `kamailio_pstn_metrics_port` / `kamailio_webrtc_metrics_port`: Kamailio `prometheus` module on the edge (defaults `9273` / `9274`). Requires a `KAMAILIO_IMG` rebuilt after config changes in `components-git-repo/kamailio`.
+* `prometheus_*_exporter_port` / `prometheus_server_port`: ports published on `omni_ip_lan` by `observability.pod` for inter-node scrape (defaults in `group_vars/all/runtime.yml`).
 * `homer_host` / `homer_port`: enable HEP packet capture from Asterisk if you operate a Homer instance.
 
 ![Diagrama deploy tool zoom](./png/observability_MT.png)

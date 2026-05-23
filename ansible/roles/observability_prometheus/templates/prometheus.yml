@@ -7,7 +7,7 @@ scrape_configs:
   - job_name: '{{ tenant_id }}_node'
     static_configs:
 {% for h in oml_tenant_hosts %}
-      - targets: ['{{ hostvars[h].omni_ip_lan | default(omni_ip_lan) }}:9100']
+      - targets: ['{{ hostvars[h].omni_ip_lan | default(omni_ip_lan) }}:{{ prometheus_node_exporter_port | default(9100) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'os'
@@ -17,7 +17,7 @@ scrape_configs:
   - job_name: '{{ tenant_id }}_podman'
     static_configs:
 {% for h in oml_tenant_hosts %}
-      - targets: ['{{ hostvars[h].omni_ip_lan | default(omni_ip_lan) }}:9882']
+      - targets: ['{{ hostvars[h].omni_ip_lan | default(omni_ip_lan) }}:{{ prometheus_podman_exporter_port | default(9882) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'podman'
@@ -26,28 +26,28 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_postgres'
     static_configs:
-      - targets: ['{{ postgres_host | trim }}:9187']
+      - targets: ['{{ postgres_host | trim }}:{{ prometheus_postgres_exporter_port | default(9187) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'postgres'
 
   - job_name: '{{ tenant_id }}_redis'
     static_configs:
-      - targets: ['{{ redis_host | trim }}:9121']
+      - targets: ['{{ redis_host | trim }}:{{ prometheus_redis_exporter_port | default(9121) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'redis'
 
   - job_name: '{{ tenant_id }}_gearman'
     static_configs:
-      - targets: ['{{ gearman_host | trim }}:9418']
+      - targets: ['{{ gearman_host | trim }}:{{ prometheus_gearman_exporter_port | default(9418) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'gearman'
 
   - job_name: '{{ tenant_id }}_uwsgi'
     static_configs:
-      - targets: ['{{ nginx_host | trim }}:9117']
+      - targets: ['{{ nginx_host | trim }}:{{ prometheus_uwsgi_exporter_port | default(9117) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'uwsgi'
@@ -61,7 +61,31 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_rtpengine'
     static_configs:
-      - targets: ['{{ rtpengine_host | trim }}:22223']
+      - targets: ['{{ rtpengine_host | trim }}:{{ rtpengine_metrics_port | default(22223) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'rtpengine'
+
+{% if (oml_tenant_hosts | intersect(groups.get('edge', []))) | length > 0 %}
+  - job_name: '{{ tenant_id }}_haproxy'
+    static_configs:
+      - targets: ['{{ edge_host | trim }}:{{ haproxy_metrics_port | default(8404) }}']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'haproxy'
+          host: '{{ (oml_tenant_hosts | intersect(groups.get("edge", []))) | first }}'
+{% endif %}
+
+  - job_name: '{{ tenant_id }}_kamailio_pstn'
+    static_configs:
+      - targets: ['{{ kamailio_pstn_host | default(edge_host) | trim }}:{{ kamailio_pstn_metrics_port | default(9273) }}']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'kamailio_pstn'
+
+  - job_name: '{{ tenant_id }}_kamailio_webrtc'
+    static_configs:
+      - targets: ['{{ kamailio_host | trim }}:{{ kamailio_webrtc_metrics_port | default(9274) }}']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'kamailio_webrtc'

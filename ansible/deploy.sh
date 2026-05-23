@@ -231,7 +231,6 @@ run_playbook() {
   ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" \
   ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}" \
   ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-/tmp/ansible-remote}" \
-  ANSIBLE_LOG_PATH="${ANSIBLE_LOG_PATH:-/tmp/oml_install_logs}" \
   ansible-playbook "$playbook" -i "$inventory_path" "${vault_args[@]}" "$@"
 }
 

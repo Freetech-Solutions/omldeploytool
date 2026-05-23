@@ -3,7 +3,7 @@ server:
   http_listen_address: {{ '0.0.0.0' }}
 
 positions:
-  filename: /tmp/positions.yaml
+  filename: /tmp/positions.yaml 
   sync_period: 1m
 
 clients:
@@ -13,7 +13,7 @@ clients:
 {% else %}
   - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
 {% endif %}
-    batchsize: 102400
+    batchsize: 1048576
     batchwait: 1s
     backoff_config:
       min_period: 1s
@@ -211,6 +211,7 @@ scrape_configs:
 # edge: telephony_edge pod
 # ============================================
 {% set edge_services = [
+  {'name': 'haproxy', 'unit': 'haproxy.container', 'family': 'edge'},
   {'name': 'kamailio_pstn', 'unit': 'kamailio_pstn.container', 'family': 'telephony'},
   {'name': 'kamailio_webrtc', 'unit': 'kamailio_webrtc.container', 'family': 'telephony'},
   {'name': 'rtpengine', 'unit': 'rtpengine.container', 'family': 'telephony'},

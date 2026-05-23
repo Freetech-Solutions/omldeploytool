@@ -88,7 +88,7 @@ ansible-galaxy collection install -r requirements.yml --upgrade
 
 A partir de OMniLeads 3.X, **todos los secretos** del inventario se referencian
 como `{{ vault_<nombre> }}` y se desencriptan desde
-`./group_vars/all//vault.yml` (ver `ansible/UPGRADE_YOUR_INVENTORY.md`).
+`./group_vars/all/vault.yml` (ver `ansible/UPGRADE_YOUR_INVENTORY.md`).
 
 El archivo está versionado en el repo solo a modo de plantilla cifrada compartida;
 **cada operador debe poseer la password de Vault para poder desencriptarlo y/o
@@ -155,7 +155,7 @@ vault_backup_bucket_secret_key: "..."
 
 ```bash
 # Desde ansible/
-ansible-vault create ./group_vars/all//vault.yml
+ansible-vault create ./group_vars/all/vault.yml
 ```
 
 Se abre `$EDITOR`; pegá el bloque YAML con los `vault_*` y guardá. El archivo
@@ -164,19 +164,19 @@ queda cifrado en disco (cabecera `$ANSIBLE_VAULT;1.1;AES256`).
 #### Opción B — Editarlo si ya existe
 
 ```bash
-ansible-vault edit ./group_vars/all//vault.yml
+ansible-vault edit ./group_vars/all/vault.yml
 ```
 
 #### Opción C — Inspeccionarlo en claro (sin abrir editor)
 
 ```bash
-ansible-vault view ./group_vars/all//vault.yml
+ansible-vault view ./group_vars/all/vault.yml
 ```
 
 #### Opción D — Recifrar con otra password
 
 ```bash
-ansible-vault rekey ./group_vars/all//vault.yml
+ansible-vault rekey ./group_vars/all/vault.yml
 ```
 
 ---
@@ -282,8 +282,8 @@ Para la lista completa de acciones, ver `./deploy.sh --help` y la sección
 | ------- | -------------- | -------- |
 | `ERROR! Attempting to decrypt but no vault secrets found` | No exportaste `ANSIBLE_VAULT_PASSWORD_FILE` ni configuraste `vault_password_file` en `ansible.cfg`. | Reexportar la variable, descomentar `vault_password_file` en `ansible.cfg`, o usar `./deploy.sh --ask-vault-pass`. |
 | `Ansible Vault password not configured` (al invocar `deploy.sh`) | `deploy.sh` no encontró ninguna fuente de password del Vault. | Completar el paso 2.1 (`export ANSIBLE_VAULT_PASSWORD_FILE=...`) o pasar `--ask-vault-pass`. |
-| `ERROR! Decryption failed` | Password incorrecta o archivo cifrado con otra clave. | Validar la password (`ansible-vault view ./group_vars/all//vault.yml`) o re-cifrar con `rekey`. |
+| `ERROR! Decryption failed` | Password incorrecta o archivo cifrado con otra clave. | Validar la password (`ansible-vault view ./group_vars/all/vault.yml`) o re-cifrar con `rekey`. |
 | `Missing inventory source. Use --tenant or --inventory.` | `deploy.sh` invocado sin `--tenant=` ni `--inventory=`. | Pasar uno de los dos. |
 | `instances/<tenant>/inventory.yml: No such file or directory` | El tenant no fue creado o tipeaste mal el nombre. | Revisar `ls instances/`. |
-| Cambios en `./group_vars/all//vault.yml` aparecen en `git status` aunque esté en `.gitignore` | El archivo ya está trackeado en la historia del repo. | `git rm --cached ansible/./group_vars/all//vault.yml` (ver sección 2.3). |
+| Cambios en `./group_vars/all/vault.yml` aparecen en `git status` aunque esté en `.gitignore` | El archivo ya está trackeado en la historia del repo. | `git rm --cached ansible/./group_vars/all/vault.yml` (ver sección 2.3). |
 | `command not found: ansible` después de cerrar la terminal | El venv se desactivó al cerrar la shell. | `source ansible/venv/bin/activate`. |

@@ -9,7 +9,7 @@ RequiresMountsFor=%t/containers
 ContainerName=obs-prometheus-gearman
 Image={{ GEARMAN_EXPORTER_IMG }}
 Pod=observability.pod
-Exec=--addr={{ omni_ip_lan }}:9418 --gearmand=127.0.0.1:4730
+Exec=--addr=0.0.0.0:{{ prometheus_gearman_exporter_port | default(9418) }} --gearmand=127.0.0.1:4730
 PodmanArgs=--cgroups=no-conmon
 LogDriver=journald
 Label=tier=observability

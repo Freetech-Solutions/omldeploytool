@@ -6,6 +6,7 @@ Description=OmniLeads ACD Pod
 Network={{ oml_network }}
 
 PublishPort={{ omni_ip_lan if (kamailio_pstn_out | default(false)) else '127.0.0.1' }}:5060:5060/udp
+PublishPort={{ omni_ip_lan }}:{{ acd_ari_port | default(7088) }}:7088
 
 [Install]
 WantedBy=multi-user.target

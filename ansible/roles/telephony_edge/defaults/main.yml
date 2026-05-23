@@ -1,2 +1,4 @@
 ---
 component_telephony_edge_enabled: false
+kamailio_pstn_metrics_port: 9273
+kamailio_webrtc_metrics_port: 9274

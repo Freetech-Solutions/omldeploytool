@@ -179,3 +179,12 @@
     - install
     - upgrade
     - observability
+
+- name: OBSERVABILITY Validate scrape reachability from Prometheus host
+  ansible.builtin.import_tasks: validate_scrape.yml
+  when: oml_runs_omlapp_web | default(false) | bool
+  tags:
+    - install
+    - upgrade
+    - validate
+    - observability

@@ -30,8 +30,10 @@ frontend https_in
 {% set _pp = haproxy_prom_path_prefix %}
     acl path_prom_exact path {{ _pp }}
     acl path_prom_prefix path_beg {{ _pp }}/
-{% if haproxy_prom_allowed_src | length > 0 %}
-    acl prom_allowed src {{ haproxy_prom_allowed_src | join(' ') }}
+{% set _prom_allowed_raw = haproxy_prom_allowed_src | default([]) %}
+{% set _prom_allowed_src = ([_prom_allowed_raw] if (_prom_allowed_raw is string) else _prom_allowed_raw) %}
+{% if _prom_allowed_src | length > 0 %}
+    acl prom_allowed src {{ _prom_allowed_src | join(' ') }}
     http-request deny if path_prom_exact !prom_allowed
     http-request deny if path_prom_prefix !prom_allowed
 {% else %}
@@ -54,3 +56,17 @@ backend prometheus_cluster
 {% for h in haproxy_prometheus_peers %}
     server prom{{ loop.index0 }} {{ hostvars[h]['omni_ip_lan'] }}:{{ haproxy_prom_backend_port }} check
 {% endfor %}
+{% if haproxy_metrics_enabled | default(true) | bool %}
+{% set _metrics_allowed_raw = haproxy_metrics_allowed_src | default([]) %}
+{% set _metrics_allowed_src = ([_metrics_allowed_raw] if (_metrics_allowed_raw is string) else _metrics_allowed_raw) %}
+{% if _metrics_allowed_src | length == 0 %}
+{% set _metrics_allowed_src = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'] %}
+{% endif %}
+
+frontend prometheus_metrics
+    bind {{ omni_ip_lan }}:{{ haproxy_metrics_port }}
+    mode http
+    acl metrics_allowed src {{ _metrics_allowed_src | join(' ') }}
+    http-request deny unless metrics_allowed
+    http-request use-service prometheus-exporter if { path /metrics }
+{% endif %}

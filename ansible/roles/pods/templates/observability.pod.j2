@@ -4,8 +4,18 @@ Description=OmniLeads Observability Pod
 
 [Pod]
 Network={{ oml_network }}
+PublishPort={{ omni_ip_lan }}:{{ prometheus_node_exporter_port | default(9100) }}:{{ prometheus_node_exporter_port | default(9100) }}
+PublishPort={{ omni_ip_lan }}:{{ prometheus_podman_exporter_port | default(9882) }}:{{ prometheus_podman_exporter_port | default(9882) }}
 {% if oml_runs_omlapp_web | default(false) | bool %}
-PublishPort={{ omni_ip_lan }}:9090:9090
+PublishPort={{ omni_ip_lan }}:{{ prometheus_server_port | default(9090) }}:{{ prometheus_server_port | default(9090) }}
+PublishPort={{ omni_ip_lan }}:{{ prometheus_uwsgi_exporter_port | default(9117) }}:{{ prometheus_uwsgi_exporter_port | default(9117) }}
+{% endif %}
+{% if oml_runs_data_statefull | default(false) | bool %}
+PublishPort={{ omni_ip_lan }}:{{ prometheus_postgres_exporter_port | default(9187) }}:{{ prometheus_postgres_exporter_port | default(9187) }}
+{% endif %}
+{% if oml_runs_data_stateless | default(false) | bool %}
+PublishPort={{ omni_ip_lan }}:{{ prometheus_redis_exporter_port | default(9121) }}:{{ prometheus_redis_exporter_port | default(9121) }}
+PublishPort={{ omni_ip_lan }}:{{ prometheus_gearman_exporter_port | default(9418) }}:{{ prometheus_gearman_exporter_port | default(9418) }}
 {% endif %}
 
 [Install]

@@ -29,6 +29,21 @@ acd_app: oml_acd
 acd_ari_port: 7088
 acd_ag_handoff_ttl: 10
 
+# Edge telephony — endpoints Prometheus (LAN-only; scrape desde tenant Prometheus)
+kamailio_pstn_metrics_port: 9273
+kamailio_webrtc_metrics_port: 9274
+haproxy_metrics_port: 8404
+rtpengine_metrics_port: 22223
+
+# Exporters observability.pod — publicados en omni_ip_lan para scrape inter-nodo
+prometheus_server_port: 9090
+prometheus_node_exporter_port: 9100
+prometheus_podman_exporter_port: 9882
+prometheus_postgres_exporter_port: 9187
+prometheus_redis_exporter_port: 9121
+prometheus_gearman_exporter_port: 9418
+prometheus_uwsgi_exporter_port: 9117
+
 oml_network: omnileads
 
 django_settings_module: ominicontacto.settings.production
