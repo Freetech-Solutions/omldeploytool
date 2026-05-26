@@ -712,6 +712,37 @@ Run just the observability layer on existing hosts:
 ./deploy.sh --action=observability --tenant=<tenant>
 ```
 
+### Promtail / Loki — validación post-deploy
+
+Promtail envía logs de contenedores core (journald, unidades Quadlet `*.service`) a Loki. Tras cambios en [`roles/observability_promtail/templates/promtail.yml`](roles/observability_promtail/templates/promtail.yml), ejecutá el smoke test local:
+
+```bash
+cd ansible
+ansible-playbook playbooks/smoke_promtail_template.yml
+```
+
+En cada host del tenant, confirmá que journald recibe logs del servicio:
+
+```bash
+journalctl -u nginx.service -n 3 --no-pager
+journalctl -u whatsapp.service -n 3 --no-pager
+```
+
+En Grafana / Loki (usar el `tenant_id` del inventario, p. ej. `KonectaPortaVoice`):
+
+```logql
+{tenant="<tenant_id>", job="nginx"}
+{tenant="<tenant_id>", job="whatsapp"}
+{tenant="<tenant_id>", job="dialer_scheduler"}
+{tenant="<tenant_id>", job="dialer_api"}
+```
+
+Listar jobs activos en el host:
+
+```bash
+systemctl list-units 'acd-*.service' 'nginx.service' 'dialer_*.service' 'omnileads.service' --state=running
+```
+
 # Scalability settings <a name="scalability"></a>
 
 The default installation is tuned for tenants with 20–30 concurrent users. To scale beyond that, tweak the following blocks in the inventory.

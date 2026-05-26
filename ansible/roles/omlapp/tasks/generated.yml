@@ -120,6 +120,8 @@
     - upgrade_from_oml_1 is not defined
     - backup_filename is not defined
     - omlapp_bootstrap_required | bool
+    # El rol omlapp hereda tags upgrade/update; limitar reset solo a --action=install.
+    - "'install' in ansible_run_tags"
 
 - name: DJANGO Enable and start systemd services
   systemd:

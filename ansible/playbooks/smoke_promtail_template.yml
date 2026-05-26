@@ -1,0 +1,129 @@
+---
+# Renderiza promtail.yml sin vault. Valida jobs core y unidades systemd (*.service).
+- name: Smoke test — inventario en memoria
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Host AIO mock
+      ansible.builtin.add_host:
+        name: mock_aio
+        groups:
+          - omnileads_aio
+    - name: Host omlapp_web cluster mock
+      ansible.builtin.add_host:
+        name: mock_web
+        groups:
+          - omlapp_web
+
+- name: Smoke test — Promtail AIO (omnidialer)
+  hosts: mock_aio
+  connection: local
+  gather_facts: false
+  vars:
+    tenant_id: tenant_smoke_aio
+    loki_host: 10.0.0.1
+    dialer_engine: omnidialer
+    dialer_process_campaign_replicas: 5
+    dialer_process_contact_replicas: 1
+    dialer_process_event_replicas: 1
+  tasks:
+    - name: Renderizar promtail.yml (AIO)
+      ansible.builtin.template:
+        src: ../roles/observability_promtail/templates/promtail.yml
+        dest: /tmp/oml_promtail_smoke_aio.yml
+        mode: "0644"
+
+    - name: Cargar YAML renderizado
+      ansible.builtin.set_fact:
+        _smoke_parsed: "{{ lookup('file', '/tmp/oml_promtail_smoke_aio.yml') | from_yaml }}"
+        _smoke_raw: "{{ lookup('file', '/tmp/oml_promtail_smoke_aio.yml') }}"
+      changed_when: false
+
+    - name: Extraer job names y journal matches
+      ansible.builtin.set_fact:
+        _smoke_job_names: >-
+          {{
+            _smoke_parsed.scrape_configs
+            | map(attribute='job_name')
+            | list
+          }}
+        _smoke_journal_matches: >-
+          {{
+            _smoke_parsed.scrape_configs
+            | selectattr('journal', 'defined')
+            | map(attribute='journal')
+            | map(attribute='matches', default='')
+            | list
+          }}
+      changed_when: false
+
+    - name: Comprobar jobs core presentes (AIO + omnidialer)
+      ansible.builtin.assert:
+        that:
+          - "'nginx' in _smoke_job_names"
+          - "'whatsapp' in _smoke_job_names"
+          - "'dialer_api' in _smoke_job_names"
+          - "'dialer_scheduler' in _smoke_job_names"
+          - "'acd-config' in _smoke_job_names"
+          - "'haproxy' in _smoke_job_names"
+        fail_msg: "Faltan jobs esperados en AIO: {{ _smoke_job_names }}"
+      changed_when: false
+
+    - name: Comprobar jobs obsoletos ausentes
+      ansible.builtin.assert:
+        that:
+          - "'dialer_flask' not in _smoke_job_names"
+          - "'dialer_postgresql' not in _smoke_job_names"
+          - "'acd-conf' not in _smoke_job_names"
+        fail_msg: "Jobs obsoletos aún presentes: {{ _smoke_job_names }}"
+      changed_when: false
+
+    - name: Comprobar que no hay unidades journal *.container
+      ansible.builtin.assert:
+        that:
+          - "_smoke_raw is not search('\\.container')"
+          - "_smoke_journal_matches | select('search', '\\\\.container') | list | length == 0"
+        fail_msg: "Se encontraron matches con sufijo .container (Quadlet usa .service)"
+      changed_when: false
+
+- name: Smoke test — Promtail omlapp_web (cluster)
+  hosts: mock_web
+  connection: local
+  gather_facts: false
+  vars:
+    tenant_id: tenant_smoke_web
+    loki_host: 10.0.0.1
+    dialer_engine: omnidialer
+  tasks:
+    - name: Renderizar promtail.yml (web)
+      ansible.builtin.template:
+        src: ../roles/observability_promtail/templates/promtail.yml
+        dest: /tmp/oml_promtail_smoke_web.yml
+        mode: "0644"
+
+    - name: Cargar YAML renderizado
+      ansible.builtin.set_fact:
+        _smoke_web_parsed: "{{ lookup('file', '/tmp/oml_promtail_smoke_web.yml') | from_yaml }}"
+        _smoke_web_raw: "{{ lookup('file', '/tmp/oml_promtail_smoke_web.yml') }}"
+      changed_when: false
+
+    - name: Extraer job names (web)
+      ansible.builtin.set_fact:
+        _smoke_web_job_names: >-
+          {{
+            _smoke_web_parsed.scrape_configs
+            | map(attribute='job_name')
+            | list
+          }}
+      changed_when: false
+
+    - name: Comprobar jobs web cluster
+      ansible.builtin.assert:
+        that:
+          - "'nginx' in _smoke_web_job_names"
+          - "'dialer_api' in _smoke_web_job_names"
+          - "'omnileads' in _smoke_web_job_names"
+          - "_smoke_web_raw is not search('\\.container')"
+        fail_msg: "Config web cluster inválida: {{ _smoke_web_job_names }}"
+      changed_when: false
