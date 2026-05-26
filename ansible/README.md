@@ -702,7 +702,9 @@ Relevant variables:
 * `haproxy_metrics_port` / `haproxy_metrics_allowed_src`: HAProxy native Prometheus exporter on the edge (default `:8404/metrics`, LAN-only).
 * `kamailio_pstn_metrics_port` / `kamailio_webrtc_metrics_port`: Kamailio `prometheus` module on the edge (defaults `9273` / `9274`). Requires a `KAMAILIO_IMG` rebuilt after config changes in `components-git-repo/kamailio`.
 * `prometheus_*_exporter_port` / `prometheus_server_port`: ports published on `omni_ip_lan` by `observability.pod` for inter-node scrape (defaults in `group_vars/all/runtime.yml`).
-* `homer_host` / `homer_port`: enable HEP packet capture from Asterisk if you operate a Homer instance.
+* `homer_host` / `homer_port`: enable HEP packet capture from Asterisk and Kamailio (PSTN + WebRTC) when you operate a Homer instance.
+* `homer_kamailio_pstn_capture_id` / `homer_kamailio_webrtc_capture_id`: numeric HEP agent IDs (defaults `2002` / `2003`) to distinguish PSTN vs WebRTC traffic in Homer.
+* `homer_pstn_node_name` / `homer_webrtc_node_name`: optional string labels for HEP correlation (defaults `{{ tenant_id }}-pstn` / `{{ tenant_id }}-webrtc`).
 
 ![Diagrama deploy tool zoom](./png/observability_MT.png)
 

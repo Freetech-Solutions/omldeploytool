@@ -12,8 +12,7 @@ LogDriver=journald
 EnvironmentFile=/etc/default/kamailio_webrtc.env
 Label=tier=telephony
 PodmanArgs=--cgroups=no-conmon
-PodmanArgs=--entrypoint=/bin/sh
-Exec=-c "kamailio -DD -E -m {{ kamailio_shm_size | default(64 ,true)}} -M {{ kamailio_pkg_size | default(8, true) }} -f /etc/kamailio/kamailio_webrtc.cfg"
+PodmanArgs=--entrypoint=/entrypoint_webrtc.sh
 
 #{{ dialer_password | default('demoadmin', true)}}
 
