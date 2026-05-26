@@ -616,7 +616,7 @@ services:
       context: ./$REPO_PATH/kamailio
       dockerfile: Dockerfile
     image: ${KAMAILIO_IMG}
-    entrypoint: [ "/bin/sh", "-c", "kamailio -DD -E -m ${SHM_SIZE} -M ${PKG_SIZE} -f /etc/kamailio/kamailio_webrtc.cfg" ]
+    entrypoint: [ "/entrypoint_webrtc.sh" ]
     depends_on:
       redis:
         condition: service_healthy
@@ -631,6 +631,11 @@ services:
       SHM_SIZE: ${SHM_SIZE}
       PKG_SIZE: ${PKG_SIZE}
       TZ: ${TZ}
+      HOMER_ENABLE: ${HOMER_ENABLE}
+      HOMER_HOST: ${HOMER_HOSTNAME}
+      HOMER_PORT: ${HOMER_PORT}
+      HOMER_CAPTURE_ID: ${HOMER_KAMAILIO_WEBRTC_CAPTURE_ID:-2003}
+      HOMER_NODE_NAME: ${HOMER_WEBRTC_NODE_NAME:-}
     dns: 8.8.8.8
     privileged: true
     restart: on-failure
@@ -716,6 +721,11 @@ services:
       ITSP_NODES: ${PSTN_EMULATOR_IP}
       RTPENGINE_SOCKET: udp:${RTPENGINE_HOSTNAME}:${RTPENGINE_BIND_UDP_PORT}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
+      HOMER_ENABLE: ${HOMER_ENABLE}
+      HOMER_HOST: ${HOMER_HOSTNAME}
+      HOMER_PORT: ${HOMER_PORT}
+      HOMER_CAPTURE_ID: ${HOMER_KAMAILIO_PSTN_CAPTURE_ID:-2002}
+      HOMER_NODE_NAME: ${HOMER_PSTN_NODE_NAME:-}
     dns: 8.8.8.8
     privileged: true
     restart: on-failure

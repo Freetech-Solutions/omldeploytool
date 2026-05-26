@@ -338,8 +338,13 @@ DIALER_PROCESS_EVENT_REPLICAS=1
 #########################################################################################################
 HOMER_ENABLE=True
 # --- IP or hostname that each instance will invoke when locating the other    
-HOMER_HOSTNAME=grafana.sephir.tech
+HOMER_HOSTNAME=observability.example.com
 HOMER_PORT=9060
+# hep_capture_id must be numeric; use HOMER_*_NODE_NAME for Homer correlation/labels
+HOMER_KAMAILIO_PSTN_CAPTURE_ID=2002
+HOMER_KAMAILIO_WEBRTC_CAPTURE_ID=2003
+HOMER_PSTN_NODE_NAME=devenv.01-pstn
+HOMER_WEBRTC_NODE_NAME=devenv.01-webrtc
 
 #########################################################################################################
 #                                        Google Maps integrations                                       #
