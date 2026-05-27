@@ -22,7 +22,9 @@
   gather_facts: false
   vars:
     tenant_id: tenant_smoke_aio
-    loki_host: 10.0.0.1
+    loki_url: http://10.0.0.1:3100
+    loki_user: smoke
+    loki_password: smoke
     dialer_engine: omnidialer
     dialer_process_campaign_replicas: 5
     dialer_process_contact_replicas: 1
@@ -93,7 +95,9 @@
   gather_facts: false
   vars:
     tenant_id: tenant_smoke_web
-    loki_host: 10.0.0.1
+    loki_url: http://10.0.0.1:3100
+    loki_user: smoke
+    loki_password: smoke
     dialer_engine: omnidialer
   tasks:
     - name: Renderizar promtail.yml (web)

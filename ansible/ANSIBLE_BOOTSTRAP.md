@@ -141,6 +141,9 @@ vault_dialer_password: "..."
 vault_google_api_key: "..."
 vault_callrec_transcriber_api_key: "..."
 
+# --- Observabilidad (Promtail → Loki central; URL base sin path de push)
+vault_loki_url: "http://loki.example.com:3100"
+
 # --- Backups en S3
 vault_backup_bucket_access_key: "..."
 vault_backup_bucket_secret_key: "..."

@@ -75,15 +75,17 @@
 
 - name: OBSERVABILITY Promtail test Loki connectivity
   ansible.builtin.uri:
-    url: "http://{{ loki_host }}:3100/ready"
+    url: "{{ loki_url }}/ready"
     method: GET
     timeout: 10
   register: loki_health_check
   failed_when: false
   changed_when: false
   when:
-    - loki_host is defined
-    - loki_host not in ["", "127.0.0.1"]
+    - loki_url is defined
+    - (loki_url | string | length) > 0
+    - loki_url is not search('127.0.0.1')
+    - loki_url is not search('localhost')
   tags:
     - install
     - upgrade
@@ -94,11 +96,11 @@
   ansible.builtin.debug:
     msg: |
       Loki connectivity status: {{ 'SUCCESS' if (loki_health_check.status | default(0)) == 200 else 'FAILED' }}
-      Loki URL: http://{{ loki_host | default('not_configured') }}:3100
+      Loki URL: {{ loki_url | default('http://127.0.0.1:3100') }}
       Status Code: {{ loki_health_check.status | default('No response') }}
   when:
-    - loki_host is defined
-    - loki_host != ""
+    - loki_url is defined
+    - loki_url != ""
   tags:
     - install
     - upgrade

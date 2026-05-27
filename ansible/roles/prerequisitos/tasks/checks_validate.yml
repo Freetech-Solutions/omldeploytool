@@ -178,14 +178,16 @@
   tags:
     - always
 
-- name: CHECKS Validate Loki host when promtail is enabled
+- name: CHECKS Validate Loki URL when promtail is enabled
   ansible.builtin.assert:
     that:
-      - loki_host is defined and (loki_host | string | length) > 0
+      - loki_url is defined and (loki_url | string | length) > 0
     fail_msg: >-
-      Promtail está habilitado (oml_observability_deploy=true o loki_host declarado)
-      pero loki_host quedó vacío.
-  when: component_observability_promtail_enabled | default(false) | bool
+      Promtail está habilitado (oml_observability_deploy=true o loki_url declarado)
+      pero loki_url quedó vacío.
+  when:
+    - component_observability_promtail_enabled | default(false) | bool
+    - not (oml_observability_deploy | default(false) | bool)
   tags:
     - always
 

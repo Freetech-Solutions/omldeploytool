@@ -696,8 +696,8 @@ Each tenant host gets an `observability.pod` that exposes OS metrics, Redis/Post
 
 Relevant variables:
 
-* `loki_host`: when set, Promtail is deployed and configured to push to that Loki endpoint.
-* `oml_observability_deploy=true` (passed automatically by `--action=observability`): allows deploying Promtail even when `loki_host` is not set yet (handy for templating in QA).
+* `loki_url`: when set, Promtail is deployed and configured to push to that Loki endpoint (base URL, e.g. `http://host:3100`).
+* `oml_observability_deploy=true` (passed automatically by `--action=observability`): allows deploying Promtail even when `loki_url` is not set yet (handy for templating in QA).
 * `haproxy_prom_allowed_src`: list of CIDRs allowed at `https://<fqdn>/prom` (defaults to deny-all).
 * `haproxy_metrics_port` / `haproxy_metrics_allowed_src`: HAProxy native Prometheus exporter on the edge (default `:8404/metrics`, LAN-only).
 * `kamailio_pstn_metrics_port` / `kamailio_webrtc_metrics_port`: Kamailio `prometheus` module on the edge (defaults `9273` / `9274`). Requires a `KAMAILIO_IMG` rebuilt after config changes in `components-git-repo/kamailio`.

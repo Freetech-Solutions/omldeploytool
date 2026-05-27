@@ -278,7 +278,7 @@
         or oml_runs_data_statefull or oml_runs_edge or oml_runs_dialer_workers
         or oml_runs_callrec_processor
       }}
-    component_observability_promtail_enabled: "{{ loki_host is defined or (oml_observability_deploy | default(false) | bool) }}"
+    component_observability_promtail_enabled: "{{ loki_url is defined or (oml_observability_deploy | default(false) | bool) }}"
     component_addons_enabled: "{{ oml_runs_omlapp_web }}"
     component_qa_enabled: "{{ qa_env is defined }}"
   tags:

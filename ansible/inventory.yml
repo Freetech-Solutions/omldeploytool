@@ -415,7 +415,7 @@ all:
     #------------------------------------- Observability ----------------------------------
     # --- Observability integrations with Loki & Homer
     # --- Request by promtail:
-    loki_host: "{{ vault_loki_host }}"
+    loki_url: "{{ vault_loki_url }}"
     # --- HAProxy (host edge): orígenes permitidos para https://<fqdn>/prom (Prometheus bajo
     # --- /prom). Si no se define o queda vacío, HAProxy deniega /prom por defecto.
     # --- Definir en vars del tenant o del host edge, p. ej.:

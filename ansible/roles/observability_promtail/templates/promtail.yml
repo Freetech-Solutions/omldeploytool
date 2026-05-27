@@ -8,10 +8,16 @@ positions:
 
 clients:
 {% if tenant_id is defined and tenant_id != '' %}
-  - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
+  - url: {{ loki_url | default('http://127.0.0.1:3100') }}/loki/api/v1/push
+    basic_auth:
+      username: {{ loki_user }}
+      password: {{ loki_password }}
     tenant_id: {{ tenant_id }}
 {% else %}
-  - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
+  - url: {{ loki_url | default('http://127.0.0.1:3100') }}/loki/api/v1/push
+    basic_auth:
+      username: {{ loki_user }}
+      password: {{ loki_password }}
 {% endif %}
     batchsize: 1048576
     batchwait: 1s

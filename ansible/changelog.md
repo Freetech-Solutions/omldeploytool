@@ -1,56 +1,59 @@
-# Changelog tecnico Ansible: `oml-773-dev-oml-3`
+# Changelog tecnico Ansible: `develop-3.0`
 
-Comparacion analizada: `main...oml-773-dev-oml-3` sobre `ansible/`.
+Comparacion analizada: `main...develop-3.0` sobre `ansible/` (HEAD actual de la rama).
 
 ## Resumen Ejecutivo
 
-La rama `oml-773-dev-oml-3` transforma el deploy Ansible de OMniLeads hacia una arquitectura 3.X basada en roles, topologia normalizada y servicios Podman gestionados por systemd/Quadlet. El cambio reduce el acoplamiento del antiguo arbol `components/*`, separa responsabilidades por dominio (`data`, `edge`, `nodes`, `aio`) y prepara el despliegue para escenarios AIO y cluster mas claros. Tambien centraliza secretos con Ansible Vault y reordena la capa de telefonia para separar WebRTC, PSTN y RTPengine.
+La rama `develop-3.0` transforma el deploy Ansible de OMniLeads hacia una arquitectura 3.X basada en roles, topologia normalizada por **grupos pod** y servicios Podman gestionados por systemd/Quadlet. El cambio elimina el arbol `components/*` como mecanismo principal, separa responsabilidades por capas (`data`, `edge`, compute) y prepara despliegues AIO y cluster con inventarios explicitos. Tambien centraliza secretos con Ansible Vault, reordena la telefonia (WebRTC, PSTN, RTPengine), incorpora observabilidad tenant con validacion de scrape y captura SIP opcional hacia Homer (HEP), y documenta la migracion de inventarios legacy en `UPGRADE_YOUR_INVENTORY.md`.
 
 ## Nuevas Funcionalidades (Features)
 
-- `deploy.sh` 3.X: integracion obligatoria de Ansible Vault (pre-vuelo `ansible-vault view`, `ANSIBLE_VAULT_PASSWORD_FILE` / `ansible.cfg` / `--ask-vault-pass`), activacion automatica del venv, derivacion correcta de `tenant_folder` desde `instances/<tenant>/inventory.yml`, acciones alineadas con tags de `site_core.yml` (`data`, `edge`, `gearman`, `nginx`, `qa`, …), alias `kamailio` → `telephony-edge`, y eliminacion de acciones legacy (`backup`, `restore`, `recycle`, `sentinel`, `restart`, `components/haproxy`).
-- Deploy por topologia: se agregan `playbooks/site.yml`, `site_core.yml`, `aio.yml` y `cluster.yml`, con validacion explicita de layout antes de desplegar.
-- Inventario 3.X: se introducen grupos `omnileads_data`, `omnileads_edge`, `omnileads_nodes` y `omnileads_aio`, reemplazando el patron anterior de `omnileads_voice`, `omnileads_app` y `omnileads_dialer`.
-- Normalizacion automatica de topologia: el rol `topology_normalize` infiere `data_host`, `edge_host`, `aio_host`, endpoints de servicios y switches de componentes segun el grupo donde vive cada host.
-- Gestion de pods Podman con Quadlet: se agregan pods declarativos para `data_statefull`, `data_stateless`, `telephony_edge`, `acd`, `omlapp_web`, `omlapp_workers`, `dialer_workers`, `callrec_processor` y `observability`.
-- Telefonia de borde: se agrega el rol `telephony_edge`, que administra `rtpengine`, `kamailio_webrtc` y el nuevo `kamailio_pstn`.
-- Dialer simplificado: se elimina la dependencia operativa de contenedores propios de dialer para Asterisk/dialplan/listener y se reduce el rol a API, workers y jobs de Omnidialer.
-- Ansible Vault obligatorio: los secretos del inventario pasan a variables `vault_*` resueltas desde `group_vars/all/vault.yml`, que queda fuera de git.
-- Upgrade desde 2.X: se agrega el rol `upgrade_from_2X` con limpieza de unidades legacy, upgrade Debian 12 -> Debian 13 y restore de bases `omnileads` y opcionalmente `omnidialer`.
-- Operacion local: se agrega `oml_manage` orientado a Podman/Quadlet para status, health, logs, reinicios, consola Django, Redis, PostgreSQL, Asterisk y flujos de backup/restore.
-- Dependencias declaradas: se agregan `requirements.txt` para el entorno Python/Ansible y `requirements.yml` para collections de Ansible.
+- `deploy.sh` 3.X: integracion obligatoria de Ansible Vault (pre-vuelo `ansible-vault view`, `ANSIBLE_VAULT_PASSWORD_FILE` / `ansible.cfg` / `--ask-vault-pass`), activacion automatica del venv, derivacion de `tenant_folder` desde `instances/<tenant>/inventory.yml` o basename de `--inventory`, acciones alineadas con tags de `site_core.yml` (`data`, `edge`, `gearman`, `nginx`, `qa`, `observability`, `interaction_processor`, …), alias `kamailio` → `telephony-edge`, accion dedicada `--action=observability` (fuerza `oml_observability_deploy=true`) y **rechazo explicito** de acciones legacy (`backup`, `restore`, `recycle`, `sentinel`, `restart`) con mensaje orientando a `oml_manage`.
+- Deploy por topologia: `playbooks/site.yml` (capas data → edge → compute → AIO), `site_core.yml`, `aio.yml` y `cluster.yml`.
+- Inventario 3.X por **grupos pod**: `data_statefull`, `data_stateless`, `edge`, `omlapp_web`, `omlapp_workers`, `dialer_workers`, `acd`, `callrec_processor` y `omnileads_aio`. Un host puede repetirse en varios grupos para co-localizar pods. Los grupos legacy `omnileads_data`, `omnileads_edge`, `omnileads_nodes`, `omnileads_voice`, `omnileads_app` y `omnileads_dialer` **ya no controlan el deploy** (ver `UPGRADE_YOUR_INVENTORY.md`).
+- Normalizacion automatica de topologia: el rol `topology_normalize` infiere layout (`aio` vs `cluster`), `data_host`, `edge_host`, endpoints de servicios y switches `component_*_enabled` segun membresia pod del host.
+- Gestion de pods Podman con Quadlet: pods declarativos para `data_statefull`, `data_stateless`, `telephony_edge`, `acd`, `omlapp_web`, `omlapp_workers`, `dialer_workers`, `callrec_processor`, `observability` y `qa` (cuando `qa_env` esta definido).
+- Telefonia de borde: rol `telephony_edge` con `rtpengine`, `kamailio_webrtc` y `kamailio_pstn`; captura HEP v3 opcional hacia Homer cuando `homer_host` esta definido.
+- Procesamiento de grabaciones: rol `interaction_processor` despliega compresor y transcriptor en el pod `callrec_processor.pod` (accion/tag `interaction_processor`).
+- Dialer simplificado: sin contenedores propios de Asterisk/dialplan/listener; API, workers y jobs de Omnidialer.
+- Observabilidad tenant: roles `observability_prometheus` y `observability_promtail`, pod `observability` en cada host con tier activo, validacion TCP de targets de scrape desde el host Prometheus, acceso externo a `/prom` via HAProxy en edge con ACL `haproxy_prom_allowed_src`, y plantillas de dashboards Grafana de referencia en el rol Prometheus.
+- Ansible Vault obligatorio: secretos como `vault_*` en `group_vars/all/vault.yml` (fuera de git).
+- Upgrade desde 2.X: rol `upgrade_from_2X` (limpieza systemd legacy, Debian 12 → 13, restore `omnileads` y opcionalmente `omnidialer`).
+- Operacion local: `oml_manage` para status, health, logs, reinicios, consola Django, Redis, PostgreSQL, Asterisk y backup/restore en el host.
+- Bootstrap documentado: `ANSIBLE_BOOTSTRAP.md`, script `bootstrap.sh`, `requirements.txt` y `requirements.yml`.
+- Roles opcionales fuera de `site_core.yml`: `traefik_lb` (balanceo Traefik v3 hacia backends nginx) y `sentiment_analysis` (`component_sentiment_analysis_enabled: false` por defecto).
 
 ## Cambios Arquitectonicos / Tecnicos
 
 ### Cambio hacia roles
 
-El cambio mas importante es la migracion desde playbooks monoliticos por componente en `ansible/components/*` hacia roles Ansible en `ansible/roles/*`. La composicion ahora ocurre en `playbooks/site_core.yml`, donde cada rol se activa con condiciones calculadas por `topology_normalize`.
+La migracion va de playbooks monoliticos en `ansible/components/*` (eliminado) hacia roles en `ansible/roles/*`. La composicion ocurre en `playbooks/site_core.yml`, donde cada rol se activa con condiciones de `topology_normalize`.
 
 Roles principales introducidos o reestructurados:
 
-- `prerequisitos`: paquetes, red Podman, checks, certificados, swap, journald, backup env y `oml_manage`.
-- `topology_normalize`: deteccion de layout, hosts de servicio y componentes habilitados.
+- `prerequisitos`: paquetes, red Podman, checks de inventario, certificados, swap, journald, backup env y `oml_manage`.
+- `topology_normalize`: layout, peers de cluster, hosts de servicio y componentes habilitados.
 - `pods`: render y arranque de `.pod` Quadlets por topologia.
-- `data`: `postgresql`, `redis`, `gearman`, `minio`.
-- `edge`: `telephony_edge`, `haproxy`.
-- `compute/nodes`: `acd`, `omlapp`, `omlapp_workers`, `websockets`, `dialer`, `nginx`, `interaction_processor`, `addons`, `qa`.
-- `observability`: `observability_prometheus` y `observability_promtail`.
-- `upgrade_from_2X`: migracion operativa desde despliegues 2.X.
+- Datos: `postgresql`, `redis`, `gearman`, `minio`.
+- Edge: `telephony_edge`, `haproxy` (solo en hosts del grupo `edge` explicito, no en AIO sin grupo `edge`).
+- Compute: `acd`, `omlapp`, `omlapp_workers`, `websockets`, `dialer`, `nginx`, `interaction_processor`, `addons`, `qa`.
+- Observabilidad: `observability_prometheus`, `observability_promtail`.
+- Migracion: `upgrade_from_2X`.
 
-El valor tecnico es que cada componente queda encapsulado con defaults, handlers, templates y tareas propias. Esto facilita despliegues parciales por tags, reduce parametros `*_repo_path` y permite razonar por capas: primero data, luego edge, luego nodos de compute y finalmente AIO.
+Cada componente queda encapsulado con defaults, handlers, templates y tareas propias. Esto facilita despliegues parciales por tags, elimina parametros `*_repo_path` y permite razonar por capas: data → edge → compute → AIO.
 
-### Introduccion de Quadlet (Qualet)
+### Introduccion de Quadlet
 
-La rama introduce Podman Quadlet como mecanismo principal para definir contenedores y pods bajo `/etc/containers/systemd/`. En lugar de generar unidades systemd manuales con `podman run`, los roles renderizan archivos `.container`, `.pod` y `.network`; systemd genera las unidades finales (`*.service`) a partir de esas definiciones.
+Podman Quadlet define contenedores y pods bajo `/etc/containers/systemd/`. Los roles renderizan `.container`, `.pod` y `.network`; systemd genera las unidades `*.service`.
 
 Ejemplos:
 
 - `roles/pods/templates/*.pod.j2` define la infraestructura de pods.
-- `roles/omlapp/templates/django.service` se instala como `/etc/containers/systemd/omnileads.container`.
-- `roles/nginx/templates/nginx.container` se instala como `/etc/containers/systemd/nginx.container`.
-- `roles/telephony_edge/templates/kamailio_pstn.service` se instala como `/etc/containers/systemd/kamailio_pstn.container`.
+- `roles/omlapp/templates/django.service` → `/etc/containers/systemd/omnileads.container`.
+- `roles/nginx/templates/nginx.container` → `/etc/containers/systemd/nginx.container`.
+- `roles/telephony_edge/templates/kamailio_pstn.service` → `/etc/containers/systemd/kamailio_pstn.container`.
 
-Esto cambia el modelo operativo: DevOps sigue usando `systemctl start|stop|restart <servicio>.service`, pero el origen declarativo vive en Quadlet. Tambien aparecen handlers que reinician pods completos cuando el contenedor pertenece a un pod, porque reiniciar servicios individuales puede dejar inestable la infra del pod en Podman 5.x.
+DevOps sigue operando con `systemctl start|stop|restart <servicio>.service`, pero el origen declarativo vive en Quadlet. Los handlers reinician pods completos cuando el contenedor pertenece a un pod, porque reiniciar unidades individuales puede dejar inestable la infra del pod en Podman 5.x.
 
 ### Networking: bridge por defecto, host solo para el Pod Edge
 
@@ -66,134 +69,151 @@ Pods en bridge:
 
 Excepcion principal:
 
-- `telephony_edge` usa `Network=host`. Ese pod contiene `rtpengine`, `kamailio_webrtc` y `kamailio_pstn`, porque necesita control fino de interfaces, puertos SIP/RTP y exposicion hacia redes externas.
-
-La implicancia es una superficie de red mas acotada: los servicios internos quedan en bridge y solo se publican puertos especificos, mientras que la exposicion telefonica queda concentrada en el pod de edge.
+- `telephony_edge` usa `Network=host` (`rtpengine`, `kamailio_webrtc`, `kamailio_pstn`) por requisitos de interfaces, puertos SIP/RTP y exposicion hacia redes externas.
 
 ### Introduccion de Kamailio PSTN
 
-Antes existia un Kamailio mas general asociado a la telefonia. Ahora el rol `telephony_edge` separa dos responsabilidades:
+Antes existia un Kamailio mas general asociado a la telefonia. Ahora el rol `telephony_edge` separa:
 
-- `kamailio_webrtc`: proxy WebRTC/SIP para agentes y trafico asociado a WebRTC.
-- `kamailio_pstn`: proxy SIP PSTN para interconexion con ITSP/trunks.
+- `kamailio_webrtc`: proxy WebRTC/SIP para agentes.
+- `kamailio_pstn`: proxy SIP PSTN para ITSP/trunks.
 
-`kamailio_pstn` consume variables como `ITSP_NODES`, `IPADDR_PUBLIC`, `IPADDR_PRIVATE`, `FQDN`, `RTPENGINE_SOCKET` y `KAMAILIO_CERTS_LOCATION`. ACD apunta a este proxy mediante `VOIP_PROXY_HOSTNAME` y `VOIP_PROXY_PORT`, y `topology_normalize` calcula `kamailio_pstn_host` por defecto: local en AIO/edge y `edge_host` para nodos de compute en cluster.
+`kamailio_pstn` consume variables como `ITSP_NODES`, `IPADDR_PUBLIC`, `IPADDR_PRIVATE`, `FQDN`, `RTPENGINE_SOCKET` y `KAMAILIO_CERTS_LOCATION`. ACD apunta via `VOIP_PROXY_HOSTNAME` / `VOIP_PROXY_PORT`, y `topology_normalize` calcula `kamailio_pstn_host` por defecto: local en AIO/edge y `edge_host` para nodos de compute en cluster.
 
-Esto permite que la capa ACD deje de resolver directamente todos los escenarios de red y derive la salida PSTN al edge.
+### Captura SIP hacia Homer (HEP)
+
+Cuando `homer_host` esta definido en el inventario, `kamailio_pstn` y `kamailio_webrtc` activan `siptrace` con HEP v3 hacia el colector (`homer_port`, default `9060`). Variables relevantes:
+
+- `homer_kamailio_pstn_capture_id` / `homer_kamailio_webrtc_capture_id` (defaults `2002` / `2003`).
+- `homer_pstn_node_name` / `homer_webrtc_node_name` (defaults `{{ tenant_id }}-pstn` / `{{ tenant_id }}-webrtc`).
+
+Sin `homer_host`, `HOMER_ENABLE=false` y no se compila la config HEP. Asterisk mantiene `HOMER_ENABLE=False` por defecto; habilitar HEP en ACD requiere intervencion explicita.
 
 ### Advertencia sobre `infra_env`
 
-`infra_env` deja de formar parte del flujo ejecutable de Ansible 3.X. En `main` se usaba para decidir escenarios `cloud`, `lan`, `nat`, `custom`, `hybrid` o `all` dentro de templates de Asterisk, Kamailio y RTPengine; en esta rama esa logica se reemplaza por variables mas explicitas:
+`infra_env` deja de formar parte del flujo ejecutable de Ansible 3.X. En `main` se usaba para escenarios `cloud`, `lan`, `nat`, `custom`, `hybrid` o `all`; en esta rama esa logica se reemplaza por variables explicitas:
 
 - `omni_ip_lan` y `omni_ip_wan`.
 - `nat_ip_addr` como fallback para calcular `omni_ip_wan`.
 - `rtpengine_env` y `rtpengine_custom_net_cfg`.
 - `kamailio_pstn_host` y `kamailio_pstn_port`.
-- grupos de inventario `omnileads_data`, `omnileads_edge`, `omnileads_nodes`, `omnileads_aio`.
+- **Grupos pod** del inventario (`data_statefull`, `edge`, `omlapp_web`, …) y `omnileads_aio`.
 
-La mejora es que la topologia ya no depende de una variable global ambigua. El rol `topology_normalize` infiere endpoints por rol de nodo y solo deja override manual cuando hay servicios externos (`postgres_host`, `bucket_url`, `rtpengine_host`, `kamailio_pstn_host`).
-
-Importante: quedan referencias legacy a `infra_env` en documentacion, pero los roles nuevos no la consumen. QA y DevOps no deben validar inventarios nuevos esperando que `infra_env` cambie el comportamiento del deploy.
+Los roles nuevos no consumen `infra_env`. QA y DevOps no deben validar inventarios nuevos esperando que cambie el comportamiento del deploy.
 
 ### Pods principales
 
-- `data_statefull`: agrupa servicios con estado persistente, principalmente PostgreSQL y MinIO. Publica puertos de base y bucket sobre `omni_ip_lan`.
-- `data_stateless`: agrupa Redis y Gearman. Aunque son servicios de datos, el pod separa colas/cache de almacenamiento persistente.
-- `telephony_edge`: agrupa `rtpengine`, `kamailio_webrtc` y `kamailio_pstn` en `Network=host`.
-- `acd`: agrupa `acd-server`, `acd-app`, `acd-conf` y `acd-fastagi` en bridge. Maneja Asterisk/ARI/FastAGI y habla con Kamailio PSTN/WebRTC.
-- `omlapp_web`: agrupa la capa web y HTTP: Django/uWSGI, Daphne, Nginx, Websockets y API del Dialer.
-- `omlapp_workers`: agrupa procesos async de Django: call logger, WhatsApp, supervision, dashboard scheduler, Redis cleanup, dialer events listener y callrec tasks.
-- `dialer_workers`: agrupa workers de Omnidialer para campañas, contactos, eventos y jobs auxiliares.
-- `callrec_processor`: agrupa compresion y transcripcion de grabaciones.
-- `observability`: agrupa Prometheus y exporters.
+- `data_statefull`: PostgreSQL y MinIO con puertos publicados sobre `omni_ip_lan`.
+- `data_stateless`: Redis y Gearman (colas/cache separadas del almacenamiento persistente).
+- `telephony_edge`: `rtpengine`, `kamailio_webrtc` y `kamailio_pstn` en `Network=host`.
+- `acd`: `acd-server`, `acd-app`, `acd-conf` y `acd-fastagi` en bridge.
+- `omlapp_web`: capa web/HTTP (Django, Daphne, Nginx, Websockets, API Dialer).
+- `omlapp_workers`: procesos async de Django (call logger, WhatsApp, supervision, schedulers, dialer events listener, etc.).
+- `dialer_workers`: workers y jobs auxiliares de Omnidialer.
+- `callrec_processor`: pod para compresion y transcripcion; contenedores desplegados por el rol `interaction_processor` (habilitado en hosts `omlapp_workers`; co-localizar con grupo `callrec_processor` o usar `omnileads_aio`).
+- `observability`: Prometheus (solo en tier web/AIO), exporters por tier y Promtail cuando corresponde.
 
 ### Dialer simplificado
 
-El Dialer deja de desplegar servicios propios para Asterisk, dialplan y listener. El rol nuevo se enfoca en:
+El Dialer deja de desplegar Asterisk, dialplan y listener propios. El rol nuevo se enfoca en:
 
 - `dialer_api` dentro del pod `omlapp_web`.
-- Servicios auxiliares (`incidence_rules`, `manage_campaign`, `scheduler`, `send_reports`, `render_template`) dentro de `dialer_workers`.
-- Workers parametrizados `dialer_process_campaign@`, `dialer_process_contact@` y `dialer_process_event@`.
+- Servicios auxiliares en `dialer_workers` (`incidence_rules`, `manage_campaign`, `scheduler`, `send_reports`, `render_template`).
+- Workers templated `dialer_process_campaign@`, `dialer_process_contact@` y `dialer_process_event@`.
 - Un unico `dialer.env` con Redis, PostgreSQL, Gearman, WebSocket y CAPS.
 
-Tambien se reduce el default de `dialer_process_campaign_replicas` de 10 a 5 en el inventario de ejemplo y se elimina `dialer_user`. La integracion con Django se refuerza mediante `background_dialer_tasks` en `omlapp_workers` y `OML_OMNIDIALER_SECRET` en `django.env`.
+Default de `dialer_process_campaign_replicas` reducido de 10 a 5 en el inventario de ejemplo; se elimina `dialer_user`. Integracion con Django via `background_dialer_tasks` en `omlapp_workers` y `OML_OMNIDIALER_SECRET` en `django.env`.
 
-Consideracion: el rol renderiza las unidades templated `dialer_process_*@.container`; QA debe confirmar en despliegue que las replicas esperadas queden iniciadas/habilitadas segun `dialer_process_*_replicas`, porque ese es el punto funcional critico del escalado del Dialer.
+Consideracion: QA debe confirmar que las replicas `dialer_process_*_replicas` queden iniciadas/habilitadas segun inventario.
+
+### Observabilidad
+
+Capa tenant desacoplada del centro Grafana/Loki/Homer central:
+
+- Pod `observability` automatico en hosts con cualquier tier data/edge/compute activo.
+- Prometheus server y scrape config solo en hosts `omlapp_web` / AIO; exporters (node, podman, postgres, redis, gearman, uwsgi) segun tier del host.
+- Publicacion de Prometheus en `omni_ip_lan:9090`; acceso externo recomendado via `https://<fqdn>/prom` en HAProxy edge, restringido por `haproxy_prom_allowed_src` (lista vacia = `/prom` denegado por defecto).
+- Validacion post-deploy (`validate_scrape.yml`): comprobacion TCP de puertos de scrape inter-nodo desde el host Prometheus (tag `validate`).
+- Promtail hacia `loki_url` cuando esta definido, o forzado con `--action=observability` / `oml_observability_deploy=true`.
+- Plantillas JSON de dashboards (SIP, QoS, PostgreSQL, Redis, MinIO, etc.) incluidas como referencia para provisioning Grafana central; no se instalan en el tenant por defecto.
+- Smoke tests locales: `playbooks/smoke_prometheus_template.yml` y `playbooks/smoke_promtail_template.yml`.
 
 ### Ansible Vault
 
-Los secretos dejan de estar en texto plano dentro del inventario. El inventario referencia variables como:
+Secretos fuera del inventario en texto plano. Referencias tipicas:
 
-- `vault_postgres_password`.
-- `vault_s3_http_admin_pass`.
-- `vault_bucket_access_key` y `vault_bucket_secret_key`.
-- `vault_ami_password`.
-- `vault_dialer_password`.
-- `vault_google_api_key`.
-- `vault_callrec_transcriber_api_key`.
-- `vault_backup_bucket_access_key` y `vault_backup_bucket_secret_key`.
+- `vault_postgres_password`, `vault_s3_http_admin_pass`, `vault_bucket_access_key`, `vault_bucket_secret_key`.
+- `vault_ami_password`, `vault_dialer_password`, `vault_google_api_key`, `vault_google_cloud_projectid`.
+- `vault_callrec_transcriber_api_key`, `vault_autheph_sk`.
+- `vault_backup_bucket_access_key`, `vault_backup_bucket_secret_key`, `vault_loki_url`.
 
-El playbook principal carga `group_vars/all/vault.yml`, y `.gitignore` lo excluye del repositorio. Esto mejora seguridad y portabilidad, pero vuelve obligatorio que cada entorno tenga configurada la password de Vault antes de ejecutar `deploy.sh` o `ansible-playbook`.
+`site_core.yml` carga `group_vars/all/vault.yml` junto con `runtime.yml`, `images.yml`, `observability.yml` y `qa.yml`. El archivo vault queda en `.gitignore`.
 
 ### Dependencias, imagenes y configuracion Ansible
 
-- `requirements.txt` fija `ansible-core==2.17.14`, `mitogen`, `ansible-lint`, `yamllint` y `black`.
-- `requirements.yml` declara al menos `community.postgresql` y `containers.podman`.
-- `ansible.cfg` activa `roles_path=./roles`, fact caching, `forks=25`, callbacks de profiling/timer, `pipelining` y ControlMaster SSH con mayor persistencia.
-- Las imagenes pasan de un unico `group_vars/all` plano a `group_vars/all/images.yml`, usando nombres en mayusculas como `APP_IMG`, `ACD_IMG`, `KAMAILIO_IMG`, `POSTGRES_IMG`, `REDIS_IMG`, etc.
+- `requirements.txt`: `ansible-core==2.17.14`, `mitogen==0.3.47`, `ansible-lint==24.12.2`, `yamllint==1.38.0`, `black==26.3.1`.
+- `requirements.yml`: `community.postgresql`, `containers.podman`, `ansible.posix`, `community.general`, `ansible.netcommon`, `ansible.utils`.
+- `ansible.cfg`: `roles_path=./roles`, fact caching, `forks=25`, callbacks profile/timer, pipelining, ControlMaster SSH.
+- Imagenes centralizadas en `group_vars/all/images.yml` (`APP_IMG`, `ACD_IMG`, `KAMAILIO_IMG`, `POSTGRES_IMG`, etc.).
+- Runtime y puertos de observabilidad en `group_vars/all/runtime.yml`.
 
 ### Base de datos y migraciones
 
-No se observa un cambio de esquema Ansible propio, pero el rol `omlapp` sigue ejecutando migraciones Django mediante `django_migrations.sh` cuando cambia el env o los Quadlets de la app. PostgreSQL cambia de imagen base hacia `postgres:18-trixie` y el inventario refuerza `postgres_maintenance_db: postgres`.
+El rol `omlapp` ejecuta migraciones Django via `django_migrations.sh` cuando cambia el env o los Quadlets. PostgreSQL apunta a imagen `postgres:18-trixie`; inventario refuerza `postgres_maintenance_db: postgres`.
 
-La base `omnidialer` queda contemplada en templates SQL y en restore de `upgrade_from_2X`; si `backup_filename_OMD` no se define, el restore de Omnidialer se omite de forma explicita.
+La base `omnidialer` esta en templates SQL y en restore de `upgrade_from_2X`; si `backup_filename_OMD` no se define, el restore de Omnidialer se omite explicitamente.
 
 ## Impacto y Consideraciones para Despliegue
 
 ### Para QA
 
-- Probar ambos layouts: `layout-aio` y `layout-cluster`, ademas de corridas `install`, `update` y `upgrade`.
-- Validar que `topology_normalize` resuelva correctamente `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host` y `dialer_host`.
-- Verificar servicios generados por Quadlet con `systemctl status <servicio>.service` y pods con `systemctl status <pod>-pod.service`.
-- Validar networking: servicios internos en bridge `omnileads`, puertos publicados en `omni_ip_lan` y `telephony_edge` en host network.
-- Probar llamadas WebRTC y PSTN por separado: registros WebRTC contra `kamailio_webrtc`, llamadas PSTN contra `kamailio_pstn` y RTP por `rtpengine`.
-- Probar Dialer extremo a extremo: creacion/ejecucion de campanas, workers `process_campaign/contact/event`, Gearman, Redis DB 3, WebSocket y eventos hacia Django.
-- Verificar que los secretos faltantes en Vault fallen temprano y con mensajes claros.
-- Ejecutar pruebas de upgrade desde 2.X en entorno descartable: limpieza de servicios legacy, Debian 12 -> 13, restore `omnileads` y restore opcional `omnidialer`.
-- Validar observabilidad: Prometheus, exporters, Promtail con `loki_host` o `oml_observability_deploy=true`, y dashboards provisionados.
+- Probar layouts `layout-aio` y `layout-cluster`, mas corridas `install`, `update` y `upgrade`.
+- Validar resolucion de `topology_normalize`: `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host`, `dialer_host`.
+- Verificar Quadlets: `systemctl status <servicio>.service` y pods `systemctl status <pod>-pod.service`.
+- Validar networking: bridge `omnileads`, puertos en `omni_ip_lan`, `telephony_edge` en host network.
+- Telefonia: WebRTC vs PSTN por separado; RTP via `rtpengine`.
+- Homer: con `homer_host` definido, verificar HEP desde Kamailio PSTN/WebRTC (IDs `2002`/`2003` por defecto).
+- Dialer E2E: campanas, workers `process_campaign/contact/event`, Gearman, Redis DB 3, WebSocket y eventos hacia Django.
+- Vault: secretos faltantes deben fallar temprano con mensajes claros (`prerequisitos` / pre-vuelo `deploy.sh`).
+- Upgrade 2.X en entorno descartable: limpieza legacy, Debian 13, restore DBs.
+- Observabilidad: exporters por host, scrape inter-nodo, mensaje de `validate_scrape`, Promtail → Loki, `/prom` en HAProxy solo con CIDRs en `haproxy_prom_allowed_src`.
 
 ### Para DevOps
 
-- Migrar inventarios antes del merge: eliminar `infra_env`, mover hosts a `omnileads_data`, `omnileads_edge`, `omnileads_nodes` o `omnileads_aio`, y reemplazar secretos planos por `vault_*`.
-- Crear y distribuir de forma segura `group_vars/all/vault.yml` y configurar `ANSIBLE_VAULT_PASSWORD_FILE` o `vault_password_file`.
-- Ejecutar `pip install -r requirements.txt` y `ansible-galaxy collection install -r requirements.yml` en el entorno de deploy.
-- En despliegues nuevos, correr primero `install`; los tags parciales asumen que paquetes, red Podman y pods base ya existen o que `prerequisitos` puede reconciliarlos.
-- Revisar firewall/security groups: abrir solo los puertos publicados por pods y la superficie SIP/RTP del edge.
-- Considerar que `POSTGRES_IMG` sube a PostgreSQL 18/Trixie; validar compatibilidad, backups y restore antes de actualizar entornos con datos reales.
-- Usar `telephony-edge` o `voice` para validar telefonia. No asumir que variables legacy de `infra_env` sigan modificando templates.
-- Cuidado con acciones legacy de `deploy.sh`: `backup`, `restore`, `recycle`, `haproxy` y `sentinel` aun referencian rutas `components/*`, pero ese arbol fue removido en la rama. Antes de depender de esas acciones en produccion, hay que corregirlas o reemplazarlas por roles/playbooks vigentes.
-- Revisar documentacion antes de publicar: existen referencias legacy a `infra_env` y algunos ejemplos aun pueden no representar exactamente la estructura final 3.X.
+- Migrar inventarios segun `UPGRADE_YOUR_INVENTORY.md`: eliminar `infra_env`, reemplazar grupos legacy por **grupos pod**, mover secretos a `vault_*`.
+- Crear `group_vars/all/vault.yml` y configurar `ANSIBLE_VAULT_PASSWORD_FILE` o `vault_password_file` (ver `ANSIBLE_BOOTSTRAP.md`).
+- Ejecutar `./bootstrap.sh` o equivalente (`pip install -r requirements.txt`, `ansible-galaxy collection install -r requirements.yml`).
+- Despliegues nuevos: correr `install` primero; tags parciales asumen prerequisitos y pods base reconciliados.
+- Firewall/security groups: puertos publicados por pods + superficie SIP/RTP del edge + scrape LAN entre nodos del tenant.
+- PostgreSQL 18/Trixie: validar compatibilidad y backups antes de actualizar produccion.
+- Telefonia: usar `--action=telephony-edge`, `--action=voice` o `--action=kamailio`; no depender de `infra_env`.
+- Backup/restore operativo: usar `oml_manage` en el host; `deploy.sh` rechaza `backup`/`restore`/`recycle`/`sentinel`/`restart`.
+- Playbooks `backup.yml`, `restore.yml` y `recycle.yml` aun existen pero importan rutas `components/*` eliminadas; no usar hasta reimplementarlos.
+- Documentacion ampliada: `README.md`, `Docs/observability.md`, `Docs/pods.md`, `UPGRADE_YOUR_INVENTORY.md`.
 
 ### Variables nuevas o relevantes
 
-- Secretos Vault: `vault_postgres_password`, `vault_s3_http_admin_pass`, `vault_bucket_access_key`, `vault_bucket_secret_key`, `vault_ami_password`, `vault_dialer_password`, `vault_google_api_key`, `vault_callrec_transcriber_api_key`, `vault_backup_bucket_access_key`, `vault_backup_bucket_secret_key`.
+- Secretos Vault: `vault_postgres_password`, `vault_s3_http_admin_pass`, `vault_bucket_access_key`, `vault_bucket_secret_key`, `vault_ami_password`, `vault_dialer_password`, `vault_google_api_key`, `vault_google_cloud_projectid`, `vault_callrec_transcriber_api_key`, `vault_autheph_sk`, `vault_backup_bucket_access_key`, `vault_backup_bucket_secret_key`, `vault_loki_url`.
 - Topologia/upgrade: `upgrade_from_2X`, `omni_ip_lan`, `omni_ip_wan`, `nat_ip_addr`.
-- Edge/RTP: `kamailio_pstn_host`, `kamailio_pstn_port`, `rtpengine_host`, `rtpengine_ctl_port`, `rtpengine_env`, `rtpengine_custom_net_cfg`.
-- Bucket: `bucket_endpoint`, `bucket_endpoint_internal`.
+- Edge/RTP: `kamailio_pstn_host`, `kamailio_pstn_port`, `rtpengine_host`, `rtpengine_ctl_port`, `rtpengine_env`, `rtpengine_custom_net_cfg`, `kamailio_webrtc_iface`.
+- Homer: `homer_host`, `homer_port`, `homer_kamailio_pstn_capture_id`, `homer_kamailio_webrtc_capture_id`, `homer_pstn_node_name`, `homer_webrtc_node_name`.
+- Bucket: `bucket_endpoint`, `bucket_endpoint_internal`, `bucket_url`.
 - Dialer: `dialer_engine`, `dialer_caps`, `dialer_process_campaign_replicas`, `dialer_process_contact_replicas`, `dialer_process_event_replicas`.
-- Observability: `loki_host`, `oml_observability_deploy`.
+- Observabilidad: `loki_url`, `oml_observability_deploy`, `haproxy_prom_allowed_src`, `prometheus_*_exporter_port`, `prometheus_server_port`.
 - Runtime: `force_image_pull`, `pods_role_tags`.
 
 ## Changelog resumido
 
 - Eliminado: arbol `ansible/components/*` como mecanismo principal de deploy.
-- Agregado: `ansible/roles/*` como nueva unidad de composicion.
-- Agregado: `topology_normalize` para inferir layout, endpoints y componentes habilitados.
+- Agregado: `ansible/roles/*` como unidad de composicion en `site_core.yml`.
+- Agregado: inventario por **grupos pod** (reemplaza grupos legacy `omnileads_*` operativos).
+- Agregado: `topology_normalize` para layout, endpoints y componentes habilitados.
 - Agregado: pods Podman/Quadlet por dominio de servicio.
-- Cambiado: networking de host network generalizado a bridge interno, con excepcion del pod `telephony_edge`.
-- Agregado: `kamailio_pstn` como proxy SIP PSTN separado de `kamailio_webrtc`.
-- Cambiado: Dialer reducido a API, workers y jobs de Omnidialer.
-- Agregado: Vault para secretos y exclusion de `group_vars/all/vault.yml` en git.
-- Agregado: upgrade operativo desde 2.X, incluyendo Debian 13 y restore de DBs.
-- Cambiado: `deploy.sh` usa playbooks en `ansible/playbooks`, acepta `--inventory` y agrega acciones de layout.
-- Riesgo abierto: acciones legacy que aun apuntan a `components/*` deben corregirse o validarse antes de uso operativo.
+- Cambiado: networking bridge interno, con excepcion `telephony_edge` en host network.
+- Agregado: `kamailio_pstn` separado de `kamailio_webrtc`; captura HEP opcional hacia Homer.
+- Agregado: rol `interaction_processor` para callrec en pod `callrec_processor`.
+- Cambiado: Dialer reducido a API, workers y jobs Omnidialer.
+- Agregado: observabilidad tenant (Prometheus, exporters, Promtail, validate scrape, ACL `/prom`).
+- Agregado: Vault, bootstrap documentado y upgrade operativo desde 2.X (Debian 13).
+- Cambiado: `deploy.sh` con Vault obligatorio, `--inventory`, acciones de layout y rechazo de acciones legacy.
+- Riesgo abierto: playbooks `backup.yml` / `restore.yml` / `recycle.yml` rotos (importan `components/*`); usar `oml_manage` hasta reimplementacion.
