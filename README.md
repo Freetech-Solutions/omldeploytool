@@ -82,4 +82,3 @@ GPLv3. Every source code file contains the license preamble and copyright detail
 
 For Issues & Bugs reporting: https://gitlab.com/omnileads/ominicontacto/issues
 
-# test ISO 27001
