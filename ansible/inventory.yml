@@ -428,6 +428,12 @@ all:
     # custom_cors_allowed_origins: https://example1.net,https://example2.com,https://example3.tech
     # custom_cors_allow_headers: access-control-allow-origin,cache-control
 
+    #------------------------------------- WhatsApp Integration ----------------------------------
+    # Public media URL - File Manager Whatsapp
+    # oml_public_media_base_url: https://example.com/
+    # Expiration for HMAC signed media
+    # oml_signed_media_url_expire_seconds: 432000
+
     #####################################################################################################
     #                                       BACKUP AUTOMATIONS                                          #
     #####################################################################################################
@@ -470,8 +476,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20260406-588c953e
-    asterisk_img: docker.io/omnileads/asterisk:20260406-b413ed4c
+    omnileads_img: docker.io/omnileads/omlapp:20260601-9a7787e0
+    asterisk_img: docker.io/omnileads/asterisk:20260515-cf88f33c
 
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
