@@ -28,17 +28,17 @@ GATEWAY=10.22.22.254
 ###################################################################################################
 
 # --- OMniLeads images WEB
-OML_APP_IMG=docker.io/omnileads/omlapp:20260406-588c953e
-OML_NGINX_IMG=docker.io/omnileads/nginx:20260325-e26582d8
+OML_APP_IMG=docker.io/omnileads/omlapp:20260601-9a7787e0
+OML_NGINX_IMG=docker.io/omnileads/nginx:20260515-e9a992f9
 OML_WS_IMG=docker.io/omnileads/websockets:20250825-3b0448ff
 
 # --- OMniLeads images TEL
-OML_ACD_IMG=docker.io/omnileads/asterisk:20260406-b413ed4c
+OML_ACD_IMG=docker.io/omnileads/asterisk:20260515-cf88f33c
 OML_ACD_CONF_IMG=docker.io/omnileads/acd_retrieve_conf:20250825-47b3aa78
 OML_FASTAGI_IMG=docker.io/omnileads/fastagi:20260213-da00c122
 OML_AMI_IMG=docker.io/omnileads/astami:20250825-5d38d2e1
 OML_KAM_IMG=docker.io/omnileads/kamailio:20250825-6b854038
-OML_RTPENGINE_IMG=docker.io/omnileads/rtpengine:20251203-0d2c9b76
+OML_RTPENGINE_IMG=docker.io/omnileads/rtpengine:20260515-3c267866
 OML_ACD_CALL_LOGGER_IMG=docker.io/omnileads/chan_tel_logger:20250826-0cd256e4
 OML_CALLREC_COMPRESSOR_IMG=docker.io/omnileads/callrec_compressor:20251203-7de4a125
 OML_CALLREC_TRANSCRIBER_IMG=docker.io/omnileads/callrec_transcriber:20251203-7de4a125
@@ -422,6 +422,20 @@ GOOGLE_MAPS_API_KEY=NULL
 GOOGLE_MAPS_CENTER='{ "lat": -31.416668, "lng": -64.183334 }'
 GOOGLE_API_KEY=jkjghjkgjk65467GHFGHF5646ghghfghFHGFghf
 GOOGLE_CLOUD_PROJECTID=your_project_id
+
+#########################################################################################################
+#                                        CRM integrations                                               #
+#########################################################################################################
+
+#CUSTOM_CORS_ALLOWED_ORIGINS=https://example1.net,https://example2.com,https://example3.tech
+#CUSTOM_CORS_ALLOW_HEADERS=access-control-allow-origin,cache-control
+
+#########################################################################################################
+#                                        WhatsApp integrations                                          #
+#########################################################################################################
+
+#OML_PUBLIC_MEDIA_BASE_URL=https://example.com/
+#OML_SIGNED_MEDIA_URL_EXPIRE_SECONDS=432000
 
 #########################################################################################################
 #                                       QA & Testing                                                    #
