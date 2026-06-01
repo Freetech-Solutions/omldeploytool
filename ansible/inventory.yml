@@ -297,10 +297,12 @@ all:
     # 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
     acd_log_level: 1
 
-    # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip  & port
+    # --- Only if "infra_env: custom", you can set custom SIP PJSIP transport ip & port, 
     acd_pjsip_transport_dialer: 127.0.0.1:5260
     acd_pjsip_transport_agent: 127.0.0.1:5160
     acd_pjsip_transport_trunk: 127.0.0.1:5060
+    # acd_pjsip_transport_trunk_external_media_address: X.X.X.X
+    # acd_pjsip_transport_trunk_external_signaling_address: X.X.X.X
     acd_api_listen_ip: 127.0.0.1
 
     # If you set scale_asterisk to true, then you must assign values to
@@ -426,6 +428,12 @@ all:
     # custom_cors_allowed_origins: https://example1.net,https://example2.com,https://example3.tech
     # custom_cors_allow_headers: access-control-allow-origin,cache-control
 
+    #------------------------------------- WhatsApp Integration ----------------------------------
+    # Public media URL - File Manager Whatsapp
+    # oml_public_media_base_url: https://example.com/
+    # Expiration for HMAC signed media
+    # oml_signed_media_url_expire_seconds: 432000
+
     #####################################################################################################
     #                                       BACKUP AUTOMATIONS                                          #
     #####################################################################################################
@@ -468,8 +476,8 @@ all:
     # --- the omnileads_img image tag:
     # --- for example: "docker.io/omnileads/omlapp:240216.01-enterprise".
 
-    omnileads_img: docker.io/omnileads/omlapp:20260406-588c953e
-    asterisk_img: docker.io/omnileads/asterisk:20260406-b413ed4c
+    omnileads_img: docker.io/omnileads/omlapp:20260601-9a7787e0
+    asterisk_img: docker.io/omnileads/asterisk:20260515-cf88f33c
 
 ##########################################################################################################
 ## In this section the hosts are grouped based on the type of deployment (AIO, Cluster & Cluster HA      #
