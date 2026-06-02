@@ -185,6 +185,13 @@ all:
     # --- that will last the SIP credentials used to authenticate a SIP user
     # --- in the telephony system
     ECCTL: 28800
+    # --- Presence log/heartbeat (optional overrides; defaults shown)
+    PRESENCE_LOG_RECONNECT_COOLDOWN_MS: 1500
+    PRESENCE_HEARTBEAT_INTERVAL_SEC: 15
+    PRESENCE_HEARTBEAT_TIMEOUT_SEC: 60
+    PRESENCE_HEARTBEAT_SWEEP_SEC: 15
+    PRESENCE_HEARTBEAT_LOGOUT_RECENT_SEC: 90
+    PRESENCE_HEARTBEAT_GUARD_TTL_SEC: 90
     # --- is the attempts a user has to enter an incorrect password in login
     LOGIN_FAILURE_LIMIT: 10 
     # --- SMTP server params, if you want to use your own SMTP, put true and

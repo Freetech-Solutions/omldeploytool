@@ -21,7 +21,21 @@
   changed_when: false
   tags: [install, upgrade, update]
 
-- name: DIALER Set environment variables for this installation
+- name: DIALER ensure dialer.env is available (dialer-only hosts)
+  ansible.builtin.template:
+    src: dialer.env
+    dest: /etc/default/dialer.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: dialer_standalone_env_file
+  notify: Restart dialer pods
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - not (component_omlapp_enabled | default(false) | bool)
+  tags: [install, upgrade, update]
+
+- name: DIALER Set environment variables for this installation (co-located with omlapp)
   ansible.builtin.template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
@@ -30,6 +44,7 @@
     group: "{{ usuario }}"
   register: dialer_env_files
   notify: Restart dialer pods
+  when: component_omlapp_enabled | default(false) | bool
   loop:
     - { src: dialer.env, dest: /etc/default/dialer.env }
   tags: [install, upgrade, update]
@@ -85,6 +100,68 @@
   when: oml_has_dialer_workers | default(false) | bool
   tags: [install, upgrade]
 
+# Quadlet no permite systemctl enable en plantillas @.; instancias vía symlinks @N.container → @.container
+- name: DIALER | Listar symlinks process_campaign instanciados
+  ansible.builtin.find:
+    paths: /etc/containers/systemd
+    patterns: "dialer_process_campaign@[0-9]*.container"
+  register: dialer_process_campaign_instance_files
+  when: oml_has_dialer_workers | default(false) | bool
+  tags: [install, upgrade, update]
+
+- name: DIALER | Calcular instancias process_campaign obsoletas
+  ansible.builtin.set_fact:
+    dialer_process_campaign_obsolete_instances: >-
+      {{
+        (
+          dialer_process_campaign_instance_files.files | default([])
+          | map(attribute='path')
+          | map('basename')
+          | map('regex_replace', '^dialer_process_campaign@([0-9]+)\\.container$', '\\1')
+          | map('int')
+          | list
+        )
+        | difference(range(1, (dialer_process_campaign_replicas | int) + 1) | list)
+        | list
+      }}
+  when: oml_has_dialer_workers | default(false) | bool
+  changed_when: false
+  tags: [install, upgrade, update]
+
+- name: DIALER | Detener instancias process_campaign obsoletas
+  ansible.builtin.systemd:
+    name: "dialer_process_campaign@{{ item }}.service"
+    state: stopped
+  loop: "{{ dialer_process_campaign_obsolete_instances | default([]) }}"
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - (dialer_process_campaign_obsolete_instances | default([]) | length) > 0
+  failed_when: false
+  tags: [install, upgrade, update]
+
+- name: DIALER | Eliminar symlinks process_campaign obsoletos
+  ansible.builtin.file:
+    path: "/etc/containers/systemd/dialer_process_campaign@{{ item }}.container"
+    state: absent
+  loop: "{{ dialer_process_campaign_obsolete_instances | default([]) }}"
+  register: dialer_process_campaign_removed_instances
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - (dialer_process_campaign_obsolete_instances | default([]) | length) > 0
+  tags: [install, upgrade, update]
+
+- name: DIALER | Crear symlinks process_campaign según réplicas
+  ansible.builtin.file:
+    src: /etc/containers/systemd/dialer_process_campaign@.container
+    dest: "/etc/containers/systemd/dialer_process_campaign@{{ item }}.container"
+    state: link
+  loop: "{{ range(1, (dialer_process_campaign_replicas | int) + 1) | list }}"
+  register: dialer_process_campaign_instance_symlinks
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - (dialer_process_campaign_replicas | int) > 0
+  tags: [install, upgrade, update]
+
 # Quadlet genera unidades en daemon-reload; una sola recarga antes de start/restart.
 - name: DIALER | systemd daemon-reload (Quadlet + unidades clásicas)
   ansible.builtin.systemd:
@@ -92,6 +169,37 @@
   when: >-
     ((dialer_quadlet_api | default({})).changed | default(false))
     or ((dialer_quadlet_workers | default({})).changed | default(false))
+    or ((dialer_process_campaign_instance_symlinks | default({})).changed | default(false))
+    or ((dialer_process_campaign_removed_instances | default({})).changed | default(false))
+  tags: [install, upgrade, update]
+
+- name: DIALER Build process_campaign replica service names
+  ansible.builtin.set_fact:
+    dialer_process_campaign_replica_services: >-
+      {{
+        range(1, (dialer_process_campaign_replicas | int) + 1)
+        | map('string')
+        | map('regex_replace', '^(.*)$', 'dialer_process_campaign@\\1.service')
+        | list
+      }}
+  when: oml_has_dialer_workers | default(false) | bool
+  changed_when: false
+  tags: [install, upgrade, update]
+
+- name: DIALER Detect process_campaign template change
+  ansible.builtin.set_fact:
+    dialer_process_campaign_template_changed: >-
+      {{
+        (
+          dialer_quadlet_workers.results | default([])
+          | selectattr('changed', 'equalto', true)
+          | map(attribute='dest')
+          | select('match', '.*/dialer_process_campaign@\\.container$')
+          | list
+          | length
+        ) > 0
+      }}
+  changed_when: false
   tags: [install, upgrade, update]
 
 - name: DIALER Determine changed services
@@ -101,7 +209,21 @@
         (
           (
             dialer_managed_services
-            if dialer_env_files is changed else []
+            if (
+              (dialer_env_files.changed | default(false))
+              or (dialer_standalone_env_file.changed | default(false))
+            ) else []
+          )
+          +
+          (
+            dialer_process_campaign_replica_services | default([])
+            if (
+              (dialer_env_files.changed | default(false))
+              or (dialer_standalone_env_file.changed | default(false))
+              or dialer_process_campaign_template_changed | default(false)
+              or (dialer_process_campaign_instance_symlinks | default({})).changed | default(false)
+              or (dialer_process_campaign_removed_instances | default({})).changed | default(false)
+            ) else []
           )
           +
           (
@@ -136,4 +258,14 @@
     state: started
     enabled: yes
   loop: "{{ dialer_managed_services }}"
+  tags: [install, upgrade, update]
+
+- name: DIALER Start process_campaign worker replicas
+  ansible.builtin.systemd:
+    name: "dialer_process_campaign@{{ item }}.service"
+    state: started
+  loop: "{{ range(1, (dialer_process_campaign_replicas | int) + 1) | list }}"
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - (dialer_process_campaign_replicas | int) > 0
   tags: [install, upgrade, update]
