@@ -1,0 +1,38 @@
+{# Banner OMniLeads para MOTD SSH — generado por Ansible #}
+{%- if prerequisitos_motd_component | default('') | length > 0 -%}
+{%- set motd_component = prerequisitos_motd_component -%}
+{%- elif oml_is_aio | default(false) -%}
+{%- set motd_component = 'All-in-One' -%}
+{%- else -%}
+{%- set motd_parts = [] -%}
+{%- if oml_runs_data_statefull | default(false) -%}{%- set _ = motd_parts.append('Data Stateful') -%}{%- endif -%}
+{%- if oml_runs_data_stateless | default(false) -%}{%- set _ = motd_parts.append('Data Stateless') -%}{%- endif -%}
+{%- if oml_runs_edge | default(false) -%}{%- set _ = motd_parts.append('Edge') -%}{%- endif -%}
+{%- if oml_runs_omlapp_web | default(false) -%}{%- set _ = motd_parts.append('Web App') -%}{%- endif -%}
+{%- if oml_runs_omlapp_workers | default(false) -%}{%- set _ = motd_parts.append('Workers') -%}{%- endif -%}
+{%- if oml_runs_dialer_workers | default(false) -%}{%- set _ = motd_parts.append('Dialer') -%}{%- endif -%}
+{%- if oml_runs_acd | default(false) -%}{%- set _ = motd_parts.append('ACD') -%}{%- endif -%}
+{%- if oml_runs_callrec_processor | default(false) -%}{%- set _ = motd_parts.append('Call Recording') -%}{%- endif -%}
+{%- set motd_component = motd_parts | join(' · ') if (motd_parts | length > 0) else 'OMniLeads Node' -%}
+{%- endif -%}
+{%- set motd_title = 'OMniLeads 3.0' -%}
+{%- set motd_deploy_line = 'Deploy: ' ~ prerequisitos_motd_deploy_date -%}
+{%- set motd_field_width = [
+  motd_title | length,
+  motd_component | length,
+  motd_deploy_line | length
+] | max -%}
+{%- if motd_field_width < 36 -%}
+{%- set motd_field_width = 36 -%}
+{%- endif -%}
+{%- set motd_rule = '─' * (motd_field_width + 3) -%}
+{%- set motd_pad = motd_field_width -%}
+{{ '\033[38;5;39m' }}
+{{ '\033[1;37m' }}  ╭{{ motd_rule }}╮
+  │   {{ ' ' * motd_pad }} │
+  │   {{ '\033[1;97m' }}{{ motd_title }}{{ '\033[1;37m' }}{{ ' ' * (motd_pad - (motd_title | length)) }} │
+  │   {{ '\033[0;36m' }}{{ motd_component }}{{ '\033[1;37m' }}{{ ' ' * (motd_pad - (motd_component | length)) }} │
+  │   {{ '\033[0;90m' }}{{ motd_deploy_line }}{{ '\033[1;37m' }}{{ ' ' * (motd_pad - (motd_deploy_line | length)) }} │
+  │   {{ ' ' * motd_pad }} │
+  ╰{{ motd_rule }}╯
+{{ '\033[0m' }}

@@ -117,7 +117,8 @@
           dialer_process_campaign_instance_files.files | default([])
           | map(attribute='path')
           | map('basename')
-          | map('regex_replace', '^dialer_process_campaign@([0-9]+)\\.container$', '\\1')
+          | map('regex_replace', '^dialer_process_campaign@', '')
+          | map('regex_replace', '\\.container$', '')
           | map('int')
           | list
         )
@@ -179,7 +180,8 @@
       {{
         range(1, (dialer_process_campaign_replicas | int) + 1)
         | map('string')
-        | map('regex_replace', '^(.*)$', 'dialer_process_campaign@\\1.service')
+        | map('regex_replace', '^', 'dialer_process_campaign@')
+        | map('regex_replace', '$', '.service')
         | list
       }}
   when: oml_has_dialer_workers | default(false) | bool

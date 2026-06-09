@@ -1,4 +1,9 @@
 ---
+# Intérprete remoto estable en Debian (/usr/bin/python3 es symlink al Python del SO).
+# Evita que interpreter_python=auto_silent + fact cache elijan rutas versionadas
+# inexistentes (p. ej. /usr/bin/python3.11 en hosts 2.X legacy).
+ansible_python_interpreter: /usr/bin/python3
+
 websocket_host: websocket-server
 websocket_port: 8000
 uwsgi_port: 8099
@@ -27,6 +32,7 @@ force_image_pull: false
 
 acd_app: oml_acd
 acd_ari_port: 7088
+acd_app_metrics_port: 7098
 acd_ag_handoff_ttl: 10
 
 # Edge telephony — endpoints Prometheus (LAN-only; scrape desde tenant Prometheus)
@@ -68,8 +74,7 @@ acd_pod: acd
 dialer_api_pod: dialer
 web_pod: omlapp
 
-acd_host: 127.0.0.1
-
+# acd_host lo resuelve topology_normalize (IP del grupo acd en cluster, omni_ip_lan en AIO).
 acd_server_container_name: acd-server
 acd_app_container_name: acd-app
 acd_conf_container_name: acd-conf
@@ -98,7 +103,8 @@ websocket_container_name: websocket-server
 rtpengine_container_name: rtpengine-server
 pstn_qa_container_name: oml-pstn-server
 
-autheph_sk: "{{ vault_autheph_sk }}"
+kamailio_webrtc_auth_eph_key: "{{ vault_kamailio_webrtc_auth_eph_key }}"
+django_secret_key: "{{ vault_django_secret_key }}"
 
 bucket_endpoint: "{{ bucket_url }}"
 bucket_endpoint_internal: "{{ bucket_url }}"

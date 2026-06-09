@@ -27,3 +27,8 @@ prerequisitos_partial_deploy_tags:
 # Quadlets .network en /etc/containers/systemd
 prerequisitos_quadlet_networks:
   - omnileads.network
+
+# MOTD SSH al ingresar (rol prerequisitos)
+prerequisitos_motd_enabled: true
+# Si está vacío, se infiere desde topology_normalize / group_names
+prerequisitos_motd_component: ""

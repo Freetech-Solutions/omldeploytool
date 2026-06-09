@@ -137,6 +137,12 @@ vault_ami_password: "..."
 # --- Dialer
 vault_dialer_password: "..."
 
+# --- Django
+vault_django_secret_key: "..."
+
+# --- Telefonía WebRTC (auth efímera Kamailio + SIP_SECRET_KEY en Django)
+vault_kamailio_webrtc_auth_eph_key: "..."
+
 # --- Integraciones
 vault_google_api_key: "..."
 vault_callrec_transcriber_api_key: "..."

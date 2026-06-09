@@ -1,4 +1,60 @@
 
+- name: OMLApp Workers resolve deploy timestamp for OML_BUILD_DATE
+  ansible.builtin.command: date '+%Y-%m-%d %H:%M %Z'
+  environment:
+    TZ: "{{ TZ }}"
+  register: omlapp_workers_deploy_timestamp
+  changed_when: false
+  when: not (component_omlapp_enabled | default(false) | bool)
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers set build_date fact
+  ansible.builtin.set_fact:
+    build_date: "{{ omlapp_workers_deploy_timestamp.stdout }}"
+  when: not (component_omlapp_enabled | default(false) | bool)
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers ensure django.env is available (workers-only hosts)
+  ansible.builtin.template:
+    src: "{{ role_path }}/../omlapp/templates/django.env"
+    dest: /etc/default/django.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: omlapp_workers_django_env_file
+  notify: Restart omlapp_workers services
+  when: not (component_omlapp_enabled | default(false) | bool)
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers ensure dialer.env is available (workers-only hosts)
+  ansible.builtin.template:
+    src: "{{ role_path }}/../dialer/templates/dialer.env"
+    dest: /etc/default/dialer.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: omlapp_workers_dialer_env_file
+  notify: Restart dialer pods
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - not (component_omlapp_enabled | default(false) | bool)
+    - dialer_engine is defined
+    - dialer_engine == 'omnidialer'
+  tags:
+    - install
+    - upgrade
+    - update
+    - dialer
+
 - name: OMLApp Workers set environment variables for this installation
   ansible.builtin.template:
     src: call_logger.env
@@ -61,7 +117,21 @@
               'presence_heartbeat_scheduler.service',
               'whatsapp.service'
             ]
-            if omlapp_workers_env_file.changed else []
+            if omlapp_workers_env_file.changed | default(false) else []
+          )
+          +
+          (
+            [
+              'daily_redis_cleanup.service',
+              'background_dialer_tasks.service',
+              'background_callrec_tasks.service',
+              'dashboard_agent_scheduler.service',
+              'supervision_agentes_scheduler.service',
+              'supervision_events_listener.service',
+              'presence_heartbeat_scheduler.service',
+              'whatsapp.service'
+            ]
+            if omlapp_workers_django_env_file.changed | default(false) else []
           )
           +
           (
@@ -81,6 +151,34 @@
     - install
     - upgrade
     - update
+
+- name: OMLApp Workers flag dialer services for restart when dialer.env changed
+  ansible.builtin.set_fact:
+    dialer_changed_services: >-
+      {{
+        [
+          'dialer_incidence_rules.service',
+          'dialer_manage_campaign.service',
+          'dialer_scheduler.service',
+          'dialer_send_reports.service',
+          'dialer_render_template.service',
+        ]
+        + (
+          range(1, (dialer_process_campaign_replicas | default(1) | int) + 1)
+          | map('string')
+          | map('regex_replace', '^', 'dialer_process_campaign@')
+          | map('regex_replace', '$', '.service')
+          | list
+          if (dialer_process_campaign_replicas | default(0) | int) > 0 else []
+        )
+      }}
+  when: omlapp_workers_dialer_env_file.changed | default(false)
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+    - dialer
 
 - name: OMLApp WorkersEnable and start systemd services
   systemd:

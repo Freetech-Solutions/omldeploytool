@@ -167,30 +167,30 @@
       {% endif %}
     kamailio_host: "{{ kamailio_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
     acd_host: >-
-      {{ acd_host | default(
+      {{
         omni_ip_lan if oml_is_aio_only
         else (
           hostvars[acd_peers | first].omni_ip_lan
           if (acd_peers | default([]) | length > 0)
           else aio_host
         )
-      ) }}
+      }}
     # ACD_NODES (kamailio_pstn.env): lista comma-separated <ip:5060> con todos
     # los hosts del mismo tenant declarados bajo el grupo 'acd'. En AIO no hay
     # 'acd' group: kamailio_pstn corre en host network y el ACD publica 5060/udp
     # sobre 127.0.0.1 (ver pods/templates/acd.pod.j2). En cluster sin acd_peers
-    # caemos al acd_host ya resuelto.
+    # caemos al aio_host ya resuelto.
     acd_nodes: >-
-      {{ acd_nodes | default(
+      {{
         '127.0.0.1:5060' if oml_is_aio_only
         else (
           (acd_peers | map('extract', hostvars, 'omni_ip_lan')
                      | map('regex_replace', '$', ':5060')
                      | list | join(','))
           if (acd_peers | default([]) | length > 0)
-          else (acd_host ~ ':5060')
+          else (aio_host ~ ':5060')
         )
-      ) }}
+      }}
     rtpengine_host: "{{ rtpengine_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
     nginx_host: >-
       {{ nginx_host | default(

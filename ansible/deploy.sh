@@ -216,10 +216,6 @@ release_value() {
   git -C "$ANSIBLE_DIR" describe --tags --exact-match 2>/dev/null || git -C "$ANSIBLE_DIR" rev-parse --short HEAD
 }
 
-build_date_value() {
-  git -C "$ANSIBLE_DIR" log -1 --date=iso-strict --format=%cd 2>/dev/null || LC_ALL=C date
-}
-
 run_playbook() {
   local playbook="$1"
   shift
@@ -273,10 +269,9 @@ resolve_vault_args
 preflight_vault
 
 common_extra_vars=(
-  --extra-vars "tenant_folder=${oml_tenant}"
-  --extra-vars "commit=$(git -C "$ANSIBLE_DIR" rev-parse HEAD)"
-  --extra-vars "omnileads_release=$(release_value)"
-  --extra-vars "build_date=$(build_date_value)"
+  "--extra-vars=tenant_folder=${oml_tenant}"
+  "--extra-vars=commit=$(git -C "$ANSIBLE_DIR" rev-parse HEAD)"
+  "--extra-vars=omnileads_release=$(release_value)"
 )
 
 rc=0

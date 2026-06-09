@@ -46,7 +46,7 @@
         - upgrade
         - upgrade_from_2X
 
-    - name: UPGRADE_2X Asegurar pod data_statefull activo en nodo de datos (cluster: delegar a data_statefull)
+    - name: "UPGRADE_2X Asegurar pod data_statefull activo en nodo de datos (cluster: delegar a data_statefull)"
       ansible.builtin.systemd:
         name: data_statefull-pod.service
         state: started

@@ -221,6 +221,62 @@
     - install
     - upgrade
 
+- name: OS_CONF Configure SSH login MOTD
+  when: prerequisitos_motd_enabled | default(true) | bool
+  tags:
+    - install
+    - upgrade
+  block:
+    - name: OS_CONF Resolve MOTD deploy timestamp
+      ansible.builtin.command: date '+%Y-%m-%d %H:%M %Z'
+      environment:
+        TZ: "{{ TZ }}"
+      register: prerequisitos_motd_deploy_date_cmd
+      changed_when: false
+
+    - name: OS_CONF Set MOTD deploy timestamp fact
+      ansible.builtin.set_fact:
+        prerequisitos_motd_deploy_date: "{{ prerequisitos_motd_deploy_date_cmd.stdout }}"
+
+    - name: OS_CONF Render OMniLeads MOTD banner
+      ansible.builtin.template:
+        src: motd_banner.j2
+        dest: /etc/omnileads/motd.banner
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: OS_CONF Remove original static /etc/motd (Debian dynamic motd)
+      ansible.builtin.file:
+        path: /etc/motd
+        state: absent
+      when: ansible_os_family == "Debian"
+
+    - name: OS_CONF Install MOTD script (Debian dynamic motd)
+      ansible.builtin.template:
+        src: 99-omnileads-motd.j2
+        dest: /etc/update-motd.d/99-omnileads
+        owner: root
+        group: root
+        mode: '0755'
+      when: ansible_os_family == "Debian"
+
+    - name: OS_CONF Install MOTD banner (RedHat static motd)
+      ansible.builtin.template:
+        src: motd_banner.j2
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+
+    - name: OS_CONF Regenerate dynamic MOTD (Debian)
+      ansible.builtin.shell: run-parts /etc/update-motd.d/ > /run/motd.dynamic
+      args:
+        executable: /bin/bash
+      when: ansible_os_family == "Debian"
+      changed_when: true
+
 - name: OS_CONF Set Storage journald.conf
   ansible.builtin.lineinfile:
     path: /etc/systemd/journald.conf

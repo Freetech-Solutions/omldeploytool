@@ -174,9 +174,17 @@ Además, Prometheus scrapea endpoints nativos en edge, ACD y telephony que no vi
 #### asterisk_metrics (7088)
 
 - **Host:** acd
-- **Propósito:** Métricas nativas expuestas por el módulo ARI/metrics de Asterisk (acd-server). No es un exporter sidecar: es el endpoint HTTP del ACD.
+- **Propósito:** Métricas nativas expuestas por el módulo `res_prometheus` de Asterisk (acd-server).
 - **Job Prometheus:** `{{ tenant_id }}_asterisk`
 - **Labels:** `tenant`, `component=asterisk`
+
+#### acd_app_metrics (7098)
+
+- **Host:** acd (contenedor `acd-app`, pod `acd`)
+- **Propósito:** Métricas ARI del proceso Python: cola de eventos, eventos recibidos/procesados/descartados, latencias.
+- **Job Prometheus:** `{{ tenant_id }}_acd_app`
+- **Labels:** `tenant`, `component=acd_app`
+- **Puerto:** `acd_app_metrics_port` (default `7098`), publicado en `omni_ip_lan` vía `acd.pod`
 
 #### rtpengine_metrics (22223)
 
@@ -473,6 +481,7 @@ Fuente: `group_vars/all/runtime.yml`
 | `prometheus_redis_exporter_port` | 9121 |
 | `prometheus_gearman_exporter_port` | 9418 |
 | `prometheus_uwsgi_exporter_port` | 9117 |
+| `acd_app_metrics_port` | 7098 |
 | `kamailio_pstn_metrics_port` | 9273 |
 | `kamailio_webrtc_metrics_port` | 9274 |
 | `haproxy_metrics_port` | 8404 |

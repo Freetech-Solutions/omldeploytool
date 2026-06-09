@@ -1,4 +1,23 @@
 
+- name: DJANGO Resolve deploy timestamp for OML_BUILD_DATE
+  ansible.builtin.command: date '+%Y-%m-%d %H:%M %Z'
+  environment:
+    TZ: "{{ TZ }}"
+  register: omlapp_deploy_timestamp
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: DJANGO Set build_date fact
+  ansible.builtin.set_fact:
+    build_date: "{{ omlapp_deploy_timestamp.stdout }}"
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: DJANGO environment variables for this installation
   template:
     src: "django.env"

@@ -143,8 +143,8 @@ Capa tenant desacoplada del centro Grafana/Loki/Homer central:
 Secretos fuera del inventario en texto plano. Referencias tipicas:
 
 - `vault_postgres_password`, `vault_s3_http_admin_pass`, `vault_bucket_access_key`, `vault_bucket_secret_key`.
-- `vault_ami_password`, `vault_dialer_password`, `vault_google_api_key`, `vault_google_cloud_projectid`.
-- `vault_callrec_transcriber_api_key`, `vault_autheph_sk`.
+- `vault_ami_password`, `vault_dialer_password`, `vault_django_secret_key`, `vault_google_api_key`, `vault_google_cloud_projectid`.
+- `vault_callrec_transcriber_api_key`, `vault_kamailio_webrtc_auth_eph_key`.
 - `vault_backup_bucket_access_key`, `vault_backup_bucket_secret_key`, `vault_loki_url`.
 
 `site_core.yml` carga `group_vars/all/vault.yml` junto con `runtime.yml`, `images.yml`, `observability.yml` y `qa.yml`. El archivo vault queda en `.gitignore`.
@@ -193,7 +193,7 @@ La base `omnidialer` esta en templates SQL y en restore de `upgrade_from_2X`; si
 
 ### Variables nuevas o relevantes
 
-- Secretos Vault: `vault_postgres_password`, `vault_s3_http_admin_pass`, `vault_bucket_access_key`, `vault_bucket_secret_key`, `vault_ami_password`, `vault_dialer_password`, `vault_google_api_key`, `vault_google_cloud_projectid`, `vault_callrec_transcriber_api_key`, `vault_autheph_sk`, `vault_backup_bucket_access_key`, `vault_backup_bucket_secret_key`, `vault_loki_url`.
+- Secretos Vault: `vault_postgres_password`, `vault_s3_http_admin_pass`, `vault_bucket_access_key`, `vault_bucket_secret_key`, `vault_ami_password`, `vault_dialer_password`, `vault_django_secret_key`, `vault_google_api_key`, `vault_google_cloud_projectid`, `vault_callrec_transcriber_api_key`, `vault_kamailio_webrtc_auth_eph_key`, `vault_backup_bucket_access_key`, `vault_backup_bucket_secret_key`, `vault_loki_url`.
 - Topologia/upgrade: `upgrade_from_2X`, `omni_ip_lan`, `omni_ip_wan`, `nat_ip_addr`.
 - Edge/RTP: `kamailio_pstn_host`, `kamailio_pstn_port`, `rtpengine_host`, `rtpengine_ctl_port`, `rtpengine_env`, `rtpengine_custom_net_cfg`, `kamailio_webrtc_iface`.
 - Homer: `homer_host`, `homer_port`, `homer_kamailio_pstn_capture_id`, `homer_kamailio_webrtc_capture_id`, `homer_pstn_node_name`, `homer_webrtc_node_name`.
@@ -201,6 +201,7 @@ La base `omnidialer` esta en templates SQL y en restore de `upgrade_from_2X`; si
 - Dialer: `dialer_engine`, `dialer_caps`, `dialer_process_campaign_replicas`, `dialer_process_contact_replicas`, `dialer_process_event_replicas`.
 - Observabilidad: `loki_url`, `oml_observability_deploy`, `haproxy_prom_allowed_src`, `prometheus_*_exporter_port`, `prometheus_server_port`.
 - Runtime: `force_image_pull`, `pods_role_tags`.
+- Django seguridad: `fqdn` obligatorio por tenant; `DJANGO_ALLOWED_HOSTS` y `DJANGO_CSRF_TRUSTED_ORIGINS` en `django.env`; `django_allowed_hosts_extra` opcional para alias/white-label.
 
 ## Changelog resumido
 

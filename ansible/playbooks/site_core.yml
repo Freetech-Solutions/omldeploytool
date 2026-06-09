@@ -28,6 +28,10 @@
       tags: [upgrade_from_2X, upgrade, prerequisitos]
     - role: upgrade_from_2X
       vars:
+        upgrade_from_2X_phase: prepare_apt
+      tags: [upgrade_from_2X, upgrade, prerequisitos]
+    - role: upgrade_from_2X
+      vars:
         upgrade_from_2X_phase: upgrade_to_debian13
       tags: [upgrade_from_2X, upgrade, upgrade_debian13, prerequisitos]
     - role: prerequisitos

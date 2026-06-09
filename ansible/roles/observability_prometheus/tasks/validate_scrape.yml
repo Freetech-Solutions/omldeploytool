@@ -21,6 +21,8 @@
             (redis_host | trim) ~ ':' ~ (prometheus_redis_exporter_port | default(9121) | string),
             (gearman_host | trim) ~ ':' ~ (prometheus_gearman_exporter_port | default(9418) | string),
             (nginx_host | trim) ~ ':' ~ (prometheus_uwsgi_exporter_port | default(9117) | string),
+            (acd_host | trim) ~ ':' ~ (acd_ari_port | default(7088) | string),
+            (acd_host | trim) ~ ':' ~ (acd_app_metrics_port | default(7098) | string),
             (rtpengine_host | trim) ~ ':' ~ (rtpengine_metrics_port | default(22223) | string),
             (kamailio_pstn_host | default(edge_host) | trim) ~ ':' ~ (kamailio_pstn_metrics_port | default(9273) | string),
             (kamailio_host | trim) ~ ':' ~ (kamailio_webrtc_metrics_port | default(9274) | string),
