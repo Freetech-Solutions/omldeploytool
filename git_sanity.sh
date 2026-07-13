@@ -130,7 +130,7 @@ fi
 list_submodules
 
 # Identify problematic prefixes: '+', '-', 'U'
-if echo "$SUBSTAT" | grep -Eq '^[\+\-U]'; then
+  if echo "$SUBSTAT" | grep -Eq '^[+\-U]'; then
   echo
   echo "❌ Hay submódulos desalineados/no init/conflict (prefijo + - U)."
   echo "   Sugerencia: ejecutá: git submodule update --init --recursive --force"
