@@ -41,6 +41,10 @@ frontend https_in
     http-request deny if path_prom_prefix
 {% endif %}
     use_backend prometheus_cluster if path_prom_exact or path_prom_prefix
+{% if haproxy_kamailio_ws_enabled | default(true) | bool %}
+    acl path_ws path /ws
+    use_backend kamailio_webrtc_ws if path_ws
+{% endif %}
     default_backend nginx_cluster
 
 backend nginx_cluster
@@ -56,6 +60,14 @@ backend prometheus_cluster
 {% for h in haproxy_prometheus_peers %}
     server prom{{ loop.index0 }} {{ hostvars[h]['omni_ip_lan'] }}:{{ haproxy_prom_backend_port }} check
 {% endfor %}
+
+{% if haproxy_kamailio_ws_enabled | default(true) | bool %}
+backend kamailio_webrtc_ws
+    option http-server-close
+    timeout tunnel 3600s
+    http-request set-header X-Real-IP %[src]
+    server kwrtc {{ haproxy_kamailio_ws_backend_host | default(omni_ip_lan, true) }}:{{ haproxy_kamailio_ws_backend_port }} check
+{% endif %}
 {% if haproxy_metrics_enabled | default(true) | bool %}
 {% set _metrics_allowed_raw = haproxy_metrics_allowed_src | default([]) %}
 {% set _metrics_allowed_src = ([_metrics_allowed_raw] if (_metrics_allowed_raw is string) else _metrics_allowed_raw) %}

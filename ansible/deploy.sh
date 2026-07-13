@@ -3,7 +3,10 @@ set -euo pipefail
 
 ANSIBLE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-if [ -f "$ANSIBLE_DIR/venv/bin/activate" ]; then
+if [ -f "$ANSIBLE_DIR/.ci-venv/bin/activate" ]; then
+  # shellcheck source=/dev/null
+  source "$ANSIBLE_DIR/.ci-venv/bin/activate"
+elif [ -f "$ANSIBLE_DIR/venv/bin/activate" ]; then
   # shellcheck source=/dev/null
   source "$ANSIBLE_DIR/venv/bin/activate"
 fi
@@ -17,6 +20,7 @@ DEFAULT_ACTION="install"
 VAULT_FILE="$ANSIBLE_DIR/group_vars/all/vault.yml"
 
 ask_vault_pass=false
+skip_confirm=false
 oml_action="$DEFAULT_ACTION"
 oml_tenant=""
 inventory_file=""
@@ -29,6 +33,10 @@ How to use it:
 ./deploy.sh --action=<action> --tenant=<tenant>
 ./deploy.sh --action=<action> --inventory=/abs/path/to/inventory.yml
 ./deploy.sh --action=<action> --tenant=<tenant> --ask-vault-pass
+./deploy.sh --action=<action> --tenant=<tenant> --yes   # skip confirmation prompt
+
+Options:
+  --yes, -y           Run without interactive confirmation (for CI/automation)
 
 Ansible Vault (required before any run):
   Set ANSIBLE_VAULT_PASSWORD_FILE to a local password file, uncomment vault_password_file
@@ -48,6 +56,7 @@ Primary actions (playbooks/site.yml unless noted):
   postgres, redis, minio, gearman
   haproxy, edge
   data
+  backup            (playbooks/backup.yml — PostgreSQL dump on demand to S3)
   kamailio          (alias for telephony-edge)
 
 Layout validation then full site.yml (match topology to your inventory):
@@ -63,8 +72,8 @@ For brand-new servers, run install first.
 
 update is the recommended action for repeated deploys after the first install.
 
-Removed in 3.X (use oml_manage on the host for backup/restore operations):
-  backup, restore, recycle, sentinel, restart
+Removed in 3.X (use oml_manage on the host or a future deploy action when available):
+  restore, recycle, sentinel, restart
 
 Ansible log (ansible.cfg log_path): directory ANSIBLE_LOG_DIR (default /tmp/oml_install_logs)
 is created before each run; log file ansible.log inside that directory.
@@ -208,12 +217,47 @@ validate_inventory() {
 unsupported_action() {
   local action="$1"
   echo "Action '$action' is not available in deploy.sh 3.X." >&2
-  echo "Use oml_manage on the target host for backup/restore operations." >&2
+  echo "Use oml_manage on the target host for restore/recycle operations." >&2
   exit 1
 }
 
 release_value() {
   git -C "$ANSIBLE_DIR" describe --tags --exact-match 2>/dev/null || git -C "$ANSIBLE_DIR" rev-parse --short HEAD
+}
+
+confirm_action() {
+  if [ "$skip_confirm" = true ]; then
+    return 0
+  fi
+
+  local inventory_path
+  inventory_path="$(resolve_inventory)"
+
+  echo
+  echo "Deploy summary:"
+  echo "  Action:    $oml_action"
+  if [ -n "${oml_tenant:-}" ]; then
+    echo "  Tenant:    $oml_tenant"
+  fi
+  echo "  Inventory: $inventory_path"
+  echo "  Release:   $(release_value)"
+  echo
+  read -r -p "Continue with this deploy? [yes/no]: " reply
+  reply="$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')"
+
+  case "$reply" in
+    yes|y)
+      return 0
+      ;;
+    no|n)
+      echo "Deploy cancelled."
+      exit 0
+      ;;
+    *)
+      echo "Invalid response. Deploy cancelled (expected 'yes' or 'no')."
+      exit 1
+      ;;
+  esac
 }
 
 run_playbook() {
@@ -226,7 +270,7 @@ run_playbook() {
 
   ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" \
   ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}" \
-  ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-/tmp/ansible-remote}" \
+  ANSIBLE_REMOTE_TEMP="/tmp/ansible-remote" \
   ansible-playbook "$playbook" -i "$inventory_path" "${vault_args[@]}" "$@"
 }
 
@@ -244,6 +288,9 @@ for arg in "$@"; do
     --ask-vault-pass)
       ask_vault_pass=true
       ;;
+    --yes|-y)
+      skip_confirm=true
+      ;;
     --help|-h)
       print_help
       exit 0
@@ -260,19 +307,25 @@ derive_tenant_folder
 validate_inventory
 
 case "$oml_action" in
-  backup|restore|recycle|sentinel|restart)
+  restore|recycle|sentinel|restart)
     unsupported_action "$oml_action"
     ;;
 esac
 
 resolve_vault_args
 preflight_vault
+confirm_action
 
 common_extra_vars=(
   "--extra-vars=tenant_folder=${oml_tenant}"
   "--extra-vars=commit=$(git -C "$ANSIBLE_DIR" rev-parse HEAD)"
   "--extra-vars=omnileads_release=$(release_value)"
 )
+
+TENANT_OVERRIDES_FILE="$ANSIBLE_DIR/instances/${oml_tenant}/vars.yml"
+if [ -f "$TENANT_OVERRIDES_FILE" ]; then
+  common_extra_vars+=("--extra-vars=@${TENANT_OVERRIDES_FILE}")
+fi
 
 rc=0
 case "$oml_action" in
@@ -303,6 +356,11 @@ case "$oml_action" in
   prerequisitos)
     run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
       --tags "prerequisitos,gather_facts" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  backup)
+    run_playbook "$ANSIBLE_DIR/playbooks/backup.yml" \
+      --tags "backup,always" \
       "${common_extra_vars[@]}" || rc=$?
     ;;
   install|upgrade|update|voice|telephony-edge|acd|interaction_processor|omlapp|nginx|websockets|dialer|qa|addons|postgres|redis|minio|gearman|haproxy|edge|data)

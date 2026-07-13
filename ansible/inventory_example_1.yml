@@ -1,0 +1,45 @@
+
+---
+# Example of an All in One "AIO"
+all:
+  children:
+    aio_instances:
+      hosts:
+        test_aio:
+          ansible_host: "{{ vault_tenant_test_aio_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_test_aio_omni_ip_lan }}"
+
+##########################################################
+### All in One "AIO"
+##########################################################
+omnileads_aio:
+  hosts:
+    test_aio:
+
+##########################################################
+### Cluster: Pod groups (a host can be in multiple groups)
+##########################################################
+
+data_statefull:
+  hosts:
+
+data_stateless:
+  hosts:
+
+edge:
+  hosts:
+
+omlapp_web:
+  hosts:
+
+omlapp_workers:
+  hosts:
+
+dialer_workers:
+  hosts:    
+
+acd:
+  hosts:
+
+callrec_processor:
+  hosts:

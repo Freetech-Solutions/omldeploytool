@@ -53,4 +53,11 @@ scrape_configs:
       - targets:  ['acd-server:7088']
         labels:
           tenant: 'Konecta_Verloop_AIO'
-          component: 'acd-server'
+          component: 'asterisk'
+
+  - job_name: 'Konecta_Verloop_acd_app'
+    static_configs:
+      - targets:  ['acd-app:7098']
+        labels:
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'acd_app'

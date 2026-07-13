@@ -15,7 +15,7 @@ PodmanArgs=--cgroups=no-conmon
 Volume={{ certs_location | default(certs_location) }}:{{ kamailio_certs_location | default(certs_location) }}
 PodmanArgs=--entrypoint=/entrypoint_pstn.sh
 {% if kamailio_pstn_custom | default(false) | bool %}
-Volume=/etc/omnileads/kamailio_pstn.cfg:/etc/kamailio/kamailio_pstn.cfg:ro
+Volume=/etc/omnileads/kamailio_voip.cfg:/etc/kamailio/kamailio_voip.cfg:ro
 {% endif %}
 
 [Service]

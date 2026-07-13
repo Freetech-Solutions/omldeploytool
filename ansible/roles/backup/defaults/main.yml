@@ -1,0 +1,8 @@
+---
+# backup | restore
+backup_operation: backup
+
+# Hosts donde puede ejecutarse backup/restore (misma convención que backup.env en prerequisitos).
+backup_target_host_groups:
+  - omnileads_aio
+  - omlapp_web

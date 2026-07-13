@@ -1,0 +1,190 @@
+
+---
+# Example of an All in One "AIO"
+all:
+  children:
+    aio_instances:
+      hosts:
+        test_aio:
+          tenant_id: test_aio_1
+          ansible_host: "{{ vault_tenant_test_aio_1_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_test_aio_1_omni_ip_lan }}"
+          bucket_name: "{{ vault_tenant_test_aio_1_bucket_name }}"
+          fqdn: "{{ vault_tenant_test_aio_1_fqdn }}"
+          itsp_nodes: "{{ vault_tenant_test_aio_1_itsp_nodes }}"
+          kamailio_webrtc_iface: eth1
+        test_aio_2:
+          tenant_id: test_aio_2
+          ansible_host: "{{ vault_tenant_test_aio_2_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_test_aio_2_omni_ip_lan }}"
+          bucket_name: "{{ vault_tenant_test_aio_2_bucket_name }}"
+          fqdn: "{{ vault_tenant_test_aio_2_fqdn }}"
+          itsp_nodes: "{{ vault_tenant_test_aio_2_itsp_nodes }}"
+          kamailio_webrtc_iface: eth1
+
+all:
+  children:
+    cluster_instances:
+      children:
+        tenant_x:
+          hosts:
+            tenant_x_node:
+              tenant_id: tenant_x_node
+              ansible_host: "{{ vault_tenant_x_node_ansible_host }}"
+              omni_ip_lan: 172.16.202.3
+            tenant_x_edge:
+              tenant_id: tenant_x_edge
+              ansible_host: "{{ vault_tenant_x_edge_ansible_host }}"
+              omni_ip_lan: 172.16.202.2              
+          vars:
+            tenant_id: tenant_x_aio_edge
+            fqdn: "{{ vault_tenant_x_fqdn }}"
+            bucket_url: "{{ vault_bucket_url }}"
+            bucket_name: "{{ vault_tenant_x_bucket_name }}"
+            itsp_nodes: "{{ vault_tenant_x_itsp_nodes }}"            
+            kamailio_webrtc_iface: ens18          
+                tenant_x:
+        tenant_y:
+          hosts:
+            tenant_y_node:
+              tenant_id: tenant_y_node
+              ansible_host: "{{ vault_tenant_y_node_ansible_host }}"
+              omni_ip_lan: 172.16.202.4
+            tenant_y_edge:
+              tenant_id: tenant_y_edge
+              ansible_host: "{{ vault_tenant_y_edge_ansible_host }}"
+              omni_ip_lan: 172.16.202.5              
+          vars:
+            tenant_id: tenant_x_aio_edge
+            fqdn: "{{ vault_tenant_x_fqdn }}"
+            bucket_url: "{{ vault_bucket_url }}"
+            bucket_name: "{{ vault_tenant_x_bucket_name }}"
+            itsp_nodes: "{{ vault_tenant_x_itsp_nodes }}"            
+            kamailio_webrtc_iface: ens18
+        tenant_z:
+          hosts:
+            tenant_z_node:
+              tenant_id: tenant_z_node
+              ansible_host: "{{ vault_tenant_z_node_ansible_host }}"
+              omni_ip_lan: 172.16.202.6
+            tenant_z_edge:
+              tenant_id: tenant_z_edge
+              ansible_host: "{{ vault_tenant_z_edge_ansible_host }}"
+              omni_ip_lan: 172.16.202.7              
+          vars:
+            tenant_id: tenant_z
+            fqdn: "{{ vault_tenant_z_fqdn }}"
+            bucket_url: "{{ vault_bucket_url }}"
+            bucket_name: "{{ vault_tenant_z_bucket_name }}"
+            itsp_nodes: "{{ vault_tenant_z_itsp_nodes }}"            
+            kamailio_webrtc_iface: ens18
+
+      tenant_a:
+          hosts:
+            tenant_a_data_statefull:
+              tenant_id: tenant_a_data_statefull
+              ansible_host: "{{ vault_tenant_a_data_statefull_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_data_statefull_omni_ip_lan }}"
+            tenant_a_data_stateless:
+              tenant_id: tenant_a_data_stateless
+              ansible_host: "{{ vault_tenant_a_data_stateless_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_data_stateless_omni_ip_lan }}"
+            tenant_a_dialer_workers:
+              tenant_id: tenant_a_dialer_workers
+              ansible_host: "{{ vault_tenant_a_dialer_workers_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_dialer_workers_omni_ip_lan }}"
+            tenant_a_omlapp_workers:
+              tenant_id: tenant_a_omlapp_workers
+              ansible_host: "{{ vault_tenant_a_omlapp_workers_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_omlapp_workers_omni_ip_lan }}"
+            tenant_a_acd:
+              tenant_id: tenant_a_acd
+              ansible_host: "{{ vault_tenant_a_acd_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_acd_omni_ip_lan }}"
+            tenant_a_callrec_processor:
+              tenant_id: tenant_a_callrec_processor
+              ansible_host: "{{ vault_tenant_a_callrec_processor_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_callrec_processor_omni_ip_lan }}"
+            tenant_a_app_server:
+              tenant_id: tenant_a_app_server
+              ansible_host: "{{ vault_tenant_a_app_server_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_app_server_omni_ip_lan }}"
+            tenant_z_edge:
+              tenant_id: tenant_a_edge
+              ansible_host: "{{ vault_tenant_a_edge_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_a_edge_omni_ip_lan }}"
+          vars:
+            tenant_id: tenant_a
+            fqdn: "{{ vault_tenant_a_fqdn }}"
+            bucket_url: "{{ vault_tenant_a_bucket_url }}"
+            bucket_name: "{{ vault_tenant_a_bucket_name }}"
+            itsp_nodes: "{{ vault_tenant_a_itsp_nodes }}"            
+            kamailio_webrtc_iface: ens18            
+
+##########################################################
+### All in One "AIO"
+##########################################################
+omnileads_aio:
+  hosts:
+    test_aio_1:
+    test_aio_2:
+
+##########################################################
+### Cluster: Pod groups (a host can be in multiple groups)
+##########################################################
+
+data_statefull:
+  hosts:
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_data_statefull:
+
+data_stateless:
+  hosts:
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_data_stateless:
+
+edge:
+  hosts:
+    tenant_x_edge:
+    tenant_y_edge:
+    tenant_z_edge:
+    tenant_a_edge:
+
+omlapp_web:
+  hosts:
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_omlapp_web:
+
+omlapp_workers:
+  hosts:
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_omlapp_workers:
+
+dialer_workers:
+  hosts:    
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_dialer_workers:
+
+acd:
+  hosts:
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_acd:
+
+callrec_processor:
+  hosts:
+    tenant_x_node:
+    tenant_y_node:
+    tenant_z_node:
+    tenant_a_callrec_processor:

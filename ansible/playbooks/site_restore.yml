@@ -1,0 +1,25 @@
+---
+- name: OMniLeads PostgreSQL restore from backup
+  hosts: "{{ oml_play_hosts | default('omlapp_web:omnileads_aio') }}"
+  gather_facts: true
+  gather_subset:
+    - "!hardware"
+    - "!virtual"
+    - "!facter"
+    - "!ohai"
+  vars_files:
+    - ../group_vars/all/runtime.yml
+    - ../group_vars/all/vault.yml
+    - ../group_vars/all/images.yml
+    - ../group_vars/all/tenants_global.yml
+  pre_tasks:
+    - name: Normalize topology and component switches
+      ansible.builtin.include_role:
+        name: topology_normalize
+      tags:
+        - always
+  roles:
+    - role: backup
+      vars:
+        backup_operation: restore
+      tags: [install, restore, postgres]

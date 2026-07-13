@@ -41,7 +41,6 @@ CREATE INDEX idx_jobs_datime ON public.jobs(datime);
 CREATE INDEX idx_jobs_status ON public.jobs(status);
 CREATE INDEX idx_jobs_name_status ON public.jobs(job_name, status);
 
-ALTER TABLE public.jobs OWNER TO omnidialer;
 
 --
 -- Name: system.control; Type: TABLE; Schema: public; Owner: omnidialer
@@ -53,7 +52,6 @@ CREATE TABLE public.system_control (
     updated_at TIMESTAMP DEFAULT now()
 );
 
-ALTER TABLE public.system_control OWNER TO omnidialer;
 
 INSERT INTO public.system_control (id, is_active) VALUES (true, true);
 
@@ -92,7 +90,6 @@ CREATE TABLE public.campaign (
 );
 
 
-ALTER TABLE public.campaign OWNER TO omnidialer;
 
 
 --
@@ -108,7 +105,6 @@ CREATE SEQUENCE public.campaign_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.campaign_id_seq OWNER TO omnidialer;
 
 --
 -- Name: campaign_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
@@ -129,7 +125,6 @@ CREATE TABLE public.contact (
 );
 
 
-ALTER TABLE public.contact OWNER TO omnidialer;
 
 --
 -- Name: contact_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
@@ -144,7 +139,6 @@ CREATE SEQUENCE public.contact_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.contact_id_seq OWNER TO omnidialer;
 
 --
 -- Name: contact_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
@@ -172,7 +166,6 @@ CREATE TABLE public.contact_in_campaign (
 );
 
 
-ALTER TABLE public.contact_in_campaign OWNER TO omnidialer;
 
 --
 -- Name: contact_in_campaign_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
@@ -187,7 +180,6 @@ CREATE SEQUENCE public.contact_in_campaign_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.contact_in_campaign_id_seq OWNER TO omnidialer;
 
 --
 -- Name: contact_in_campaign_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
@@ -195,9 +187,6 @@ ALTER TABLE public.contact_in_campaign_id_seq OWNER TO omnidialer;
 
 ALTER SEQUENCE public.contact_in_campaign_id_seq
     OWNED BY public.contact_in_campaign.id;
-
-ALTER SEQUENCE public.contact_in_campaign_id_seq
-    OWNER TO omnidialer;
 
 
 --
@@ -230,7 +219,6 @@ CREATE TABLE public.incidence_rules (
 );
 
 
-ALTER TABLE public.incidence_rules OWNER TO omnidialer;
 
 
 --
@@ -246,7 +234,6 @@ CREATE SEQUENCE public.incidence_rules_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.incidence_rules_id_seq OWNER TO omnidialer;
 
 --
 -- Name: incidence_rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
@@ -369,7 +356,6 @@ CREATE TABLE public.incidence_rules_disposition (
     CONSTRAINT incidence_rules_in_mode_check CHECK ((in_mode >= 0))
 );
 
-ALTER TABLE public.incidence_rules_disposition OWNER TO omnidialer;
 
 --
 -- Name: incidence_rules_disposition_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
@@ -384,7 +370,6 @@ CREATE SEQUENCE public.incidence_rules_disposition_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.incidence_rules_disposition_id_seq OWNER TO omnidialer;
 
 --
 -- Name: incidence_rules_disposition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer

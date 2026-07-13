@@ -2,6 +2,23 @@
 
 Comparacion analizada: `main...develop-3.0` sobre `ansible/` (HEAD actual de la rama).
 
+## Kamailio VoIP SBC (`kamailio_voip.cfg`)
+
+- Nuevo SBC de doble cara para cluster ACD: discriminacion inbound/outbound por IP de origen (`IS_FROM_ITSP` / `ds_is_from_list`), sin cabecera `OMniLeadsOutbound`.
+- Dispatcher hacia nodos Asterisk en puerto trunk `5070` (`acd_trunk_sip_port`); Kamailio PSTN permanece en `:5060`.
+- Salida hacia ITSP via `RELAY_ITSP` (sin dispatcher); enmascaramiento From/Contact con `IPADDR_PUBLIC`.
+- RTPengine: `direction=internal/external` segun flujo; sin doble offer en `MANAGE_BRANCH`; sin flags deprecados RTPengine 14.
+- Rutas in-dialog `WITHINDLG_*` para BYE del carrier hacia ACD.
+- Entrypoint `entrypoint_pstn.sh` genera `dispatcher.list` e `itsp_allowlist.cfg`; documentacion en `components-git-repo/kamailio/README_VOIP.md`.
+- Variables Ansible: `ASTERISK_PORT` y `ASTERISK_SETID` en `kamailio_pstn.env`.
+
+## WebRTC WSS en cluster (HAProxy directo)
+
+- HAProxy en edge enruta `GET /ws` directamente a `kamailio-webrtc` en `omni_ip_lan:10060` (`haproxy_kamailio_ws_enabled`), evitando el salto nginx→edge que corrompia `X-Real-IP`.
+- Kamailio WebRTC: htable `ws_client` guarda la IP del navegador en el handshake HTTP; `WS_XFF_FIX` la usa en REGISTER para `add_contact_alias()`.
+- RTPengine standalone (dual-homed `internal`+`external`): `direction=` en Kamailio voip/webrtc; offer ancla pata ACD (`internal`) antes del lookup; sin flags deprecados `force-replace-*` / `replace-session-connection`.
+- Despliegues AIO sin HAProxy siguen usando nginx `/ws` → Kamailio (misma logica de captura IP en handshake).
+
 ## Resumen Ejecutivo
 
 La rama `develop-3.0` transforma el deploy Ansible de OMniLeads hacia una arquitectura 3.X basada en roles, topologia normalizada por **grupos pod** y servicios Podman gestionados por systemd/Quadlet. El cambio elimina el arbol `components/*` como mecanismo principal, separa responsabilidades por capas (`data`, `edge`, compute) y prepara despliegues AIO y cluster con inventarios explicitos. Tambien centraliza secretos con Ansible Vault, reordena la telefonia (WebRTC, PSTN, RTPengine), incorpora observabilidad tenant con validacion de scrape y captura SIP opcional hacia Homer (HEP), y documenta la migracion de inventarios legacy en `UPGRADE_YOUR_INVENTORY.md`.
@@ -20,6 +37,7 @@ La rama `develop-3.0` transforma el deploy Ansible de OMniLeads hacia una arquit
 - Ansible Vault obligatorio: secretos como `vault_*` en `group_vars/all/vault.yml` (fuera de git).
 - Upgrade desde 2.X: rol `upgrade_from_2X` (limpieza systemd legacy, Debian 12 → 13, restore `omnileads` y opcionalmente `omnidialer`).
 - Operacion local: `oml_manage` para status, health, logs, reinicios, consola Django, Redis, PostgreSQL, Asterisk y backup/restore en el host.
+- Rol `backup`: backup on-demand (`--action=backup`) y restore PostgreSQL desde S3 en `install` cuando el inventario define `backup_filename` (play `site_restore.yml`); reutilizado por `upgrade_from_2X`.
 - Bootstrap documentado: `ANSIBLE_BOOTSTRAP.md`, script `bootstrap.sh`, `requirements.txt` y `requirements.yml`.
 - Roles opcionales fuera de `site_core.yml`: `traefik_lb` (balanceo Traefik v3 hacia backends nginx) y `sentiment_analysis` (`component_sentiment_analysis_enabled: false` por defecto).
 
@@ -55,7 +73,7 @@ Ejemplos:
 
 DevOps sigue operando con `systemctl start|stop|restart <servicio>.service`, pero el origen declarativo vive en Quadlet. Los handlers reinician pods completos cuando el contenedor pertenece a un pod, porque reiniciar unidades individuales puede dejar inestable la infra del pod en Podman 5.x.
 
-### Networking: bridge por defecto, host solo para el Pod Edge
+### Networking: bridge por defecto, host para edge y ACD
 
 En `main`, muchos contenedores usaban `--network=host`. En esta rama se crea la red Podman `omnileads` con driver `bridge` (`roles/prerequisitos/templates/omnileads.network`) y los pods internos se conectan a esa red.
 
@@ -63,13 +81,13 @@ Pods en bridge:
 
 - `data_statefull`: PostgreSQL y MinIO; publica `5432`, `9000` y `9001` sobre `omni_ip_lan`.
 - `data_stateless`: Redis y Gearman; publica `6379` y `4730` sobre `omni_ip_lan`.
-- `acd`: Asterisk/ACD, app ARI, config y FastAGI; publica `5060/udp` de forma controlada.
 - `omlapp_web`: Django/uWSGI, Daphne, Nginx, Websockets y API del Dialer; publica `80` y `443`.
 - `omlapp_workers`, `dialer_workers`, `callrec_processor` y `observability`.
 
-Excepcion principal:
+Excepciones `Network=host`:
 
-- `telephony_edge` usa `Network=host` (`rtpengine`, `kamailio_webrtc`, `kamailio_pstn`) por requisitos de interfaces, puertos SIP/RTP y exposicion hacia redes externas.
+- `telephony_edge` (`rtpengine`, `kamailio_webrtc`, `kamailio_pstn`) por requisitos de interfaces, puertos SIP/RTP y exposicion hacia redes externas.
+- `acd` (Asterisk trunk en UDP `5070`, agentes `:5160`, ARI `:7088`, metricas `:7098`); Kamailio PSTN permanece en `:5060`.
 
 ### Introduccion de Kamailio PSTN
 
@@ -106,7 +124,7 @@ Los roles nuevos no consumen `infra_env`. QA y DevOps no deben validar inventari
 - `data_statefull`: PostgreSQL y MinIO con puertos publicados sobre `omni_ip_lan`.
 - `data_stateless`: Redis y Gearman (colas/cache separadas del almacenamiento persistente).
 - `telephony_edge`: `rtpengine`, `kamailio_webrtc` y `kamailio_pstn` en `Network=host`.
-- `acd`: `acd-server`, `acd-app`, `acd-conf` y `acd-fastagi` en bridge.
+- `acd`: `acd-server`, `acd-app`, `acd-conf` y `acd-fastagi` en `Network=host`; trunk SIP UDP `:6070` (`acd_trunk_sip_port`).
 - `omlapp_web`: capa web/HTTP (Django, Daphne, Nginx, Websockets, API Dialer).
 - `omlapp_workers`: procesos async de Django (call logger, WhatsApp, supervision, schedulers, dialer events listener, etc.).
 - `dialer_workers`: workers y jobs auxiliares de Omnidialer.
@@ -170,7 +188,7 @@ La base `omnidialer` esta en templates SQL y en restore de `upgrade_from_2X`; si
 - Probar layouts `layout-aio` y `layout-cluster`, mas corridas `install`, `update` y `upgrade`.
 - Validar resolucion de `topology_normalize`: `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host`, `dialer_host`.
 - Verificar Quadlets: `systemctl status <servicio>.service` y pods `systemctl status <pod>-pod.service`.
-- Validar networking: bridge `omnileads`, puertos en `omni_ip_lan`, `telephony_edge` en host network.
+- Validar networking: bridge `omnileads`, puertos en `omni_ip_lan`, `telephony_edge` y `acd` en host network (Asterisk trunk `:6070`, Kamailio PSTN `:5060`).
 - Telefonia: WebRTC vs PSTN por separado; RTP via `rtpengine`.
 - Homer: con `homer_host` definido, verificar HEP desde Kamailio PSTN/WebRTC (IDs `2002`/`2003` por defecto).
 - Dialer E2E: campanas, workers `process_campaign/contact/event`, Gearman, Redis DB 3, WebSocket y eventos hacia Django.
@@ -187,8 +205,11 @@ La base `omnidialer` esta en templates SQL y en restore de `upgrade_from_2X`; si
 - Firewall/security groups: puertos publicados por pods + superficie SIP/RTP del edge + scrape LAN entre nodos del tenant.
 - PostgreSQL 18/Trixie: validar compatibilidad y backups antes de actualizar produccion.
 - Telefonia: usar `--action=telephony-edge`, `--action=voice` o `--action=kamailio`; no depender de `infra_env`.
-- Backup/restore operativo: usar `oml_manage` en el host; `deploy.sh` rechaza `backup`/`restore`/`recycle`/`sentinel`/`restart`.
-- Playbooks `backup.yml`, `restore.yml` y `recycle.yml` aun existen pero importan rutas `components/*` eliminadas; no usar hasta reimplementarlos.
+- **Upgrade ACD host network + trunk `:6070`:** bump `ACD_IMG` (imagen con `PJSIP_TRUNK_PORT`), luego `./deploy.sh --action=upgrade`. El rol `pods` recrea `acd.pod`; `telephony_edge` aplica `acd_nodes`/`ACD_NET_ADDR` y reinit del pod; `acd` aplica env y reinit del pod. En cluster, abrir UDP `6070` edge→ACD. Verificar `ss -ulnp` (5060 Kamailio, 6070 Asterisk).
+- Backup on-demand: `./deploy.sh --action=backup` (playbook `backup.yml`, rol `backup`).
+- Restore en instancia nueva: definir `backup_filename` (y opcionalmente `backup_filename_OMD`) en inventario y ejecutar `./deploy.sh --action=install`; el play `site_restore.yml` restaura antes del deploy de aplicacion. Upgrade 2.X reutiliza el mismo rol via `upgrade_from_2X`.
+- Restore en produccion: usar `oml_manage` en el host; `deploy.sh` rechaza `--action=restore`/`recycle`/`sentinel`/`restart`.
+- Playbook `restore.yml` legacy aun importa `components/*` eliminado; no usar (preferir install con `backup_filename` o `oml_manage`).
 - Documentacion ampliada: `README.md`, `Docs/observability.md`, `Docs/pods.md`, `UPGRADE_YOUR_INVENTORY.md`.
 
 ### Variables nuevas o relevantes
@@ -210,11 +231,11 @@ La base `omnidialer` esta en templates SQL y en restore de `upgrade_from_2X`; si
 - Agregado: inventario por **grupos pod** (reemplaza grupos legacy `omnileads_*` operativos).
 - Agregado: `topology_normalize` para layout, endpoints y componentes habilitados.
 - Agregado: pods Podman/Quadlet por dominio de servicio.
-- Cambiado: networking bridge interno, con excepcion `telephony_edge` en host network.
+- Cambiado: networking bridge interno, con excepciones `telephony_edge` y `acd` en host network (Asterisk trunk UDP `6070`).
 - Agregado: `kamailio_pstn` separado de `kamailio_webrtc`; captura HEP opcional hacia Homer.
 - Agregado: rol `interaction_processor` para callrec en pod `callrec_processor`.
 - Cambiado: Dialer reducido a API, workers y jobs Omnidialer.
 - Agregado: observabilidad tenant (Prometheus, exporters, Promtail, validate scrape, ACL `/prom`).
 - Agregado: Vault, bootstrap documentado y upgrade operativo desde 2.X (Debian 13).
 - Cambiado: `deploy.sh` con Vault obligatorio, `--inventory`, acciones de layout y rechazo de acciones legacy.
-- Riesgo abierto: playbooks `backup.yml` / `restore.yml` / `recycle.yml` rotos (importan `components/*`); usar `oml_manage` hasta reimplementacion.
+- Riesgo abierto: playbook `restore.yml` / `recycle.yml` legacy rotos (importan `components/*`); restore en install via rol `backup` + `site_restore.yml`; backup on-demand via `--action=backup`.

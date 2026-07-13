@@ -23,9 +23,6 @@ Exec=main.py
 Restart=on-failure
 TimeoutStopSec=70
 TimeoutStartSec=900
-{% if scale_asterisk is defined and scale_asterisk %}
-MemoryMax={{ asterisk_mem_limit | default("1G", true) }}
-{% endif %}
 
 [Install]
 WantedBy=multi-user.target

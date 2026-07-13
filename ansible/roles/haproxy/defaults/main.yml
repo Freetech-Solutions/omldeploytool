@@ -23,3 +23,8 @@ haproxy_metrics_port: 8404
 # Vacío = permitir scrape desde redes privadas RFC1918. No reutiliza haproxy_prom_allowed_src
 # (ese ACL suele listar IPs públicas para /prom desde Internet).
 haproxy_metrics_allowed_src: []
+# WebSocket SIP (wss://<fqdn>/ws) directo a kamailio-webrtc en el mismo edge.
+# Kamailio escucha en KAMAILIO_IFACE (omni_ip_lan), no en 127.0.0.1.
+haproxy_kamailio_ws_enabled: true
+haproxy_kamailio_ws_backend_host: ""
+haproxy_kamailio_ws_backend_port: "{{ kamailio_wss_port | default(10060) }}"

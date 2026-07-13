@@ -1,0 +1,13 @@
+---
+# CI: validar YAML sin reglas cosméticas (trailing spaces, etc.).
+extends: default
+
+rules:
+  line-length:
+    max: 200
+    level: warning
+  trailing-spaces: disable
+  empty-lines: disable
+  comments: disable
+  colons: disable
+  truthy: disable

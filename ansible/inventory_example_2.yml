@@ -1,0 +1,55 @@
+---
+# Example of an upgrade from 2.0 to 3.0 of an All in One "AIO"
+
+all:
+  children:
+    aio_instances:
+      hosts:
+        # upgrade from 2.0
+        test_b:
+          tenant_id: test_b
+          ansible_host: "{{ vault_test_b_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_test_b_omni_ip_lan }}"
+          fqdn: "{{ vault_tenant_test_b_fqdn }}"
+          upgrade_from_2X: True
+          postgres_user: "{{ vault_tenant_test_b_postgres_user }}"
+          postgres_password: "{{ vault_tenant_test_b_postgres_password }}"         
+          bucket_url: "{{ vault_tenant_test_b_bucket_url }}"
+          bucket_name: "{{ vault_tenant_test_b_bucket_name }}"
+          itsp_nodes: "{{ vault_tenant_test_b_itsp_nodes }}"
+          kamailio_webrtc_iface: ens18
+
+##########################################################
+### All in One "AIO"
+##########################################################
+omnileads_aio:
+  hosts:
+    test_b:
+
+##########################################################
+### Cluster: Pod groups (a host can be in multiple groups)
+##########################################################
+
+data_statefull:
+  hosts:
+
+data_stateless:
+  hosts:
+
+edge:
+  hosts:
+
+omlapp_web:
+  hosts:
+
+omlapp_workers:
+  hosts:
+
+dialer_workers:
+  hosts:    
+
+acd:
+  hosts:
+
+callrec_processor:
+  hosts:

@@ -49,7 +49,19 @@
     daemon_reload: true
   tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
 
-- name: MAIN Enable and start Pod services
+- name: MAIN Build list of pods whose Quadlet definition changed
+  ansible.builtin.set_fact:
+    pods_quadlets_changed: >-
+      {{
+        pods_quadlets_render.results | default([])
+        | selectattr('changed', 'equalto', true)
+        | map(attribute='item')
+        | list
+      }}
+  changed_when: false
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Enable and start Pod services (unchanged definitions)
   ansible.builtin.systemd:
     name: "{{ item }}-pod.service"
     state: started
@@ -57,15 +69,81 @@
   loop: "{{ pods_quadlets }}"
   loop_control:
     label: "{{ item }}"
+  when: item not in (pods_quadlets_changed | default([]))
   tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
 
-# Tras un cambio en el .pod, hace falta reiniciar el pod para aplicar la definición (started no recarga).
-- name: MAIN Restart Pod services whose Quadlet definition changed
+# Tras un cambio en el .pod (p. ej. PublishPort) hay que recrear la infra Podman.
+# systemctl stop/start no alcanza: los contenedores Quadlet (BindsTo) y el pod stale
+# impiden aplicar la nueva definición. No usar systemctl enable aquí: las unidades
+# *-pod.service son generadas por Quadlet (transient) y fallan con systemctl enable.
+- name: MAIN Tear down Podman infra for changed Quadlet pods
+  ansible.builtin.shell: |
+    set -euo pipefail
+    pod="{{ item }}"
+    pod_unit="${pod}-pod.service"
+
+    for cf in /etc/containers/systemd/*.container; do
+      [[ -f "$cf" ]] || continue
+      if grep -q "Pod=${pod}.pod" "$cf" 2>/dev/null; then
+        unit="$(basename "$cf" .container).service"
+        systemctl stop "$unit" 2>/dev/null || true
+      fi
+    done
+
+    systemctl stop "$pod_unit" 2>/dev/null || true
+    podman pod stop "$pod" 2>/dev/null || true
+    podman pod rm -f "$pod" 2>/dev/null || true
+  args:
+    executable: /bin/bash
+  loop: "{{ pods_quadlets_changed | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  when: (pods_quadlets_changed | default([]) | length) > 0
+  changed_when: true
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Reload systemd after tearing down changed Quadlet pods
   ansible.builtin.systemd:
-    name: "{{ item.item }}-pod.service"
-    state: restarted
-  loop: "{{ pods_quadlets_render.results | default([]) }}"
+    daemon_reload: true
+  when: (pods_quadlets_changed | default([]) | length) > 0
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Enable and start Pod services (changed definitions)
+  ansible.builtin.systemd:
+    name: "{{ item }}-pod.service"
+    state: started
+    enabled: true
+  loop: "{{ pods_quadlets_changed | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  when: (pods_quadlets_changed | default([]) | length) > 0
+  register: pods_changed_start
+  ignore_errors: true
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Show journal for failed changed Pod start
+  ansible.builtin.command:
+    argv:
+      - journalctl
+      - -u
+      - "{{ item.item }}-pod.service"
+      - --no-pager
+      - -n
+      - "40"
+  loop: "{{ pods_changed_start.results | default([]) }}"
   loop_control:
     label: "{{ item.item | default('?') }}"
-  when: item.changed | default(false)
+  when:
+    - item.failed | default(false)
+  changed_when: false
+  tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"
+
+- name: MAIN Fail if any changed Pod did not start
+  ansible.builtin.fail:
+    msg: >-
+      Failed to start pod service(s):
+      {{ pods_changed_start.results | selectattr('failed', 'defined') | selectattr('failed') | map(attribute='item') | list | join(', ') }}
+  when:
+    - pods_changed_start.results is defined
+    - pods_changed_start.results | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0
   tags: "{{ pods_role_tags | default(pods_role_tags_default) }}"

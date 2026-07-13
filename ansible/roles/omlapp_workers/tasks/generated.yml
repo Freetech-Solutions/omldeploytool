@@ -171,6 +171,22 @@
           | list
           if (dialer_process_campaign_replicas | default(0) | int) > 0 else []
         )
+        + (
+          range(1, (dialer_process_contact_replicas | default(1) | int) + 1)
+          | map('string')
+          | map('regex_replace', '^', 'dialer_process_contact@')
+          | map('regex_replace', '$', '.service')
+          | list
+          if (dialer_process_contact_replicas | default(0) | int) > 0 else []
+        )
+        + (
+          range(1, (dialer_process_event_replicas | default(1) | int) + 1)
+          | map('string')
+          | map('regex_replace', '^', 'dialer_process_event@')
+          | map('regex_replace', '$', '.service')
+          | list
+          if (dialer_process_event_replicas | default(0) | int) > 0 else []
+        )
       }}
   when: omlapp_workers_dialer_env_file.changed | default(false)
   changed_when: false

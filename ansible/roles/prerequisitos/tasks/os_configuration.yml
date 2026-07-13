@@ -34,11 +34,21 @@
   tags:
     - install
 
-- name: MAIN Disable SELinux on Rocky, Alma Linux or CentOS
+- name: MAIN Disable SELinux on Rocky or Alma Linux
   ansible.posix.selinux:
     state: disabled
-  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux", "CentOS"]
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
   ignore_errors: true
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: MAIN Set SELinux Permissive immediately on Rocky or Alma Linux
+  ansible.builtin.command: setenforce 0
+  failed_when: false
+  changed_when: false
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
   tags:
     - install
     - upgrade
@@ -82,7 +92,7 @@
 
 - name: OS_CONF Copy google speech credentials json
   ansible.builtin.copy:
-    src: "../../../instances/{{ tenant_folder }}/google_credentials.json"
+    src: "{{ prerequisitos_tenant_instances_dir }}/google_credentials.json"
     dest: /etc/omnileads/google_credential.json
     mode: '0600'
   tags:
@@ -129,7 +139,7 @@
 
 - name: OS_CONF Copy custom SSL certs
   ansible.builtin.copy:
-    src: "../../../instances/{{ tenant_folder }}/{{ cert_file_name | default('cert.pem') }}"
+    src: "{{ prerequisitos_tenant_instances_dir }}/{{ ssl_cert_file_name | default('cert.pem') }}"
     dest: "{{ certs_location | default('/etc/omnileads/certs') }}/cert.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
@@ -141,7 +151,7 @@
 
 - name: OS_CONF Copy custom SSL keys
   ansible.builtin.copy:
-    src: "../../../instances/{{ tenant_folder }}/{{ key_file_name | default('key.pem') }}"
+    src: "{{ prerequisitos_tenant_instances_dir }}/{{ ssl_key_file_name | default('key.pem') }}"
     dest: "{{ certs_location | default('/etc/omnileads/certs') }}/key.pem"
     owner: "{{ usuario }}"
     group: "{{ usuario }}"

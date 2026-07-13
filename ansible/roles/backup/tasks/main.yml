@@ -1,0 +1,8 @@
+---
+- name: BACKUP Dispatch restore operation
+  ansible.builtin.import_tasks: restore_dbs.yml
+  when: backup_operation == 'restore'
+
+- name: BACKUP Dispatch on-demand backup operation
+  ansible.builtin.import_tasks: backup_on_demand.yml
+  when: backup_operation == 'backup'

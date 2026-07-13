@@ -149,6 +149,8 @@ vault_callrec_transcriber_api_key: "..."
 
 # --- Observabilidad (Promtail → Loki central; URL base sin path de push)
 vault_loki_url: "http://loki.example.com:3100"
+# --- HAProxy edge: CIDRs permitidos para https://<fqdn>/prom
+vault_haproxy_prom_allowed_src: ["10.0.0.0/8", "192.168.0.0/16"]
 
 # --- Backups en S3
 vault_backup_bucket_access_key: "..."
@@ -245,7 +247,7 @@ chmod 600 instances/<tenant>/key.pem
 ```
 
 Si los archivos tienen otros nombres, declaralos en el host del inventario con
-`cert_file_name` y `key_file_name` (ver `README.md`).
+`ssl_cert_file_name` y `ssl_key_file_name` (ver `README.md`).
 
 ---
 

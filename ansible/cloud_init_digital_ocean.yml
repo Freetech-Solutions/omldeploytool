@@ -1,0 +1,39 @@
+#cloud-config
+ssh_pwauth: false
+disable_root: true
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - python3
+  - sudo
+
+users:
+  - default
+  - name: omladmin
+    gecos: OMniLeads Ansible admin
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+runcmd:
+  - visudo -c
+  - |
+    # --- Configuración dinámica usando variables de Bash ---
+    USER_NAME="omladmin"
+    HOME_DIR="/home/${USER_NAME}"
+    SSH_DIR="${HOME_DIR}/.ssh"
+    
+    # 1. Creamos el directorio usando la variable
+    mkdir -p "${SSH_DIR}"
+    
+    # 2. Filtramos e inyectamos la llave limpia
+    awk '/ssh-rsa|ssh-ed25519|ecdsa-sha2/{print $NF==""?"":$0}' /root/.ssh/authorized_keys | sed 's/^.*\(ssh-rsa\|ssh-ed25519\|ecdsa-sha2\)/\1/' > "${SSH_DIR}/authorized_keys"
+    
+    # 3. Aplicamos permisos usando la variable de usuario
+    chown -R "${USER_NAME}:${USER_NAME}" "${SSH_DIR}"
+    chmod 700 "${SSH_DIR}"
+    chmod 600 "${SSH_DIR}/authorized_keys"
+
+final_message: "OMniLeads cloud-init finalizado. Proceso completado ($(date -R))"

@@ -1,345 +1,512 @@
-# Pods, Quadlet, contenedores y systemd en OMniLeads 3.X
+# Pods, contenedores y systemd en OMniLeads
 
-Documentación operativa de cómo Ansible orquesta la plataforma con **Podman**, **Pods**, **Quadlet** y **systemd**. Cubre el modelo de red (bridge `omnileads` frente a `host` en telefonía), la publicación de puertos y el funcionamiento de los pods **dialer_workers** y **acd**.
+Documentación operativa del modelo de orquestación **Podman + Quadlet + systemd** usado por Ansible para desplegar cada tenant de OMniLeads 3.X.
 
 **Roles Ansible involucrados:**
 
+- `roles/pods` — plantillas `.pod` y arranque de `<pod>-pod.service`
 - `roles/prerequisitos` — red Podman `omnileads` (Quadlet `.network`)
-- `roles/pods` — definición de pods (Quadlet `.pod`)
-- `roles/dialer`, `roles/acd`, `roles/telephony_edge`, … — contenedores (Quadlet `.container` / `.service`)
-- `roles/topology_normalize` — qué pods y componentes corre cada host
+- Cada rol de componente — plantillas `.container` o unidades clásicas con `podman run`
 
-**Referencias en el repositorio:**
+**Referencias en el repo:**
 
-- [README.md — modelo de inventario por pods](../README.md#inventory-model)
-- [README.md — modelo de red](../README.md#networking-model)
-- [group_vars/all/runtime.yml](../group_vars/all/runtime.yml) — `oml_network`, puertos, unidades systemd de pods
+- Constantes de nombres y puertos: [`group_vars/all/runtime.yml`](../group_vars/all/runtime.yml)
+- Membresía de pods por host: [`roles/topology_normalize/tasks/main.yml`](../roles/topology_normalize/tasks/main.yml)
+- Utilidad operativa en el host: [`roles/prerequisitos/templates/oml_manage.sh`](../roles/prerequisitos/templates/oml_manage.sh)
 
 ---
 
-## Conceptos y documentación oficial
+## Visión general
 
-| Concepto | Qué es en OMniLeads | Documentación oficial |
-|--------|---------------------|------------------------|
-| **Contenedor** | Proceso aislado (imagen OCI) que ejecuta un servicio (Asterisk, worker de dialer, Redis, etc.). | [Podman — contenedores](https://docs.podman.io/en/latest/) |
-| **Pod (Podman)** | Grupo de contenedores que comparten **namespace de red** (y en la práctica, el mismo stack de red del pod). Un pod es la unidad de despliegue de red en esta arquitectura. | [podman-pod(1)](https://docs.podman.io/en/latest/markdown/podman-pod.1.html) |
-| **Quadlet** | Generador de unidades systemd a partir de archivos declarativos en `/etc/containers/systemd/` (`.pod`, `.container`, `.network`). | [podman-quadlet(1)](https://docs.podman.io/en/latest/markdown/podman-quadlet.1.html), [podman-systemd.unit(5)](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) |
-| **systemd** | Init y supervisor: habilita servicios al arranque, reinicia contenedores, ordena dependencias (`After=`, `Wants=`). | [systemd.unit(5)](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html) |
+OMniLeads no usa Kubernetes ni Docker Compose en producción. Cada componente es un **contenedor Podman** gestionado por **systemd**. La capa declarativa es **Quadlet**: archivos INI en `/etc/containers/systemd/` que systemd traduce a unidades `*.service`.
 
-En este proyecto `container_orchest: systemd` ([runtime.yml](../group_vars/all/runtime.yml)): no se usa un orquestador tipo Kubernetes; **systemd es la capa de control** y Quadlet traduce los manifiestos a unidades como `dialer_workers-pod.service` o `acd-server.service`.
+El agrupamiento lógico se hace con **pods de Podman** (un archivo `.pod` por pod). Los contenedores de aplicación declaran `Pod=<nombre>.pod` y comparten red de pod (salvo excepciones documentadas abajo).
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Host Linux (tenant)                             │
+│                                                                         │
+│  systemd                                                                │
+│    ├── omnileads-network.service     ← Quadlet .network (bridge)        │
+│    ├── data_statefull-pod.service    ← Quadlet .pod                     │
+│    ├── postgresql.service            ← Quadlet .container → pod         │
+│    ├── minio.service                 ← Quadlet .container → pod         │
+│    ├── observability-pod.service                                        │
+│    ├── prometheus_node_exporter.service                                 │
+│    └── …                                                                │
+│                                                                         │
+│  Podman                                                                 │
+│    ├── red: omnileads (bridge)                                          │
+│    ├── pod: data_statefull.pod  → postgresql-server, minio-server       │
+│    ├── pod: omlapp_web.pod      → nginx, uwsgi, daphne, websockets, …   │
+│    └── contenedores sueltos     → haproxy, promtail, addons (host net)  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Glosario
+
+| Término | Significado |
+|---------|-------------|
+| **Quadlet** | Generador de unidades systemd a partir de archivos declarativos en `/etc/containers/systemd/` (`.pod`, `.container`, `.network`). |
+| **Pod (Podman)** | Grupo de contenedores que comparten namespace de red (y opcionalmente puertos publicados). No es un pod de Kubernetes. |
+| **Unidad pod** | `systemd` expone `<stem>-pod.service` por cada `<stem>.pod` (p. ej. `omlapp_web.pod` → `omlapp_web-pod.service`). |
+| **Unidad contenedor** | `<nombre>.container` → `<nombre>.service` (p. ej. `postgresql.container` → `postgresql.service`). |
+| **Co-localización** | Un mismo host puede pertenecer a varios grupos del inventario (`omlapp_web` + `acd` + `dialer_workers`, etc.) y por tanto ejecutar varios pods. |
+| **AIO** | Host en grupo `omnileads_aio`: todos los pods del tenant en una sola máquina. |
 
 ---
 
-## Cómo encajan las piezas (flujo Ansible → runtime)
+## Flujo de despliegue
+
+1. **`topology_normalize`** (tag `always`) calcula flags `oml_runs_*` según los grupos del inventario del host (`data_statefull`, `edge`, `omlapp_web`, `omnileads_aio`, …).
+
+2. **`prerequisitos`** despliega `omnileads.network` (driver **bridge**, nombre `omnileads`) y arranca `omnileads-network.service`.
+
+3. **`pods`** resuelve `pods_quadlets` para el host y:
+   - copia las plantillas `roles/pods/templates/<pod>.pod.j2` → `/etc/containers/systemd/<pod>.pod`;
+   - ejecuta `daemon-reload`;
+   - `enable` + `start` de cada `<pod>-pod.service`;
+   - reinicia el pod si la plantilla `.pod` cambió.
+
+4. **Roles de componente** despliegan `.container` (o unidades clásicas) y arrancan sus `*.service`. Muchos contenedores declaran `Requires=<pod>-pod.service` para garantizar que el pod exista antes del contenedor.
+
+El rol `pods` debe ejecutarse **antes** que cualquier rol cuyos contenedores referencien un `.pod`; de ahí la lista amplia de tags en `pods_role_tags` en `runtime.yml`.
+
+### Diagrama de dependencias (simplificado)
 
 ```mermaid
-flowchart TB
-  subgraph ansible [Ansible]
-    TN[topology_normalize<br/>oml_runs_*]
-    PR[prerequisitos<br/>omnileads.network]
-    POD[roles/pods<br/>*.pod.j2]
-    COMP[roles componente<br/>*.container]
-  end
-
-  subgraph host [Host Linux]
-    QDIR["/etc/containers/systemd/"]
-    GEN[podman-system-generator]
-    SD[systemd]
-    NET[red omnileads bridge]
-    P[pod Podman]
-    C[contenedores]
-  end
-
-  TN --> POD
-  TN --> COMP
-  PR --> QDIR
-  POD --> QDIR
-  COMP --> QDIR
-  QDIR --> GEN
-  GEN --> SD
-  SD --> NET
-  SD --> P
-  P --> C
+flowchart TD
+    INV[Inventario: grupos pod por host] --> TOPO[topology_normalize<br/>oml_runs_*]
+    TOPO --> NET[prerequisitos: omnileads.network]
+    NET --> PODS[roles/pods: *.pod]
+    PODS --> COMP[Roles componente: *.container]
+    COMP --> SD[systemd daemon-reload]
+    SD --> RUN[*.service started]
 ```
-
-1. **`topology_normalize`** calcula, según los grupos del inventario (`dialer_workers`, `acd`, `edge`, …), flags como `oml_runs_dialer_workers` y endpoints (`redis_host`, `gearman_host`, `kamailio_pstn_host`, …).
-2. **`prerequisitos`** despliega `omnileads.network` (driver **bridge**, nombre `omnileads`) y arranca `omnileads-network.service`.
-3. **`roles/pods`** renderiza solo los `.pod` que corresponden al host (p. ej. `dialer_workers.pod`, `acd.pod`) y arranca `*-pod.service`.
-4. Cada rol de componente renderiza archivos **`.container`** (Quadlet) con `Pod=<nombre>.pod`. Tras `daemon-reload`, systemd expone un servicio por contenedor (`acd-server.service`, `dialer_process_campaign@1.service`, …).
-5. Los contenedores **no pueden unirse correctamente al pod** si `*-pod.service` no está activo; los handlers del proyecto reinician el **pod completo** ante cambios críticos (ver comentarios en `roles/redis/handlers/main.yml`).
-
-El rol `pods` debe ejecutarse antes o junto con cualquier rol que declare `Pod=…` ([`pods_role_tags`](../group_vars/all/runtime.yml)); si no, systemd responde que no encuentra la unidad del pod.
 
 ---
 
-## Inventario: un grupo → un pod (salvo excepciones)
+## Topología: qué pods corre cada host
 
-| Grupo de inventario | Archivo Quadlet | Red del pod |
-|---------------------|-----------------|-------------|
-| `dialer_workers` | `dialer_workers.pod` | `omnileads` (bridge) |
-| `acd` | `acd.pod` | `omnileads` (bridge) |
-| `omlapp_web` | `omlapp_web.pod` | `omnileads` + `PublishPort` 80/443 |
-| `edge` | `telephony_edge.pod` | **`host`** |
-| *(implícito)* | `observability.pod` | `omnileads` + exporters en `omni_ip_lan` |
+La membresía se define en el inventario (grupos `data_statefull`, `data_stateless`, `edge`, `omlapp_web`, `omlapp_workers`, `dialer_workers`, `acd`, `callrec_processor`, `omnileads_aio`). Un host puede estar en **varios** grupos a la vez.
 
-Co-localización: un host puede pertenecer a varios grupos y por tanto ejecutar **varios pods** a la vez (típico en AIO: `omnileads_aio`).
+| Flag Ansible | Grupo inventario | Pod Quadlet |
+|--------------|------------------|-------------|
+| `oml_runs_data_statefull` | `data_statefull` o `omnileads_aio` | `data_statefull` |
+| `oml_runs_data_stateless` | `data_stateless` o `omnileads_aio` | `data_stateless` |
+| `oml_runs_edge` | `edge` o `omnileads_aio` | `telephony_edge` |
+| `oml_runs_omlapp_web` | `omlapp_web` o `omnileads_aio` | `omlapp_web` |
+| `oml_runs_omlapp_workers` | `omlapp_workers` o `omnileads_aio` | `omlapp_workers` |
+| `oml_runs_dialer_workers` | `dialer_workers` o `omnileads_aio` | `dialer_workers` |
+| `oml_runs_acd` | `acd` o `omnileads_aio` | `acd` |
+| `oml_runs_callrec_processor` | `callrec_processor` o `omnileads_aio` | `callrec_processor` |
+| `component_qa_enabled` | (variable, no grupo pod) | `qa` |
+| observabilidad | cualquier pod de cómputo/datos/edge/voz arriba | `observability` |
 
----
+El pod `observability` se despliega en **todo host** que ejecute al menos uno de los pods de la fila anterior (excepto `qa`).
 
-## Publicación de puertos (`PublishPort`)
-
-En Quadlet, **`PublishPort` se declara en el archivo `.pod`**, no en cada `.container`. Podman crea el mapeo host:contenedor para **todo el pod** en la IP/puertos indicados.
-
-Formato habitual en este proyecto:
-
-```ini
-PublishPort=<IP_en_host>:<puerto_host>:<puerto_contenedor>[/proto]
-```
-
-- **`omni_ip_lan`**: IP privada del host en la LAN del tenant; es la interfaz sobre la que se publican servicios alcanzables entre nodos del cluster (PostgreSQL, Redis, Prometheus, ARI de ACD, etc.).
-- **Sin IP** (p. ej. `PublishPort=80:80` en `omlapp_web.pod`): Podman enlaza en todas las interfaces del host para esos puertos.
-- **Pods sin `PublishPort`** (p. ej. `dialer_workers`, `omlapp_workers`): no exponen puertos en el host; los procesos solo hacen conexiones **salientes** hacia Redis, Gearman, PostgreSQL, APIs internas, etc.
-
-Tras cambiar un `.pod`, Ansible reinicia `*-pod.service` para reaplicar red y portmaps ([`roles/pods/tasks/main.yml`](../roles/pods/tasks/main.yml)). En datos stateful existe un workaround adicional si el contenedor se une al pod después de creado el portmap ([`roles/postgresql/tasks/generated.yml`](../roles/postgresql/tasks/generated.yml)).
+Plantilla de resolución: [`roles/pods/tasks/main.yml`](../roles/pods/tasks/main.yml).
 
 ---
 
 ## Modelo de red
 
-### Red bridge `omnileads` (casi todos los pods)
+### Red bridge `omnileads`
 
-Definición:
+Definida en [`roles/prerequisitos/templates/omnileads.network`](../roles/prerequisitos/templates/omnileads.network):
 
-```1:9:ansible/roles/prerequisitos/templates/omnileads.network
-[Unit]
-Description=OMniLeads Podman Network
-
+```ini
 [Network]
 NetworkName=omnileads
 Driver=bridge
-
-[Install]
-WantedBy=multi-user.target
 ```
 
-Los pods de aplicación, datos y cómputo usan `Network={{ oml_network }}` con `oml_network: omnileads` ([runtime.yml](../group_vars/all/runtime.yml)).
+Variable Ansible: `oml_network: omnileads` en `runtime.yml`. Los pods internos usan `Network={{ oml_network }}`.
 
-**Comportamiento:**
+Los contenedores dentro del mismo pod se resuelven por **nombre DNS interno del pod** (p. ej. el exporter uWSGI apunta a `http://omlapp-uwsgi-server:9191`).
 
-- Los contenedores del mismo pod comparten red; se resuelven entre sí por nombre de contenedor en el namespace del pod.
-- El tráfico hacia otros hosts del tenant usa **`omni_ip_lan`** y los puertos publicados en los pods remotos (p. ej. `redis_host:6379`, `postgres_host:5432`).
-- Lo que no está en `PublishPort` **no queda escuchando en la LAN** del host, salvo tráfico originado dentro del bridge.
+### Excepciones: `Network=host`
 
-### Red `host` — solo telefonía VoIP en el pod edge
+| Componente | Motivo |
+|------------|--------|
+| Pod `telephony_edge` | SIP/RTP requieren interfaces y puertos del host. |
+| Pod `acd` | Asterisk trunk SIP/RTP, ARI y métricas en namespace del host; trunk en `:5070` (Kamailio PSTN en `:5060`). |
+| `haproxy` | Terminación TLS y balanceo en el edge; métricas en `:8404`. |
+| Addons (`wallboard_*`, `bulk_messages`, `survey_worker`) | Workers Django one-shot/permanentes con `--network=host`. |
+| `sentiment_analysis` | Servicio opcional de analítica de voz. |
+| `nginx_certbot` | Renovación ACME puntual. |
 
-```1:9:ansible/roles/pods/templates/telephony_edge.pod.j2
-[Unit]
-StopWhenUnneeded=false
-Description=OmniLeads Telephony Edge Pod 
+### Publicación de puertos (`PublishPort`)
 
-[Pod]
-Network=host
+Los pods publican puertos en la IP LAN (`omni_ip_lan`) o en todas las interfaces según la plantilla. Resumen por pod en las secciones siguientes.
 
-[Install]
-WantedBy=multi-user.target
-```
-
-En el grupo **`edge`** viven:
-
-- `rtpengine` — media proxy RTP
-- `kamailio_webrtc` — SIP/WebRTC
-- `kamailio_pstn` — SIP hacia ITSP/red telefónica
-
-Estos contenedores necesitan **interfaces y puertos del host** (SIP UDP/TCP, RTP dinámico, posible NAT con `nat_ip_addr`, métricas en puertos locales). Por eso el pod usa `Network=host`.
-
-**HAProxy** en edge también usa `Network=host` en su Quadlet (`.container` aparte), no dentro de `telephony_edge.pod`, pero comparte la misma filosofía: terminación TLS y enrutamiento en la frontera.
-
-**El resto de la plataforma — incluido ACD (Asterisk) y dialer — permanece en bridge**, no en modo host.
+**Regla operativa importante:** tras un reinicio del servidor, arrancar primero la unidad del pod (`<pod>-pod.service`). Reiniciar un contenedor individual sin pod activo puede fallar en Podman 5.x.
 
 ---
 
-## Pod `dialer_workers`
+## Convenciones systemd
 
-### Cuándo existe
+| Archivo Quadlet | Unidad systemd generada | Ejemplo |
+|-----------------|---------------------------|---------|
+| `foo.pod` | `foo-pod.service` | `omlapp_web-pod.service` |
+| `bar.container` | `bar.service` | `postgresql.service` |
+| `baz@.container` + symlink `@N.container` | `baz@N.service` | `dialer_process_campaign@3.service` |
+| `omnileads.network` | `omnileads-network.service` | — |
 
-Se despliega si el host está en el grupo `dialer_workers` o en `omnileads_aio` (`oml_runs_dialer_workers` en `topology_normalize`). El motor debe ser OMniDialer (`dialer_engine: omnidialer`).
+Algunos contenedores usan nombre de unidad distinto al del fichero:
 
-### Definición del pod
+| Fichero | Unidad systemd | Contenedor |
+|---------|----------------|------------|
+| `omnileads.container` | `omnileads.service` | `omlapp-uwsgi` |
+| `dialer_api.container` | `dialer_api.service` | `dialer-api` |
+| `django.service` (legacy path) | — | desplegado como `omnileads.container` |
 
-```1:9:ansible/roles/pods/templates/dialer_workers.pod.j2
-[Unit]
-StopWhenUnneeded=false
-Description=OmniLeads Workers Pod 
+Variables de entorno runtime viven en `/etc/default/*.env` (p. ej. `django.env`, `acd.env`, `dialer.env`). Los logs van a **journald** (`LogDriver=journald` en Quadlet).
 
-[Pod]
-Network={{ oml_network }}
+---
 
-[Install]
-WantedBy=multi-user.target
+## Pods y contenedores (detalle)
+
+### 1. `data_statefull` — datos persistentes
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/data_statefull.pod.j2` |
+| **Unidad systemd** | `data_statefull-pod.service` |
+| **Red** | `omnileads` (bridge) |
+| **Puertos publicados** | `omni_ip_lan:5432`, `:9000`, `:9001` |
+| **Hosts** | `data_statefull`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen (rol) | Función |
+|----------------|------------|--------------|---------|
+| `postgresql.service` | `postgresql-server` | `POSTGRES_IMG` | Base PostgreSQL del tenant (OML + esquema dialer). |
+| `minio.service` | `minio-server` | `MINIO_IMG` | Almacenamiento S3-compatible (grabaciones, estáticos, etc.). |
+
+Dependencia: `postgresql.service` declara `Requires=data_statefull-pod.service`.
+
+---
+
+### 2. `data_stateless` — datos volátiles / colas
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/data_stateless.pod.j2` |
+| **Unidad systemd** | `data_stateless-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | `omni_ip_lan:6379`, `:4730` |
+| **Hosts** | `data_stateless`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `redis.service` | `redis-server` | `REDIS_IMG` | Cache, sesiones, pub/sub. |
+| `gearman.service` | `gearman-server` | `GEARMAN_IMG` | Cola de trabajos para dialer y workers. |
+
+---
+
+### 3. `telephony_edge` — borde SIP/WebRTC
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/telephony_edge.pod.j2` |
+| **Unidad systemd** | `telephony_edge-pod.service` |
+| **Red** | **`host`** (sin bridge) |
+| **Puertos publicados** | Ninguno en el `.pod` (los procesos enlazan directamente al host) |
+| **Hosts** | `edge`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `kamailio_webrtc.service` | `kamailio-webrtc` | `KAMAILIO_IMG` | Proxy SIP/WSS para agentes WebRTC. Métricas `:9274`. |
+| `kamailio_pstn.service` | `kamailio-pstn-server` | `KAMAILIO_IMG` | Proxy SIP hacia trunks PSTN. Métricas `:9273`. HEP hacia Homer si está configurado. |
+| `rtpengine.service` | `rtpengine-server` | `RTPENGINE_IMG` | Media relay RTP/SRTP. Métricas `:22223`. |
+
+**Nota:** `haproxy` corre en el host edge pero **fuera** de este pod (`Network=host`, sin `Pod=`).
+
+**WSS agentes (cluster):** el navegador abre `wss://<fqdn>/ws` en `:443`. HAProxy termina TLS y reenvía `GET /ws` a `kamailio-webrtc` en `omni_ip_lan:10060` (sin pasar por nginx en `omlapp_web`). En AIO sin HAProxy, nginx en `:443` hace el proxy `/ws` hacia Kamailio.
+
+**Upgrade (`--action=upgrade`):** cambios en `kamailio_pstn.env` / `kamailio_webrtc.env` (p. ej. `acd_nodes` con `:5070`, `ACD_NET_ADDR`) disparan reinit de `telephony_edge-pod.service` en el rol `telephony_edge` antes de arrancar contenedores.
+
+---
+
+### 4. `omlapp_web` — capa web y API dialer
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/omlapp_web.pod.j2` |
+| **Unidad systemd** | `omlapp_web-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | `80`, `443` (todas las interfaces), `omni_ip_lan:9191` (stats uWSGI) |
+| **Hosts** | `omlapp_web`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `omnileads.service` | `omlapp-uwsgi` | `APP_IMG` | Django vía uWSGI (aplicación principal). |
+| `daphne.service` | `omlapp-daphne` | `APP_IMG` | ASGI / canales Django (tiempo real). |
+| `websockets.service` | `websocket-server` | `WS_IMG` | Servidor WebSocket OMniLeads (`:8000` interno). |
+| `nginx.service` | `nginx-server` | `NGINX_IMG` | Reverse proxy TLS, estáticos, upstream hacia uWSGI/Daphne/WS. |
+| `dialer_api.service` | `dialer-api` | `DIALER_API_IMG` | API REST Omnidialer (Flask). |
+
+Varios servicios declaran `Requires=omlapp_web-pod.service`.
+
+---
+
+### 5. `omlapp_workers` — workers de aplicación Django
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/omlapp_workers.pod.j2` |
+| **Unidad systemd** | `omlapp_workers-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | Ninguno |
+| **Hosts** | `omlapp_workers`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `whatsapp.service` | `omlapp-whatsapp` | `APP_IMG` | Integración WhatsApp (si está habilitada). |
+| `call_logger.service` | `oml-call-logger` | `APP_IMG` | Registro de llamadas en background. |
+| `background_dialer_tasks.service` | `omlapp-dialer-worker` | `APP_IMG` | Listener de eventos Omnidialer (`omnidialer_events_listener`). |
+| `background_callrec_tasks.service` | `omlapp-callrec-worker` | `APP_IMG` | Tareas background de grabaciones. |
+| `dashboard_agent_scheduler.service` | `omlapp-dashboard-agent-scheduler` | `APP_IMG` | Scheduler del dashboard de agentes. |
+| `supervision_agentes_scheduler.service` | `omlapp-supervision-agentes-scheduler` | `APP_IMG` | Scheduler de supervisión de agentes. |
+| `supervision_events_listener.service` | `omlapp-supervision-events-listener` | `APP_IMG` | Listener de eventos de supervisión. |
+| `presence_heartbeat_scheduler.service` | `omlapp-presence-heartbeat-scheduler` | `APP_IMG` | Heartbeat de presencia de agentes. |
+| `daily_redis_cleanup.service` | `omlapp-daily-redis-cleanup` | `APP_IMG` | Limpieza programada de claves Redis. |
+
+Todos usan `EnvironmentFile=/etc/default/django.env` salvo casos específicos del rol.
+
+---
+
+### 6. `dialer_workers` — workers Omnidialer (Gearman)
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/dialer_workers.pod.j2` |
+| **Unidad systemd** | `dialer_workers-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | Ninguno |
+| **Hosts** | `dialer_workers`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `dialer_manage_campaign.service` | `dialer-manage-campaign` | `DIALER_WORKER_IMG` | Gestión de campañas salientes. |
+| `dialer_incidence_rules.service` | `dialer-incidence-rules` | `DIALER_WORKER_IMG` | Reglas de incidencias del dialer. |
+| `dialer_render_template.service` | `dialer-render-template` | `DIALER_WORKER_IMG` | Renderizado de plantillas de campaña. |
+| `dialer_scheduler.service` | `dialer-scheduler` | `DIALER_WORKER_IMG` | Job Gearman `schedule-agenda`. |
+| `dialer_send_reports.service` | `dialer-send-reports` | `DIALER_WORKER_IMG` | Envío de reportes de campaña. |
+| `dialer_process_campaign@N.service` | `dialer-process-campaign-N` | `DIALER_WORKER_IMG` | Workers de procesamiento de campaña (réplicas). |
+| `dialer_process_contact@N.service` | `dialer-process-contact-N` | `DIALER_WORKER_IMG` | Workers de contactos (plantilla `@`, réplicas vía inventario). |
+| `dialer_process_event@N.service` | `dialer-process-event-N` | `DIALER_WORKER_IMG` | Workers de eventos (plantilla `@`). |
+
+**Réplicas:** controladas por variables de inventario (`dialer_process_campaign_replicas`, `dialer_process_contact_replicas`, `dialer_process_event_replicas`; defaults en `tenants_global.yml`: campaña **5**, contacto/evento **1**). Ansible crea symlinks `dialer_process_campaign@N.container` → `@.container` y arranca `dialer_process_campaign@N.service`.
+
+La API (`dialer-api`) vive en el pod **`omlapp_web`**, no aquí.
+
+---
+
+### 7. `acd` — telefonía ACD (Asterisk)
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/acd.pod.j2` |
+| **Unidad systemd** | `acd-pod.service` |
+| **Red** | `host` |
+| **Puertos en el host** | Trunk SIP UDP `:5070` (`acd_trunk_sip_port`), agentes WebRTC `:5160`, ARI `:7088`, métricas app `:7098` |
+| **Hosts** | `acd`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `acd-config.service` | `acd-conf` | `ACD_IMG` | Generación/sincronización de configuración Asterisk (`retrieve_conf`). |
+| `acd-server.service` | `acd-server` | `ACD_IMG` | Daemon Asterisk (colas, dialplan, RTP PSTN). |
+| `acd-app.service` | `acd-app` | `ACD_IMG` | ARI Stasis app (lógica de colas OMniLeads). |
+| `acd-fastagi.service` | `acd-fastagi` | `FASTAGI_IMG` | FastAGI para scripts de dialplan (`:4573` hacia el pod). |
+
+Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-fastagi`.
+
+**Upgrade (`--action=upgrade`):** si cambia `acd.pod` (p. ej. migración bridge → `Network=host`), el rol `pods` hace tear-down y recrea la infra Podman antes de que el rol `acd` aplique env vars y reinicie `acd-pod.service`. Coordinar con `telephony_edge` en el mismo upgrade: `kamailio_pstn.env` (`acd_nodes` con `:5070`) y `kamailio_webrtc.env` (`ACD_NET_ADDR`) deben desplegarse en el mismo ciclo. Requiere imagen `ACD_IMG` con trunk PJSIP en `acd_trunk_sip_port` (default `:5070`).
+
+---
+
+### 8. `callrec_processor` — post-procesado de grabaciones
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/callrec_processor.pod.j2` |
+| **Unidad systemd** | `callrec_processor-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | Ninguno |
+| **Hosts** | `callrec_processor`, `omnileads_aio` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `callrec_compressor.service` | `callrec-compressor` | `CALLREC_COMPRESSOR_IMG` | Compresión/conversión de grabaciones (p. ej. a MP3). |
+| `callrec_transcriber.service` | `callrec-transcriptor` | `CALLREC_TRANSCRIBER_IMG` | Transcripción de audio (si está habilitada). |
+
+---
+
+### 9. `observability` — métricas locales
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/observability.pod.j2` |
+| **Unidad systemd** | `observability-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | Condicionales por rol del host (ver tabla abajo) |
+| **Hosts** | Todo host con pods de datos, edge, web, workers, dialer, acd o callrec |
+
+| Puerto | Contenedor / unidad | Presente en |
+|--------|---------------------|-------------|
+| `:9100` | `obs-prometheus-node-exporter` / `prometheus_node_exporter.service` | Todos |
+| `:9882` | `obs-prometheus-podman-exporter` / `prometheus_podman_exporter.service` | Todos |
+| `:9090` | `obs-prometheus-server` / `prometheus.service` | `omlapp_web`, AIO |
+| `:9117` | `obs-prometheus-uwsgi` / `prometheus_uwsgi.service` | `omlapp_web`, AIO |
+| `:9187` | `obs-prometheus-postgres` / `prometheus_postgres.service` | `data_statefull`, AIO |
+| `:9121` | `obs-prometheus-redis` / `prometheus_redis.service` | `data_stateless`, AIO |
+| `:9418` | `obs-prometheus-gearman` / `prometheus_gearman.service` | `data_stateless`, AIO |
+
+Documentación ampliada de scrape, Loki y Homer: [`observability.md`](observability.md).
+
+**Promtail** (`obs-promtail`, unidad `promtail.service`) usa la red `omnileads` pero **no** pertenece al pod `observability`; es un contenedor Quadlet independiente que lee journald y envía logs a Loki.
+
+---
+
+### 10. `qa` — entorno de pruebas PSTN (opcional)
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/qa.pod.j2` |
+| **Unidad systemd** | `qa-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | `omni_ip_lan:4569/udp`, `:8808` |
+| **Hosts** | Cuando `component_qa_enabled: true` |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `pstn.service` | `oml-pstn-server` | imagen QA PSTN | Simulador PSTN / Asterisk de prueba (SIP, `sipp`). |
+| `nginx_qa.service` | `oml-nginx_qa-server` | `NGINX_IMG` | Nginx auxiliar para escenarios QA. |
+
+---
+
+## Contenedores fuera de pods
+
+Estos servicios **no** declaran `Pod=`; conviene tratarlos aparte en operaciones y diagramas de red.
+
+| Unidad | Contenedor | Red | Rol / función |
+|--------|------------|-----|----------------|
+| `haproxy.service` | `haproxy` | `host` | Balanceador edge (`/prom`, Web, `wss://<fqdn>/ws` → kamailio-webrtc `:10060`). |
+| `promtail.service` | `obs-promtail` | `omnileads` | Envío de logs journald → Loki. |
+| `traefik.service` | `traefik-lb` | Quadlet con `PublishPort` propio | Alternativa a HAProxy (rol `traefik_lb`). |
+| `wallboard_worker.service` | `oml-wallboard-worker` | `host` | Addon wallboard (widgets inertes). |
+| `wallboard_listener.service` | `oml-wallboard-server` | `host` | Addon wallboard (eventos). |
+| `bulk_messages.service` | `oml-bulk-messages-worker` | `host` | Envío masivo de mensajes. |
+| `survey_worker.service` | `oml-survey_worker-server` | `host` | Encuestas post-llamada. |
+| `sentiment_analysis.service` | `oml-sentiment_analysis-server` | `host` | Analítica de sentimiento (opcional). |
+| `nginx_certbot.service` | `oml-nginx-certbot-server` | `host` | Renovación certificados Let's Encrypt. |
+
+---
+
+## Operación en el host
+
+### Comandos systemd habituales
+
+```bash
+# Estado del pod web
+systemctl status omlapp_web-pod.service
+
+# Reiniciar un contenedor
+systemctl restart nginx.service
+
+# Tras editar un .container o .pod manualmente
+sudo systemctl daemon-reload
 ```
 
-**Sin `PublishPort`**: los workers no ofrecen API HTTP en la LAN; consumen trabajos de **Gearman** y estado en **Redis** / **PostgreSQL** usando variables de `/etc/default/dialer.env` (`redis_host`, `gearman_host`, `postgres_host`, …).
+### `oml_manage`
 
-### Contenedores en el pod
+Script instalado por `prerequisitos` (`/usr/local/bin/oml_manage` o ruta del rol). Comandos relevantes:
 
-| Unidad systemd (Quadlet) | Función |
-|--------------------------|---------|
-| `dialer_incidence_rules.service` | Reglas de incidencia (jobs Gearman) |
-| `dialer_manage_campaign.service` | Ciclo de vida de campañas |
-| `dialer_scheduler.service` | Agenda (`schedule-agenda`) |
-| `dialer_send_reports.service` | Informes |
-| `dialer_render_template.service` | Plantillas |
-| `dialer_process_campaign@N.service` | Workers de campaña (réplicas) |
-| `dialer_process_contact@N.service` | Workers de contacto |
-| `dialer_process_event@N.service` | Workers de eventos |
-
-Todos declaran `Pod=dialer_workers.pod` (ejemplo):
-
-```9:17:ansible/roles/dialer/templates/process_campaign@.container
-[Container]
-# Podman reemplazará el %i por el número de instancia que le pases:
-ContainerName=dialer-process-campaign-%i
-Image={{ DIALER_WORKER_IMG }}
-Pod=dialer_workers.pod
-EnvironmentFile=/etc/default/dialer.env
-Environment=GEARMAN_JOBS=process-campaign
+```bash
+oml_manage status                   # contenedores conocidos + stats
+oml_manage health                   # postgres, redis, minio, omlapp, nginx, acd
+oml_manage stack-up                 # arranca unidades en orden de dependencia
+oml_manage pod-restart omlapp_web   # reinicia omlapp_web-pod.service
+oml_manage restart acd              # reinicia acd-pod.service (pod conocido)
 ```
 
-### API del dialer (otro pod)
+Pods reconocidos por `oml_manage`: `acd`, `callrec_processor`, `data_statefull`, `data_stateless`, `dialer_workers`, `observability`, `omlapp_web`, `omlapp_workers`, `telephony_edge`.
 
-La **API REST** (`dialer_api` / `flask.container`) vive en **`omlapp_web.pod`**, no en `dialer_workers`, porque comparte el tier web con Nginx y la aplicación Django. El rol `dialer` despliega API y workers en tareas separadas según `oml_has_omlapp_web` y `oml_has_dialer_workers`.
+### Orden de arranque recomendado
+
+1. `omnileads-network.service`
+2. Unidades `*-pod.service` de los pods del host
+3. Datos: `postgresql`, `redis`, `minio`, `gearman`
+4. Aplicación: `omnileads`, `daphne`, `websockets`, `nginx`
+5. Voz: `acd-*`, `kamailio_*`, `rtpengine`
+6. Dialer workers y observabilidad
+
+`oml_manage stack-up` implementa un subconjunto de este orden en `STACK_UNITS_ORDER`.
+
+### Logs
+
+```bash
+# Logs de un contenedor vía journald
+journalctl -u nginx.service -f
+
+# O directamente Podman
+oml_manage logs -f nginx-server
+```
+
+Promtail etiqueta streams con `tenant`, `service` y `node_type` para Loki.
 
 ---
 
-## Pod `acd`
+## Resumen por despliegue
 
-### Cuándo existe
+### AIO (un solo host)
 
-Grupo `acd` o `omnileads_aio` → `oml_runs_acd`.
+Todos los pods anteriores (salvo `qa` si no está habilitado) coexisten en `omnileads_aio`. `omni_ip_lan` concentra servicios de datos; el edge telefónico comparte el mismo kernel con `Network=host` en `telephony_edge` y HAProxy.
 
-### Definición del pod y puertos
+### Cluster (hosts separados)
 
-```1:12:ansible/roles/pods/templates/acd.pod.j2
-[Unit]
-StopWhenUnneeded=false
-Description=OmniLeads ACD Pod 
-
-[Pod]
-Network={{ oml_network }}
-
-PublishPort={{ omni_ip_lan if (kamailio_pstn_out | default(false)) else '127.0.0.1' }}:5060:5060/udp
-PublishPort={{ omni_ip_lan }}:{{ acd_ari_port | default(7088) }}:7088
-
-[Install]
-WantedBy=multi-user.target
-```
-
-| Puerto | Protocolo | Binding | Uso |
-|--------|-----------|---------|-----|
-| 5060 | UDP | `127.0.0.1` por defecto, o `omni_ip_lan` si `kamailio_pstn_out` | SIP hacia Asterisk (`acd-server`) |
-| 7088 (configurable `acd_ari_port`) | TCP | `omni_ip_lan` | ARI — `acd-app` y automatizaciones en la LAN |
-
-Con la topología habitual (Kamailio PSTN en **edge**), Asterisk recibe SIP desde el proxy en **loopback** del nodo ACD (`127.0.0.1:5060`), no desde Internet directa. ARI sí queda en LAN para integración y métricas internas.
-
-### Contenedores en el pod
-
-| Servicio | Contenedor | Rol |
-|----------|------------|-----|
-| `acd-server.service` | Asterisk | Plan de marcado, grabaciones, trunks SIP |
-| `acd-app.service` | Aplicación ARI | Lógica de colas/agentes |
-| `acd-config.service` | Configuración | Sincronización de config |
-| `acd-fastagi.service` | FastAGI | Integración AGI |
-
-Variables relevantes (`acd-app.env`): `ARI_URL` hacia `acd_host`, `SIP_PROXY` hacia `omni_ip_lan:kamailio_pstn_port`, Redis/Georman vía hosts inferidos por topología.
+Cada fila de la tabla de topología puede mapearse a un host distinto. Los contenedores alcanzan peers por **`omni_ip_lan`** del host remoto (PostgreSQL, Redis, MinIO, Gearman, scrape Prometheus, etc.). El rol `topology_normalize` resuelve `data_host`, `edge_host`, `aio_host` para plantillas de `.env`.
 
 ---
 
-## Diagrama de red simplificado (cluster)
+## Diagrama de pods en cluster típico
 
-```mermaid
-flowchart LR
-  subgraph edge_host [Host edge — Network host]
-    KE[telephony_edge.pod<br/>Kamailio + RTPEngine]
-    HA[HAProxy host network]
-  end
+```
+                    ┌──────────────── edge ───────────────┐
+                    │ telephony_edge.pod                  │
+                    │  kamailio-webrtc, kamailio-pstn,    │
+                    │  rtpengine                          │
+                    │ haproxy (host, suelto)              │
+                    │ observability.pod (exporters)       │
+                    └─────────────────────────────────────┘
+                                      │
+     ┌──────────────── data_statefull ─────────────┐   ┌── data_stateless ──┐
+     │ postgresql-server, minio-server             │   │ redis, gearman     │
+     │ observability.pod (postgres exporter)       │   │ observability.pod  │
+     └─────────────────────────────────────────────┘   └────────────────────┘
 
-  subgraph node [Host compute — bridge omnileads]
-    WEB[omlapp_web.pod<br/>:80 :443]
-    DW[dialer_workers.pod<br/>sin PublishPort]
-    ACD[acd.pod<br/>127.0.0.1:5060 ARI :7088]
-  end
+     ┌──────────────── omlapp_web ───────────────────────────────────────────┐
+     │ nginx, omlapp-uwsgi, omlapp-daphne, websocket-server, dialer-api      │
+     │ observability.pod (prometheus, uwsgi exporter, node/podman exporters) │
+     └───────────────────────────────────────────────────────────────────────┘
 
-  subgraph data [Host data — bridge]
-    DS[data_stateless.pod<br/>Redis Gearman]
-    DF[data_statefull.pod<br/>Postgres MinIO]
-  end
+     ┌─ omlapp_workers -─┐  ┌─ dialer_workers ────────┐  ┌─ acd ──────────────┐
+     │ workers Django    │  │ dialer-* workers        │  │ acd-server, app,   │
+     │ observability.pod │  │ observability.pod       │  │ conf, fastagi      │
+     └───────────────────┘  └─────────────────────────┘  │ observability.pod  │
+                                                         └──────────────────--┘
 
-  Internet --> HA
-  HA --> WEB
-  KE <-- SIP/RTP --> Internet
-  KE <-- SIP --> ACD
-  DW --> DS
-  DW --> DF
-  ACD --> DS
-  ACD --> DF
-  WEB --> DS
-  WEB --> DF
+     ┌─ callrec_processor ────────────────────-─┐
+     │ callrec-compressor, callrec-transcriptor │
+     │ observability.pod                        │
+     └──────────────────────────────────────────┘
 ```
 
 ---
 
-## Por qué este diseño de red es más seguro
+## Referencias
 
-1. **Superficie de exposición mínima en modo host**  
-   Solo el tier **edge** (y HAProxy en ese host) usa la pila de red del host para VoIP. El resto de servicios no comparten namespace con todas las interfaces y puertos del sistema, lo que reduce el impacto de un contenedor comprometido.
-
-2. **Publicación explícita y acotada a `omni_ip_lan`**  
-   Datos y observabilidad publican en la IP LAN del tenant, no en `0.0.0.0` salvo donde el diseño lo exige (Nginx 80/443 en web). Los workers de dialer **no abren puertos** en el host: no hay endpoint atacable directamente para esos procesos.
-
-3. **ACD y SIP no expuestos a Internet por defecto**  
-   El UDP 5060 de Asterisk se enlaza a **`127.0.0.1`** salvo `kamailio_pstn_out`. El camino PSTN/WebRTC entra por **Kamailio en edge**, que actúa como SBC/proxy, no por Asterisk escuchando en WAN.
-
-4. **Aislamiento entre pods en bridge**  
-   Cada pod es un límite de red Podman; un servicio en `dialer_workers` no “ve” por defecto los puertos internos de otro pod en el mismo host sin pasar por IP publicada o rutas configuradas.
-
-5. **Separación de funciones en cluster**  
-   En inventario distribuido, Redis/Postgres/Gearman viven en hosts `data_*`; los workers solo tienen credenciales y hosts en `dialer.env`, no el binario de base de datos. Un compromiso en un worker no implica escuchar tráfico de base de datos en el mismo namespace host que RTPEngine.
-
-6. **Operación predecible con systemd**  
-   Reinicios coordinados del pod evitan estados rotos (contenedor unido a un pod caído). Eso limita errores de configuración que dejan servicios escuchando en interfaces incorrectas tras un deploy parcial.
-
-**Trade-off consciente:** `Network=host` en edge es necesario para RTP/SIP/NAT correctos; la mitigación es **concentrar VoIP en pocos hosts**, firewall perimetral, `haproxy_prom_allowed_src`, TLS en web y variables de topología que apuntan el resto del tráfico a la LAN privada del tenant.
-
----
-
-## Operación y buenas prácticas
-
-| Acción | Comando / nota |
-|--------|----------------|
-| Ver pods en un host | `podman pod ps` |
-| Ver unidades generadas | `systemctl list-units '*pod*'` / `systemctl status dialer_workers-pod.service` |
-| Tras cambiar `.pod` o `.container` en Ansible | `daemon-reload` (lo hace el playbook) y, si cambió el `.pod`, reinicio de `*-pod.service` |
-| Reinicio manual seguro | Primero `*-pod.service`, luego servicios `.container` |
-| Logs | `journalctl -u acd-server.service -f` (Quadlet usa `LogDriver=journald` en la mayoría de unidades) |
-
-**Despliegue parcial:** los tags de `pods_role_tags` incluyen `dialer`, `acd`, `telephony-edge`, etc., para que un `--tags dialer` siga recreando el pod si hace falta.
-
-**Variables útiles:**
-
-- `oml_network` — nombre de red bridge (default `omnileads`)
-- `omni_ip_lan` — IP para `PublishPort` inter-nodo
-- `kamailio_pstn_out` — enlaza SIP ACD en LAN en lugar de solo loopback
-- `acd_ari_port` — puerto ARI publicado (default `7088`)
-
----
-
-## Enlaces rápidos del repositorio
-
-| Recurso | Ruta |
-|---------|------|
-| Plantillas de pods | `ansible/roles/pods/templates/*.pod.j2` |
-| Tareas del rol pods | `ansible/roles/pods/tasks/main.yml` |
-| Workers dialer | `ansible/roles/dialer/templates/*.container` |
-| ACD | `ansible/roles/acd/templates/*.container` |
-| Edge VoIP | `ansible/roles/telephony_edge/templates/*.container` |
-| Inventario de ejemplo | `ansible/inventory.yml`, `ansible/instances/*` |
+- README general (Quadlet, firewall, imágenes): [`README.md`](../README.md#podman-systemd)
+- Observabilidad (Prometheus, Promtail, Loki): [`observability.md`](observability.md)
+- Inventario y grupos pod: [`README.md`](../README.md#inventory-model)
+- Changelog migración host → bridge: [`changelog.md`](../changelog.md)

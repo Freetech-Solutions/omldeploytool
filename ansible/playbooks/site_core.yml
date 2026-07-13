@@ -13,8 +13,7 @@
     - ../group_vars/all/runtime.yml
     - ../group_vars/all/vault.yml
     - ../group_vars/all/images.yml
-    - ../group_vars/all/observability.yml
-    - ../group_vars/all/qa.yml
+    - ../group_vars/all/tenants_global.yml
   pre_tasks:
     - name: Normalize topology and component switches
       ansible.builtin.include_role:

@@ -1,10 +1,29 @@
 ---
-# Intérprete remoto estable en Debian (/usr/bin/python3 es symlink al Python del SO).
-# Evita que interpreter_python=auto_silent + fact cache elijan rutas versionadas
-# inexistentes (p. ej. /usr/bin/python3.11 en hosts 2.X legacy).
+# General vars
 ansible_python_interpreter: /usr/bin/python3
+# Podman bridge network name
+oml_network: omnileads
+# omnileads Linux user
+usuario: omnileads
+# SSL Certs location
+certs_location: /etc/omnileads/certs
+# Swap file
+swap_file: /swapfile
+# Container image registry
+container_image_registry: docker.io
+# Container orchestrator
+container_orchest: systemd
+# Force image pull
+force_image_pull: false
 
-websocket_host: websocket-server
+# Journald vars
+journald_system_max_use: 5G
+journald_runtime_max_use: 40M
+journald_system_max_file_size: 200M
+journald_system_keep_free: 2G
+journald_runtime_keep_free: 32M
+
+# Components Ports
 websocket_port: 8000
 uwsgi_port: 8099
 daphne_port: 8098
@@ -14,74 +33,44 @@ fastagi_port: 4573
 postgres_port: 5432
 kamailio_wss_port: 10060
 kamailio_webrtc_udp_port: 10060
+kamailio_pstn_port: 5060
+# Asterisk PJSIP listen ports (Kamailio PSTN stays on kamailio_pstn_port)
+acd_agent_sip_port: 5160
+acd_trunk_sip_port: 5070
+acd_ari_port: 7088
 
+# Django OML vars
 INSTALL_PREFIX: /opt/omnileads/
 django_deploy_path: /opt/omnileads/
-asterisk_location_conf: /etc/asterisk
-certs_location: /etc/omnileads/certs
-swap_file: /swapfile
-
-USUARIO: omnileads
-MONITORFORMAT: mp3
-postgres_homer_db: homer7
-schedule: Agenda
-usuario: omnileads
-container_image_registry: docker.io
-container_orchest: systemd
-force_image_pull: false
-
-acd_app: oml_acd
-acd_ari_port: 7088
-acd_app_metrics_port: 7098
-acd_ag_handoff_ttl: 10
-
-# Edge telephony — endpoints Prometheus (LAN-only; scrape desde tenant Prometheus)
-kamailio_pstn_metrics_port: 9273
-kamailio_webrtc_metrics_port: 9274
-haproxy_metrics_port: 8404
-rtpengine_metrics_port: 22223
-
-# Exporters observability.pod — publicados en omni_ip_lan para scrape inter-nodo
-prometheus_server_port: 9090
-prometheus_node_exporter_port: 9100
-prometheus_podman_exporter_port: 9882
-prometheus_postgres_exporter_port: 9187
-prometheus_redis_exporter_port: 9121
-prometheus_gearman_exporter_port: 9418
-prometheus_uwsgi_exporter_port: 9117
-
-oml_network: omnileads
-
-django_settings_module: ominicontacto.settings.production
 task_call_processor: acd-call-processor
-kamailio_pstn_port: 5060
+callrec_format: mp3
+schedule: Agenda
+django_settings_module: ominicontacto.settings.production
+websocket_host: websocket-server
+dialer_engine: omnidialer
 
+# ACD vars
+acd_app: oml_acd
+acd_ag_handoff_ttl: 15
+
+# Pods names
 data_stateless_pod: data-stateless-server
-# Unidad systemd del quadlet data_stateless.pod (Redis + Gearman); debe estar activa al reiniciar contenedores del pod.
 data_stateless_pod_systemd_unit: data_stateless-pod.service
 data_statefull_pod: data-statefull-server
-# Unidad systemd del quadlet data_statefull.pod (PostgreSQL + MinIO, etc.)
 data_statefull_pod_systemd_unit: data_statefull-pod.service
-# Unidad systemd del quadlet telephony_edge.pod (rtpengine + kamailio_pstn + kamailio_webrtc).
-# Debe estar activa al reiniciar contenedores del pod; reiniciar contenedores
-# individuales tira la infra del pod y los siguientes starts fallan con
-# "Bound to unit telephony_edge-pod.service, but unit isn't active".
 telephony_edge_pod_systemd_unit: telephony_edge-pod.service
-# Unidad systemd del quadlet qa.pod (pstn emulator + nginx_qa CGI). Debe estar
-# activa al reiniciar contenedores del pod.
 qa_pod_systemd_unit: qa-pod.service
 acd_pod: acd
 dialer_api_pod: dialer
 web_pod: omlapp
 
-# acd_host lo resuelve topology_normalize (IP del grupo acd en cluster, omni_ip_lan en AIO).
+# Components containers names
 acd_server_container_name: acd-server
 acd_app_container_name: acd-app
 acd_conf_container_name: acd-conf
 acd_fastagi_container_name: acd-fastagi
 callrec_compressor_container_name: callrec-compressor
 callrec_transcriber_container_name: callrec-transcriber
-
 dialer_api_container_name: dialer-api
 dialer_incidence_rules_container_name: dialer-incidence-rules
 dialer_manage_campaign_container_name: dialer-manage-campaign
@@ -90,25 +79,37 @@ dialer_process_container_name: dialer-process
 dialer_render_template_container_name: dialer-render-template
 dialer_scheduler_container_name: dialer-scheduler
 dialer_send_reports_container_name: dialer-send-reports
+# Plantillas Quadlet @. de process_* fuera de /etc/containers/systemd (solo symlinks @N ahí).
+dialer_process_worker_quadlet_dir: /etc/omnileads/dialer/quadlet
 kamailio_webrtc_container_name: kamailio-webrtc
 kamailio_pstn_container_name: kamailio-pstn-server
 nginx_container_name: oml-nginx-server
-
 omlapp_daphne_container_name: omlapp-daphne
 omlapp_uwsgi_container_name: omlapp-uwsgi
 omlapp_whatsapp_container_name: omlapp-whatsapp
-
 websocket_container_name: websocket-server
-
 rtpengine_container_name: rtpengine-server
 pstn_qa_container_name: oml-pstn-server
 
-kamailio_webrtc_auth_eph_key: "{{ vault_kamailio_webrtc_auth_eph_key }}"
-django_secret_key: "{{ vault_django_secret_key }}"
+# --- Observability vars
+# Postgres Homer DB
+postgres_homer_db: homer7
 
-bucket_endpoint: "{{ bucket_url }}"
-bucket_endpoint_internal: "{{ bucket_url }}"
+# Ports for scraps
+prometheus_server_port: 9090
+prometheus_node_exporter_port: 9100
+prometheus_podman_exporter_port: 9882
+prometheus_postgres_exporter_port: 9187
+prometheus_redis_exporter_port: 9121
+prometheus_gearman_exporter_port: 9418
+prometheus_uwsgi_exporter_port: 9117
+acd_app_metrics_port: 7098
+kamailio_pstn_metrics_port: 9273
+kamailio_webrtc_metrics_port: 9274
+haproxy_metrics_port: 8404
+rtpengine_metrics_port: 22223
 
+# --- Ansible Tags
 # Tags que disparan el rol 'pods'. Debe correr siempre que corra cualquier rol
 # cuyos .container declaren Pod=<name>.pod / Requires=<name>-pod.service, sino
 # Quadlet no genera el .service del .container y systemd responde:

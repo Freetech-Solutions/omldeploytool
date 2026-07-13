@@ -1,0 +1,67 @@
+---
+# Example of a cluster with the following tiers:
+# - Edge + Monolithic compute
+
+all:
+  children:
+    cluster_instances:
+      children:
+        tenant_x:
+          hosts:
+            tenant_x_node:
+              tenant_id: tenant_x_node
+              ansible_host: "{{ vault_tenant_x_node_ansible_host }}"
+              omni_ip_lan: 172.16.202.3
+            tenant_x_edge:
+              tenant_id: tenant_x_edge
+              ansible_host: "{{ vault_tenant_x_edge_ansible_host }}"
+              omni_ip_lan: 172.16.202.2              
+          vars:
+            tenant_id: tenant_x_aio_edge
+            fqdn: "{{ vault_tenant_x_fqdn }}"
+            bucket_url: "{{ vault_bucket_url }}"
+            bucket_name: "{{ vault_tenant_x_bucket_name }}"
+            itsp_nodes: "{{ vault_tenant_x_itsp_nodes }}"            
+            kamailio_webrtc_iface: ens18            
+
+##########################################################
+### All in One "AIO"
+##########################################################
+omnileads_aio:
+  hosts:
+
+##########################################################
+### Cluster: Pod groups (a host can be in multiple groups)
+##########################################################
+
+data_statefull:
+  hosts:
+    tenant_x_node:
+
+data_stateless:
+  hosts:
+    tenant_x_node:
+
+edge:
+  hosts:
+    tenant_x_edge:
+
+omlapp_web:
+  hosts:
+    tenant_x_node:
+
+omlapp_workers:
+  hosts:
+    tenant_x_node:
+
+dialer_workers:
+  hosts:    
+    tenant_x_node:
+
+acd:
+  hosts:
+    tenant_x_node:
+
+callrec_processor:
+  hosts:
+    tenant_x_node:

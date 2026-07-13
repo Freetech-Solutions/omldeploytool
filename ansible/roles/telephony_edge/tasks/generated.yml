@@ -99,16 +99,17 @@
     - update
 
 # Workaround para race con podman 5.x (Debian Trixie): cuando recién se generan
-# los Quadlets, el primer container que arranca dispara el start del pod, pero
-# el pod queda en estado inestable (--exit-policy=stop + --network host) y los
-# starts subsiguientes (kamailio_pstn / kamailio_webrtc) fallan con
-# "Job for <svc> canceled." porque el .pod.service se desactiva.
-# Reiniciar el pod una vez deja la infra estable antes de los starts secuenciales.
+# los Quadlets o cambian los .env (p. ej. acd_nodes :6070, ACD_NET_ADDR en upgrade),
+# el primer container que arranca dispara el start del pod, pero el pod queda en
+# estado inestable (--exit-policy=stop + --network host) y los starts subsiguientes
+# (kamailio_pstn / kamailio_webrtc) fallan con "Job for <svc> canceled." porque el
+# .pod.service se desactiva. Reiniciar el pod una vez deja la infra estable antes
+# de los starts secuenciales y aplica env vars nuevas hacia Kamailio.
 - name: TELEPHONY-EDGE Reinit telephony_edge pod (workaround podman 5.x)
   ansible.builtin.systemd:
     name: "{{ telephony_edge_pod_systemd_unit | default('telephony_edge-pod.service') }}"
     state: restarted
-  when: telephony_edge_quadlet_units is changed
+  when: (telephony_edge_quadlet_units is changed) or (telephony_edge_env_files is changed)
   tags:
     - install
     - upgrade

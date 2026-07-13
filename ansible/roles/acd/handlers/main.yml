@@ -1,8 +1,12 @@
+---
+# acd-*.container declaran Pod=acd.pod y Quadlet inyecta BindsTo=acd-pod.service.
+# Reiniciar contenedores uno a uno tira la infra del pod (mismo patrón que
+# telephony_edge, data_statefull y data_stateless).
 - name: Restart acd services
   ansible.builtin.systemd:
-    name: "{{ item }}"
+    name: "{{ acd_pod_systemd_unit | default('acd-pod.service') }}"
     state: restarted
-  loop: "{{ acd_changed_services | default([]) }}"
+    daemon_reload: true
   when: (acd_changed_services | default([]) | length) > 0
   tags:
     - install
