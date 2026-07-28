@@ -39,7 +39,8 @@ El agrupamiento lógico se hace con **pods de Podman** (un archivo `.pod` por po
 │    ├── red: omnileads (bridge)                                          │
 │    ├── pod: data_statefull.pod  → postgresql-server, minio-server       │
 │    ├── pod: omlapp_web.pod      → nginx, uwsgi, daphne, websockets, …   │
-│    └── contenedores sueltos     → haproxy, promtail, addons (host net)  │
+│    ├── pod: enterprise.pod      → wallboard_*, bulk_messages            │
+│    └── contenedores sueltos     → haproxy, promtail (host / bridge)     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,6 +101,7 @@ La membresía se define en el inventario (grupos `data_statefull`, `data_statele
 | `oml_runs_dialer_workers` | `dialer_workers` o `omnileads_aio` | `dialer_workers` |
 | `oml_runs_acd` | `acd` o `omnileads_aio` | `acd` |
 | `oml_runs_callrec_processor` | `callrec_processor` o `omnileads_aio` | `callrec_processor` |
+| `component_addons_enabled` | `oml_runs_omlapp_web` **y** `APP_IMG` termina en `-enterprise` | `enterprise` |
 | `component_qa_enabled` | (variable, no grupo pod) | `qa` |
 | observabilidad | cualquier pod de cómputo/datos/edge/voz arriba | `observability` |
 
@@ -132,7 +134,7 @@ Los contenedores dentro del mismo pod se resuelven por **nombre DNS interno del 
 | Pod `telephony_edge` | SIP/RTP requieren interfaces y puertos del host. |
 | Pod `acd` | Asterisk trunk SIP/RTP, ARI y métricas en namespace del host; trunk en `:5070` (Kamailio PSTN en `:5060`). |
 | `haproxy` | Terminación TLS y balanceo en el edge; métricas en `:8404`. |
-| Addons (`wallboard_*`, `bulk_messages`, `survey_worker`) | Workers Django one-shot/permanentes con `--network=host`. |
+| `survey_worker` | Worker de encuestas (plantilla legacy; no pertenece al pod `enterprise`). |
 | `sentiment_analysis` | Servicio opcional de analítica de voz. |
 | `nginx_certbot` | Renovación ACME puntual. |
 
@@ -342,7 +344,27 @@ Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-fastagi`.
 
 ---
 
-### 9. `observability` — métricas locales
+### 9. `enterprise` — addons Enterprise (wallboard, bulk messages)
+
+| | |
+|---|---|
+| **Plantilla** | `roles/pods/templates/enterprise.pod.j2` |
+| **Unidad systemd** | `enterprise-pod.service` |
+| **Red** | `omnileads` |
+| **Puertos publicados** | Ninguno |
+| **Hosts** | `omlapp_web`, `omnileads_aio` cuando `APP_IMG` termina en `-enterprise` (`component_addons_enabled`) |
+
+| Unidad systemd | Contenedor | Imagen | Función |
+|----------------|------------|--------|---------|
+| `wallboard_listener.service` | `oml-wallboard-server` | `APP_IMG` | Listener de eventos wallboard. |
+| `wallboard_worker.service` | `oml-wallboard-worker` | `APP_IMG` | Actualización de widgets inertes del wallboard. |
+| `bulk_messages.service` | `oml-bulk-messages-worker` | `APP_IMG` | Envío masivo de mensajes. |
+
+Rol Ansible: [`roles/addons`](../roles/addons/). Sin tag `-enterprise` en `APP_IMG`, no se crea el pod ni se ejecuta el rol.
+
+---
+
+### 10. `observability` — métricas locales
 
 | | |
 |---|---|
@@ -368,7 +390,7 @@ Documentación ampliada de scrape, Loki y Homer: [`observability.md`](observabil
 
 ---
 
-### 10. `qa` — entorno de pruebas PSTN (opcional)
+### 11. `qa` — entorno de pruebas PSTN (opcional)
 
 | | |
 |---|---|
@@ -394,10 +416,7 @@ Estos servicios **no** declaran `Pod=`; conviene tratarlos aparte en operaciones
 | `haproxy.service` | `haproxy` | `host` | Balanceador edge (`/prom`, Web, `wss://<fqdn>/ws` → kamailio-webrtc `:10060`). |
 | `promtail.service` | `obs-promtail` | `omnileads` | Envío de logs journald → Loki. |
 | `traefik.service` | `traefik-lb` | Quadlet con `PublishPort` propio | Alternativa a HAProxy (rol `traefik_lb`). |
-| `wallboard_worker.service` | `oml-wallboard-worker` | `host` | Addon wallboard (widgets inertes). |
-| `wallboard_listener.service` | `oml-wallboard-server` | `host` | Addon wallboard (eventos). |
-| `bulk_messages.service` | `oml-bulk-messages-worker` | `host` | Envío masivo de mensajes. |
-| `survey_worker.service` | `oml-survey_worker-server` | `host` | Encuestas post-llamada. |
+| `survey_worker.service` | `oml-survey_worker-server` | `host` | Encuestas post-llamada (plantilla legacy). |
 | `sentiment_analysis.service` | `oml-sentiment_analysis-server` | `host` | Analítica de sentimiento (opcional). |
 | `nginx_certbot.service` | `oml-nginx-certbot-server` | `host` | Renovación certificados Let's Encrypt. |
 

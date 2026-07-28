@@ -1,0 +1,48 @@
+# Copyright (C) 2026 Freetech Solutions
+#
+# This file is part of OMniLeads
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ISO/IEC 27001 — Control 8.9 (Gestión de la configuración):
+# Variables centralizadas y versionadas para una configuración reproducible
+# del agente de seguridad en todos los nodos productivos.
+#
+# ISO/IEC 27001 — Control 8.16 (Monitoreo de actividades):
+# Parámetros de enrollment hacia el Manager Wazuh (FIM, logs, vulnerabilidades).
+---
+# Fallbacks del rol. Config operativa en:
+#   - group_vars/all/tenants_global.yml (todos los tenants)
+#   - instances/<tenant>/vars.yml (override por tenant)
+#   - inventory.yml host/group vars (p. ej. wazuh: false)
+
+# IP o FQDN del Wazuh Manager (obligatorio para enrollar).
+wazuh_manager: ""
+
+# Grupo de agentes en el Manager (debe existir exactamente en Wazuh).
+wazuh_agent_group: "default"
+
+# Contraseña de enrollment (authd). NO hardcodear: referenciar desde Vault, p. ej.:
+#   wazuh_registration_password: "{{ vault_wazuh_registration_password }}"
+# Dejar vacío si el Manager no exige autenticación por password.
+wazuh_registration_password: ""
+
+# Nombre del agente en el Manager (vacío = default del paquete / hostname).
+wazuh_agent_name: "{{ inventory_hostname }}"
+
+# Canal de paquetes oficiales Wazuh (4.x).
+wazuh_agent_repo_apt: "https://packages.wazuh.com/4.x/apt/"
+wazuh_agent_repo_yum: "https://packages.wazuh.com/4.x/yum/"
+wazuh_agent_gpg_key_url: "https://packages.wazuh.com/key/GPG-KEY-WAZUH"
+
+# Estado del paquete y del servicio systemd.
+wazuh_agent_package_state: present
+wazuh_agent_service_enabled: true
+wazuh_agent_service_state: started
+
+# Puerto de enrollment (agent-auth / authd). Solo usado si el paquete ya está
+# instalado pero aún no registrado.
+wazuh_agent_authd_port: 1515

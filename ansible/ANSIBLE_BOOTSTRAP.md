@@ -101,7 +101,7 @@ Creá un archivo local con la password del Vault (fuera del repo). Ejemplo:
 ```bash
 mkdir -p ~/.config/omnileads
 printf '%s' 'TU_PASSWORD_DE_VAULT' > ~/.config/omnileads/vault_pass
-  chmod 600 ~/.config/omnileads/vault_pass
+chmod 600 ~/.config/omnileads/vault_pass
 ```
 
 Y exportalo para que Ansible lo use automáticamente:

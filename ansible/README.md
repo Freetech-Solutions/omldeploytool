@@ -184,6 +184,7 @@ Typical parameters:
 | `omlapp` | `playbooks/site.yml` | Django/uWSGI + Daphne + Nginx + websockets. |
 | `omlapp-workers` | `playbooks/site.yml` (tags `omlapp-workers,gather_facts`) | Workers of the omlapp pod. |
 | `observability` | `playbooks/site.yml` (tags `observability,gather_facts`, `oml_observability_deploy=true`) | Prometheus + exporters + Promtail. |
+| `wazuh-agent` | `playbooks/site.yml` (tags `wazuh-agent,gather_facts`) | Wazuh Agent OS (repo oficial + enrollment). Requiere `wazuh_manager`. Desactivar con `wazuh: false` en el inventario. |
 | `postgres` / `redis` / `minio` / `gearman` | `playbooks/site.yml` | Single data role re-run. |
 | `data` | `playbooks/site.yml` | All data roles (postgres, redis, minio, gearman). |
 | `telephony-edge` | `playbooks/site.yml` | Edge telephony role (`rtpengine`, Kamailio WebRTC/PSTN). |
@@ -807,6 +808,8 @@ Override `APP_IMG` in [`images.yml`](group_vars/all/images.yml) so it points at 
 ```yaml
 APP_IMG: docker.io/your_registry/omlapp:<TAG>-enterprise
 ```
+
+`topology_normalize` sets `component_addons_enabled` only when that tag ends with `-enterprise` (and the host runs `omlapp_web` / AIO). That gates the `enterprise` Quadlet pod and the `addons` role (wallboard, bulk messages). A community `APP_IMG` skips both.
 
 Then deploy or upgrade as usual:
 

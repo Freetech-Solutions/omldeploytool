@@ -1,0 +1,122 @@
+# Excepciones documentadas — Revisado por DevSecOps
+# Formato: {commit}:{file}:{rule}:{line}
+#
+# Hallazgos históricos en ansible/ (inventarios con passwords en claro, README
+# de ejemplo, certs default embebidos). El árbol actual usa Vault para secretos
+# operativos; estos fingerprints corresponden a commits antiguos del historial.
+# NO incluir el valor del secreto en comentarios.
+#
+
+# ansible/README.md (13 hallazgos)
+065f5e785c45ad61624dbf47ee9ca6a57f9d544f:ansible/README.md:generic-api-key:254
+22fa4f571255003ccac2dae63d6d1ace4606d40d:ansible/README.md:generic-api-key:142
+22fa4f571255003ccac2dae63d6d1ace4606d40d:ansible/README.md:generic-api-key:164
+3ceada34611bfa6569f5f5ae2c5c387cd3835414:ansible/README.md:generic-api-key:399
+3ceada34611bfa6569f5f5ae2c5c387cd3835414:ansible/README.md:generic-api-key:400
+4ccb4ea4e94c9946c6ba8cd19234654fad6c6659:ansible/README.md:generic-api-key:254
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/README.md:generic-api-key:234
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/README.md:generic-api-key:248
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/README.md:generic-api-key:254
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/README.md:generic-api-key:708
+9d8384312fd36e3ccb39b37955e6d47f31edaffd:ansible/README.md:generic-api-key:803
+9d8384312fd36e3ccb39b37955e6d47f31edaffd:ansible/README.md:generic-api-key:804
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/README.md:generic-api-key:708
+
+# ansible/components/django/templates/crones (1 hallazgos)
+c73f469acae6e513fc4c7dc52197592145bc0ccf:ansible/components/django/templates/crones:generic-api-key:10
+
+# ansible/components/haproxy/certs/hap.pem (2 hallazgos)
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/components/haproxy/certs/hap.pem:private-key:120
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/components/haproxy/certs/hap.pem:private-key:120
+
+# ansible/components/haproxy/certs/key.pem (2 hallazgos)
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/components/haproxy/certs/key.pem:private-key:1
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/components/haproxy/certs/key.pem:private-key:1
+
+# ansible/inventory (3 hallazgos)
+c30e21be019b77835d28344e8a0b959db999e008:ansible/inventory:generic-api-key:111
+c30e21be019b77835d28344e8a0b959db999e008:ansible/inventory:generic-api-key:122
+c30e21be019b77835d28344e8a0b959db999e008:ansible/inventory:generic-api-key:63
+
+# ansible/inventory.yml (24 hallazgos)
+13c49cc39d6c03640013a8c83910f456262765fc:ansible/inventory.yml:generic-api-key:79
+13c49cc39d6c03640013a8c83910f456262765fc:ansible/inventory.yml:generic-api-key:98
+13c49cc39d6c03640013a8c83910f456262765fc:ansible/inventory.yml:generic-api-key:99
+22fa4f571255003ccac2dae63d6d1ace4606d40d:ansible/inventory.yml:generic-api-key:56
+22fa4f571255003ccac2dae63d6d1ace4606d40d:ansible/inventory.yml:generic-api-key:79
+3adc63fbf46c5b5fff33378cd24f9de9e457bf25:ansible/inventory.yml:gcp-api-key:248
+3ceada34611bfa6569f5f5ae2c5c387cd3835414:ansible/inventory.yml:generic-api-key:138
+3ceada34611bfa6569f5f5ae2c5c387cd3835414:ansible/inventory.yml:generic-api-key:139
+5bef651739453ce768445c0ceb89f4b725d6f323:ansible/inventory.yml:generic-api-key:63
+5bef651739453ce768445c0ceb89f4b725d6f323:ansible/inventory.yml:generic-api-key:82
+5bef651739453ce768445c0ceb89f4b725d6f323:ansible/inventory.yml:generic-api-key:83
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory.yml:generic-api-key:140
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory.yml:generic-api-key:154
+661af080dc7615c9d01653f9993b353f0d2f3767:ansible/inventory.yml:gcp-api-key:248
+68eb95e76c40a306df707bfab2733130c0d6482c:ansible/inventory.yml:generic-api-key:101
+68eb95e76c40a306df707bfab2733130c0d6482c:ansible/inventory.yml:generic-api-key:102
+68eb95e76c40a306df707bfab2733130c0d6482c:ansible/inventory.yml:generic-api-key:82
+6a3e88b02ef57b79fb409038ba946f343033e77a:ansible/inventory.yml:generic-api-key:229
+6a3e88b02ef57b79fb409038ba946f343033e77a:ansible/inventory.yml:generic-api-key:49
+7cf4c9c1ac499f798cce745e4eb1a817e8db5da7:ansible/inventory.yml:generic-api-key:63
+958a7018c0842104d17f2a736c97671aeb0b8253:ansible/inventory.yml:generic-api-key:173
+c73f469acae6e513fc4c7dc52197592145bc0ccf:ansible/inventory.yml:generic-api-key:82
+c73f469acae6e513fc4c7dc52197592145bc0ccf:ansible/inventory.yml:generic-api-key:83
+cd95e81fb04f390016745a95c466ae607d6d102f:ansible/inventory.yml:generic-api-key:63
+
+# ansible/inventory_aio.yml (8 hallazgos)
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_aio.yml:generic-api-key:62
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_aio.yml:generic-api-key:75
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_aio.yml:generic-api-key:76
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_aio.yml:generic-api-key:82
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_aio.yml:generic-api-key:63
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_aio.yml:generic-api-key:76
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_aio.yml:generic-api-key:77
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_aio.yml:generic-api-key:83
+
+# ansible/inventory_ait.yml (8 hallazgos)
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ait.yml:generic-api-key:67
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ait.yml:generic-api-key:80
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ait.yml:generic-api-key:81
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ait.yml:generic-api-key:87
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ait.yml:generic-api-key:67
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ait.yml:generic-api-key:80
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ait.yml:generic-api-key:81
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ait.yml:generic-api-key:87
+
+# ansible/inventory_ha.yml (13 hallazgos)
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory_ha.yml:generic-api-key:140
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory_ha.yml:generic-api-key:141
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory_ha.yml:generic-api-key:200
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory_ha.yml:generic-api-key:84
+65939575d8d65f83c31c7f9b4e229d020500f68c:ansible/inventory_ha.yml:generic-api-key:85
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ha.yml:gcp-api-key:167
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ha.yml:generic-api-key:145
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ha.yml:generic-api-key:146
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_ha.yml:generic-api-key:152
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ha.yml:gcp-api-key:167
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ha.yml:generic-api-key:145
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ha.yml:generic-api-key:146
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_ha.yml:generic-api-key:152
+
+# ansible/inventory_mt.yml (4 hallazgos)
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_mt.yml:generic-api-key:74
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/inventory_mt.yml:generic-api-key:94
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_mt.yml:generic-api-key:74
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/inventory_mt.yml:generic-api-key:94
+
+# ansible/inventory_template.yml (3 hallazgos)
+70a4cbc54649ab956d3c4bbb6a362c6950172f9b:ansible/inventory_template.yml:generic-api-key:63
+70a4cbc54649ab956d3c4bbb6a362c6950172f9b:ansible/inventory_template.yml:generic-api-key:82
+70a4cbc54649ab956d3c4bbb6a362c6950172f9b:ansible/inventory_template.yml:generic-api-key:83
+
+# ansible/inventory_tempplate.yml (4 hallazgos)
+7cf4c9c1ac499f798cce745e4eb1a817e8db5da7:ansible/inventory_tempplate.yml:generic-api-key:63
+7cf4c9c1ac499f798cce745e4eb1a817e8db5da7:ansible/inventory_tempplate.yml:generic-api-key:87
+cd95e81fb04f390016745a95c466ae607d6d102f:ansible/inventory_tempplate.yml:generic-api-key:63
+cd95e81fb04f390016745a95c466ae607d6d102f:ansible/inventory_tempplate.yml:generic-api-key:87
+
+# ansible/roles/prerequisitos/certs/key.pem (3 hallazgos)
+952bae20b18bd093cf4ab7a62b12e3f18217d240:ansible/roles/prerequisitos/certs/key.pem:private-key:1
+c30e21be019b77835d28344e8a0b959db999e008:ansible/roles/prerequisitos/certs/key.pem:private-key:1
+f342f7e0a17f379f5cf57d9d172ae2295a0defa9:ansible/roles/prerequisitos/certs/key.pem:private-key:1

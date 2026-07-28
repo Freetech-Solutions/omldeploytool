@@ -1,0 +1,18 @@
+# Copyright (C) 2026 Freetech Solutions
+#
+# This file is part of OMniLeads
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ISO/IEC 27001 — Control 8.9: reinicio controlado tras cambios de configuración.
+# ISO/IEC 27001 — Control 8.16: garantiza continuidad del monitoreo en el host.
+---
+- name: restart wazuh-agent
+  ansible.builtin.systemd:
+    name: wazuh-agent
+    state: restarted
+    enabled: "{{ wazuh_agent_service_enabled | bool }}"
+    daemon_reload: true

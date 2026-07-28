@@ -1,0 +1,11 @@
+---
+- name: Restart addons services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ addons_changed_services | default([]) }}"
+  when: (addons_changed_services | default([]) | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update

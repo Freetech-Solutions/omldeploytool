@@ -53,6 +53,7 @@ Primary actions (playbooks/site.yml unless noted):
   voice, telephony-edge, acd, interaction_processor
   omlapp, omlapp-workers, nginx, websockets, dialer, qa, addons
   observability
+  wazuh-agent
   postgres, redis, minio, gearman
   haproxy, edge
   data
@@ -351,6 +352,11 @@ case "$oml_action" in
     run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
       --tags "observability,gather_facts" \
       --extra-vars "oml_observability_deploy=true" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  wazuh-agent)
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "wazuh-agent,gather_facts" \
       "${common_extra_vars[@]}" || rc=$?
     ;;
   prerequisitos)

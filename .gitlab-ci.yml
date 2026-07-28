@@ -1,6 +1,13 @@
 # OMniLeads deploy CI — imagen reproducible + shell executor (tag: deploy).
 # Ver ansible/ci/README.md y .gitlab/ci/ para variables y prerequisitos.
 
+include:
+  - project: 'omnileads/devsecops'
+    ref: main
+    file:
+      - 'templates/trivy_ansible.yml'
+      - 'templates/gitleaks.yml'
+
 image: python:3.11-slim
 
 variables:
@@ -11,10 +18,67 @@ variables:
   # ANSIBLE_REMOTE_TEMP: no exportar en CI; deploy.sh usa /tmp/ansible-remote en el host remoto
   # OML_CI_CONFIG_DIR: definido en lib.sh (ruta absoluta; GitLab 12 SSH usa CI_PROJECT_DIR relativo)
   DOCTL_VERSION: "1.118.0"
+  # Trivy IaC: playbooks/roles viven bajo ansible/
+  TRIVY_CONFIG_PATH: "ansible"
 
 stages:
+  - security
   - lint
+  - test
   - deploy
+
+# GitLab no expande ${GITLEAKS_STAGE} del template incluido en el campo stage.
+# Escaneo Anti-Leaks limitado a ansible/ (pathspec en git log).
+gitleaks_scan:
+  stage: security
+  variables:
+    GITLEAKS_SCAN_PATH: "ansible"
+  script:
+    - |
+      set -eu
+      echo "Iniciando análisis Anti-Leaks con Gitleaks (path: ${GITLEAKS_SCAN_PATH})..."
+
+      if [ -f ".gitleaksignore" ]; then
+        echo "Usando excepciones documentadas en .gitleaksignore"
+      fi
+
+      # ── CASO A: Merge Request — escaneo incremental del diff ──
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+          LOG_OPTS="${CI_MERGE_REQUEST_DIFF_BASE_SHA}..${CI_COMMIT_SHA}"
+          echo "Escaneo diferencial (MR): ${LOG_OPTS}"
+        else
+          # -1 evita que `git log <sha>` recorra todo el historial.
+          LOG_OPTS="-1 ${CI_COMMIT_SHA}"
+          echo "Advertencia: CI_MERGE_REQUEST_DIFF_BASE_SHA no definida. Escaneando commit actual."
+        fi
+
+      # ── CASO B: Push directo a rama protegida — escaneo enfocado ──
+      elif [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "${CI_COMMIT_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+        LOG_OPTS="${CI_COMMIT_BEFORE_SHA}..${CI_COMMIT_SHA}"
+        echo "Escaneo incremental (push): ${LOG_OPTS}"
+
+      # ── CASO C: Pipeline web / primer push — solo el tip commit ──
+      else
+        # -1 evita que `git log <sha>` recorra todo el historial.
+        LOG_OPTS="-1 ${CI_COMMIT_SHA}"
+        echo "Escaneo de commit único: ${LOG_OPTS}"
+      fi
+
+      # Pathspec: solo diffs bajo ansible/
+      gitleaks git \
+        --log-opts="${LOG_OPTS} -- ${GITLEAKS_SCAN_PATH}" \
+        --verbose \
+        --redact \
+        --report-format json \
+        --report-path gitleaks-report.json \
+        .
+
+# Este repo de deploy no usa DefectDojo ni stage security_report.
+gitleaks_defectdojo_upload:
+  stage: security
+  rules:
+    - when: never
 
 .ansible_setup:
   before_script:

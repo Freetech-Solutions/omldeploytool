@@ -59,6 +59,54 @@
     - upgrade
     - update
 
+# Resolver IPs vía set_fact (VariableManager) y no dentro del .j2: hostvars[h].omni_ip_lan
+# en el template no re-expande referencias anidadas tipo {{ vault_* }} del inventario.
+- name: HAPROXY Resolve backend peer LAN IPs
+  ansible.builtin.set_fact:
+    haproxy_nginx_backend_ips: >-
+      {{
+        haproxy_nginx_peers
+        | map('extract', hostvars, 'omni_ip_lan')
+        | map('trim')
+        | list
+      }}
+    haproxy_prometheus_backend_ips: >-
+      {{
+        haproxy_prometheus_peers
+        | map('extract', hostvars, 'omni_ip_lan')
+        | map('trim')
+        | list
+      }}
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: HAPROXY Assert backend IPs look like IPv4
+  ansible.builtin.assert:
+    that:
+      - haproxy_nginx_backend_ips | length > 0
+      - >-
+          (haproxy_nginx_backend_ips
+           | select('match', '^\\d+\\.\\d+\\.\\d+\\.\\d+$')
+           | list
+           | length)
+          == (haproxy_nginx_backend_ips | length)
+      - >-
+          (haproxy_prometheus_backend_ips
+           | select('match', '^\\d+\\.\\d+\\.\\d+\\.\\d+$')
+           | list
+           | length)
+          == (haproxy_prometheus_backend_ips | length)
+    fail_msg: >-
+      omni_ip_lan de peers HAProxy no resolvió a IPv4 (¿referencia vault sin expandir?):
+      nginx={{ haproxy_nginx_backend_ips }} prometheus={{ haproxy_prometheus_backend_ips }}
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: HAPROXY Ensure PEM directory exists
   ansible.builtin.file:
     path: "{{ haproxy_pem_dir }}"
@@ -96,6 +144,51 @@
     owner: "{{ usuario }}"
     group: "{{ usuario }}"
     mode: "0600"
+  notify: Restart haproxy service
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: HAPROXY Locate host CA bundle for backend TLS verify
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/ssl/certs/ca-certificates.crt
+    - /etc/pki/tls/certs/ca-bundle.crt
+  register: haproxy_host_ca_stat
+  when:
+    - haproxy_backend_ssl | default(false) | bool
+    - (haproxy_backend_ssl_verify | default('required')) != 'none'
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: HAPROXY Slurp host CA bundle (if present)
+  ansible.builtin.slurp:
+    src: "{{ (haproxy_host_ca_stat.results | selectattr('stat.exists') | map(attribute='item') | list | first) }}"
+  register: haproxy_slurp_host_ca
+  when:
+    - haproxy_backend_ssl | default(false) | bool
+    - (haproxy_backend_ssl_verify | default('required')) != 'none'
+    - haproxy_host_ca_stat is defined
+    - (haproxy_host_ca_stat.results | selectattr('stat.exists') | list | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: HAPROXY Assemble backend CA trust store
+  ansible.builtin.copy:
+    dest: "{{ haproxy_backend_ssl_ca_file }}"
+    content: "{{ haproxy_slurp_cert.content | b64decode }}{{ ('\n' ~ (haproxy_slurp_host_ca.content | b64decode)) if (haproxy_slurp_host_ca is defined and haproxy_slurp_host_ca.content is defined) else '' }}\n"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+    mode: "0644"
+  when:
+    - haproxy_backend_ssl | default(false) | bool
+    - (haproxy_backend_ssl_verify | default('required')) != 'none'
   notify: Restart haproxy service
   tags:
     - install

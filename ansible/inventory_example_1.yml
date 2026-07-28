@@ -15,31 +15,3 @@ all:
 omnileads_aio:
   hosts:
     test_aio:
-
-##########################################################
-### Cluster: Pod groups (a host can be in multiple groups)
-##########################################################
-
-data_statefull:
-  hosts:
-
-data_stateless:
-  hosts:
-
-edge:
-  hosts:
-
-omlapp_web:
-  hosts:
-
-omlapp_workers:
-  hosts:
-
-dialer_workers:
-  hosts:    
-
-acd:
-  hosts:
-
-callrec_processor:
-  hosts:

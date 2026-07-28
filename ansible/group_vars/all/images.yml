@@ -1,13 +1,13 @@
 ---
 
 # --- OMniLeads images WEB
-APP_IMG: docker.io/freetechsolutions/omlapp:20260710-8922e4d3
-NGINX_IMG: docker.io/freetechsolutions/nginx:20260609-0db11e01
+APP_IMG: docker.io/freetechsolutions/omlapp:20260727-3247f077-enterprise
+NGINX_IMG: docker.io/freetechsolutions/nginx:20260716-bf4395be
 WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
 
 # --- OMniLeads images TEL
 ACD_IMG: docker.io/freetechsolutions/acd:20260708-53d74a09
-KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260710-76247be8
+KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260716-142f8e28
 RTPENGINE_IMG: docker.io/freetechsolutions/rtpengine:20260713-c32419a6
 CALLREC_COMPRESSOR_IMG: docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
 CALLREC_TRANSCRIBER_IMG: docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3

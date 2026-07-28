@@ -13,6 +13,7 @@
           (['dialer_workers'] if (oml_runs_dialer_workers | default(false) | bool) else []) +
           (['acd'] if (oml_runs_acd | default(false) | bool) else []) +
           (['callrec_processor'] if (oml_runs_callrec_processor | default(false) | bool) else []) +
+          (['enterprise'] if (component_addons_enabled | default(false) | bool) else []) +
           (['qa'] if (component_qa_enabled | default(false) | bool) else []) +
           (
             ['observability']

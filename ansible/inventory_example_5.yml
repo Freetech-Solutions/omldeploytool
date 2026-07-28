@@ -48,19 +48,6 @@ all:
               tenant_id: tenant_z_edge
               ansible_host: "{{ vault_tenant_z_edge_ansible_host }}"
               omni_ip_lan: "{{ vault_tenant_z_edge_omni_ip_lan }}"
-          vars:
-            tenant_id: tenant_z
-            fqdn: "{{ vault_tenant_z_fqdn }}"
-            bucket_url: "{{ vault_tenant_z_bucket_url }}"
-            bucket_name: "{{ vault_tenant_z_bucket_name }}"
-            itsp_nodes: "{{ vault_tenant_z_itsp_nodes }}"            
-            kamailio_webrtc_iface: ens18            
-
-##########################################################
-### All in One "AIO"
-##########################################################
-omnileads_aio:
-  hosts:
 
 ##########################################################
 ### Cluster: Pod groups (a host can be in multiple groups)

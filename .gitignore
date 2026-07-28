@@ -35,3 +35,7 @@ components-git-repo/whisper-vm-finetune/
 
 .ci-omnileads/
 .cache/
+
+CLAUDE.md
+docker-compose/CLAUDE.md
+ansible/CLAUDE.md

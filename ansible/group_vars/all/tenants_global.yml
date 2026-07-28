@@ -278,6 +278,21 @@ google_maps_center: '{ "lat": -31.416668, "lng": -64.183334 }'
 google_api_key: "{{ vault_google_api_key }}"
 google_cloud_projectid: "{{ vault_google_cloud_projectid }}"
 
+#------------------------------------- Wazuh Agent ----------------------------------
+# --- OS agent (FIM / logs) enrolled to a central Wazuh Manager.
+# --- El rol se ejecuta cuando wazuh_manager está definido (y wazuh != false).
+# --- Override por tenant: instances/<tenant>/vars.yml
+# --- Disable por host/tenant: wazuh: false en inventory.yml o vars.yml
+#
+wazuh: false
+# --- IP/FQDN del Manager (obligatorio para instalar). Preferible por tenant en vars.yml
+# --- o vía Vault: wazuh_manager: "{{ vault_wazuh_manager }}"
+# wazuh_manager: ""
+# --- Debe existir exactamente en el Manager (crear el grupo antes del enrollment).
+wazuh_agent_group: omnileads_prod
+# wazuh_registration_password: "{{ vault_wazuh_registration_password }}"
+# wazuh_agent_name: "{{ inventory_hostname }}"
+
 #------------------------------------- Observability ----------------------------------
 # --- Observability integrations with Loki & Homer
 

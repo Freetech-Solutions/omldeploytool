@@ -1,67 +1,57 @@
----
-# Example of a cluster with the following tiers:
-# - Edge + Monolithic compute
 
+---
 all:
   children:
-    cluster_instances:
-      children:
-        tenant_x:
-          hosts:
-            tenant_x_node:
-              tenant_id: tenant_x_node
-              ansible_host: "{{ vault_tenant_x_node_ansible_host }}"
-              omni_ip_lan: 172.16.202.3
-            tenant_x_edge:
-              tenant_id: tenant_x_edge
-              ansible_host: "{{ vault_tenant_x_edge_ansible_host }}"
-              omni_ip_lan: 172.16.202.2              
-          vars:
-            tenant_id: tenant_x_aio_edge
-            fqdn: "{{ vault_tenant_x_fqdn }}"
-            bucket_url: "{{ vault_bucket_url }}"
-            bucket_name: "{{ vault_tenant_x_bucket_name }}"
-            itsp_nodes: "{{ vault_tenant_x_itsp_nodes }}"            
-            kamailio_webrtc_iface: ens18            
+    tenant_example_3:
+      hosts:
+        tenant_example_3_node:
+          ansible_host: "{{ vault_tenant_example_3_node_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_3_node_private_ip }}"
+        tenant_example_3_edge:
+          ansible_host: "{{ vault_tenant_example_3_edge_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_3_edge_private_ip }}"
+        tenant_example_3_data:
+          ansible_host: "{{ vault_tenant_example_3_data_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_3_data_private_ip }}"
+        tenant_example_4_acd:
+          ansible_host: "{{ vault_tenant_example_4_acd_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_4_acd_private_ip }}"
+        tenant_example_4_callrec_processor:
+          ansible_host: "{{ vault_tenant_example_4_callrec_processor_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_4_callrec_processor_private_ip }}"
+        tenant_example_4_dialer_workers:
+          ansible_host: "{{ vault_tenant_example_4_dialer_workers_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_4_dialer_workers_private_ip }}"
 
-##########################################################
-### All in One "AIO"
-##########################################################
-omnileads_aio:
-  hosts:
-
-##########################################################
-### Cluster: Pod groups (a host can be in multiple groups)
-##########################################################
-
-data_statefull:
-  hosts:
-    tenant_x_node:
-
-data_stateless:
-  hosts:
-    tenant_x_node:
 
 edge:
   hosts:
-    tenant_x_edge:
+    tenant_example_3_edge:
+
+data_statefull:
+  hosts:
+    tenant_example_3_data:
+
+data_stateless:
+  hosts:
+    tenant_example_3_data:
 
 omlapp_web:
   hosts:
-    tenant_x_node:
+    tenant_example_3_node:
 
 omlapp_workers:
   hosts:
-    tenant_x_node:
+    tenant_example_3_node:
 
 dialer_workers:
   hosts:    
-    tenant_x_node:
+    tenant_example_3_dialer_workers:
 
 acd:
   hosts:
-    tenant_x_node:
+    tenant_example_3_acd:
 
 callrec_processor:
   hosts:
-    tenant_x_node:
+    tenant_example_3_callrec_processor:

@@ -1,0 +1,24 @@
+[Unit]
+Description=OMniLeads Wallboard Worker
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=oml-wallboard-worker
+Image={{ APP_IMG }}
+Pod=enterprise.pod
+EnvironmentFile=/etc/default/django.env
+Environment=GOOGLE_MAPS_CENTER={{ google_maps_center }}
+Label=tier=enterprise
+LogDriver=journald
+PodmanArgs=--cgroups=no-conmon
+Exec=python /opt/omnileads/ominicontacto/manage.py wallboard__update_inert_widgets
+
+[Service]
+Restart=on-failure
+RestartSec=60
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target

@@ -304,7 +304,22 @@
         or oml_runs_callrec_processor
       }}
     component_observability_promtail_enabled: "{{ loki_url is defined or (oml_observability_deploy | default(false) | bool) }}"
-    component_addons_enabled: "{{ oml_runs_omlapp_web }}"
+    # Wazuh agent: on by default when wazuh_manager is set; inventory can set wazuh: false.
+    # Dedicated --action=wazuh-agent still includes the role (assert clarifies missing manager).
+    component_wazuh_agent_enabled: >-
+      {{
+        (wazuh | default(true) | bool)
+        and (
+          (wazuh_manager | default('') | string | length > 0)
+          or ('wazuh-agent' in ansible_run_tags)
+        )
+      }}
+    # Addons (pod enterprise + rol addons) solo con imagen omlapp *-enterprise.
+    component_addons_enabled: >-
+      {{
+        (oml_runs_omlapp_web | bool)
+        and ((APP_IMG | default('') | regex_search('-enterprise$')) is not none)
+      }}
     component_qa_enabled: "{{ qa_env is defined }}"
   tags:
     - always

@@ -2,6 +2,19 @@
 
 Comparacion analizada: `main...develop-3.0` sobre `ansible/` (HEAD actual de la rama).
 
+## Wazuh Agent
+
+- Rol `wazuh-agent`: instalación y enrollment del agente oficial (Debian/RedHat) hacia un Manager externo.
+- Integrado en `site_core.yml` (tags `install` / `upgrade` / `update` / `wazuh-agent`) y acción `./deploy.sh --action=wazuh-agent`.
+- Habilitado por defecto cuando `wazuh_manager` está definido; anular con `wazuh: false` en el inventario.
+- Variables documentadas en `group_vars/all/tenants_global.yml` (`wazuh_manager`, `wazuh_agent_group`, `wazuh_registration_password`).
+
+## HAProxy TLS (ISO 27001 A.8.24)
+
+- Endurecimiento TLS en edge: `ssl-min-ver TLSv1.2`, ciphers/ciphersuites modernas, `no-tls-tickets`, HSTS.
+- Backend nginx: `ssl verify required` por defecto con trust store `backend-ca.pem` (cert del tenant + CA del host) y SNI al FQDN.
+- Evidencia y checklist de auditoria en `docs/haproxy_tls_iso27001.md`. Escape temporal: `haproxy_backend_ssl_verify: none`.
+
 ## Kamailio VoIP SBC (`kamailio_voip.cfg`)
 
 - Nuevo SBC de doble cara para cluster ACD: discriminacion inbound/outbound por IP de origen (`IS_FROM_ITSP` / `ds_is_from_list`), sin cabecera `OMniLeadsOutbound`.
