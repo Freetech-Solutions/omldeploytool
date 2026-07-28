@@ -1,347 +1,220 @@
+# OMniLeads deploy CI — imagen reproducible + shell executor (tag: deploy).
+# Ver ansible/ci/README.md y .gitlab/ci/ para variables y prerequisitos.
+
+include:
+  - project: 'omnileads/devsecops'
+    ref: main
+    file:
+      - 'templates/trivy_ansible.yml'
+      - 'templates/gitleaks.yml'
+
+image: python:3.11-slim
+
+variables:
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+  ANSIBLE_FORCE_COLOR: "true"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  ANSIBLE_LOCAL_TEMP: "$CI_PROJECT_DIR/.cache/ansible-local"
+  # ANSIBLE_REMOTE_TEMP: no exportar en CI; deploy.sh usa /tmp/ansible-remote en el host remoto
+  # OML_CI_CONFIG_DIR: definido en lib.sh (ruta absoluta; GitLab 12 SSH usa CI_PROJECT_DIR relativo)
+  DOCTL_VERSION: "1.118.0"
+  # Trivy IaC: playbooks/roles viven bajo ansible/
+  TRIVY_CONFIG_PATH: "ansible"
+
 stages:
+  - security
+  - lint
+  - test
   - deploy
+
+# GitLab no expande ${GITLEAKS_STAGE} del template incluido en el campo stage.
+# Escaneo Anti-Leaks limitado a ansible/ (pathspec en git log).
+gitleaks_scan:
+  stage: security
+  variables:
+    GITLEAKS_SCAN_PATH: "ansible"
+  script:
+    - |
+      set -eu
+      echo "Iniciando análisis Anti-Leaks con Gitleaks (path: ${GITLEAKS_SCAN_PATH})..."
+
+      if [ -f ".gitleaksignore" ]; then
+        echo "Usando excepciones documentadas en .gitleaksignore"
+      fi
+
+      # ── CASO A: Merge Request — escaneo incremental del diff ──
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+          LOG_OPTS="${CI_MERGE_REQUEST_DIFF_BASE_SHA}..${CI_COMMIT_SHA}"
+          echo "Escaneo diferencial (MR): ${LOG_OPTS}"
+        else
+          # -1 evita que `git log <sha>` recorra todo el historial.
+          LOG_OPTS="-1 ${CI_COMMIT_SHA}"
+          echo "Advertencia: CI_MERGE_REQUEST_DIFF_BASE_SHA no definida. Escaneando commit actual."
+        fi
+
+      # ── CASO B: Push directo a rama protegida — escaneo enfocado ──
+      elif [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "${CI_COMMIT_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+        LOG_OPTS="${CI_COMMIT_BEFORE_SHA}..${CI_COMMIT_SHA}"
+        echo "Escaneo incremental (push): ${LOG_OPTS}"
+
+      # ── CASO C: Pipeline web / primer push — solo el tip commit ──
+      else
+        # -1 evita que `git log <sha>` recorra todo el historial.
+        LOG_OPTS="-1 ${CI_COMMIT_SHA}"
+        echo "Escaneo de commit único: ${LOG_OPTS}"
+      fi
+
+      # Pathspec: solo diffs bajo ansible/
+      gitleaks git \
+        --log-opts="${LOG_OPTS} -- ${GITLEAKS_SCAN_PATH}" \
+        --verbose \
+        --redact \
+        --report-format json \
+        --report-path gitleaks-report.json \
+        .
+
+# Este repo de deploy no usa DefectDojo ni stage security_report.
+gitleaks_defectdojo_upload:
+  stage: security
+  rules:
+    - when: never
+
+.ansible_setup:
+  before_script:
+    - chmod +x .gitlab/ci/*.sh ansible/ci/*.sh 2>/dev/null || chmod +x .gitlab/ci/*.sh
+    - source .gitlab/ci/lib.sh && oml_ci_init_paths
+    - bash .gitlab/ci/ansible-setup.sh
+
+# --- Lint (MRs y pipelines web; no requiere Vault ni DigitalOcean) ---
+ansible_lint:
+  extends: .ansible_setup
+  stage: lint
+  variables:
+    OML_CI_SKIP_DOCTL: "1"
+  script:
+    - bash .gitlab/ci/ansible-lint.sh
+  tags:
+    - deploy
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+
+# --- Deploy helpers ---
+.deploy_aio_prepare:
+  extends: .ansible_setup
+  before_script:
+    - chmod +x .gitlab/ci/*.sh ansible/ci/*.sh 2>/dev/null || chmod +x .gitlab/ci/*.sh
+    - source .gitlab/ci/lib.sh && oml_ci_init_paths
+    - bash .gitlab/ci/oml-checkout-branch.sh
+    - bash .gitlab/ci/ansible-setup.sh
+    - source .gitlab/ci/ansible-vault-setup.sh
+    - |
+      if [ -n "${DIGITALOCEAN_ACCESS_TOKEN:-}" ]; then
+        doctl auth init -t "${DIGITALOCEAN_ACCESS_TOKEN}"
+      fi
+
+.deploy_aio_smoke_script: &deploy_aio_smoke_script
+  - cd ansible
+  - source "${OML_CI_CONFIG_DIR}/vault.env"
+  - |
+    doctl compute droplet create \
+      --image "${DIGITALOCEAN_DROPLET_IMG}" \
+      --size "${DIGITALOCEAN_DROPLET_SIZE}" \
+      --region "${DIGITALOCEAN_REGION}" \
+      --ssh-keys "${DIGITALOCEAN_SSH_KEY}" \
+      --user-data-file ./cloud_init_digital_ocean.yml \
+      "cicd-systemd.${CI_JOB_ID}"
+  - sleep 60
+  - OML_IPADDR=$(doctl compute droplet list | grep "cicd-systemd.${CI_JOB_ID}" | awk '{print $3}')
+  - OML_IPADDR_APPLAN=$(doctl compute droplet list | grep "cicd-systemd.${CI_JOB_ID}" | awk '{print $4}')
+  - echo "Public IP ${OML_IPADDR} / private LAN ${OML_IPADDR_APPLAN}"
+  - mkdir -p instances/gitlab
+  - cp inventory_example_1.yml instances/gitlab/inventory.yml
+  - |
+    ./ci/patch_vault_cicd.sh \
+      --vault-file ./group_vars/all/vault.yml \
+      --ansible-host "${OML_IPADDR}" \
+      --omni-ip-lan "${OML_IPADDR_APPLAN}" \
+      --fqdn "${OML_IPADDR}"
+  - |
+    if [ -n "${OMLAPP_IMG:-}" ]; then
+      echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"
+      sed -i "s|^APP_IMG:.*|APP_IMG: docker.io/freetechsolutions/omlapp:${OMLAPP_IMG}|" ./group_vars/all/images.yml
+    fi
+  - sleep 30
+  - bash -x deploy.sh --action=install --tenant=gitlab --yes
+  - |
+    until curl -sk --head --request GET "https://${OML_IPADDR}" | grep -q "302"; do
+      echo "Environment still being installed, sleeping 60 seconds"
+      sleep 60
+    done
+    echo "Environment is up"
+  - sleep 90
+  - doctl compute droplet delete -f "cicd-systemd.${CI_JOB_ID}"
+
+deploy-aio-cloud:
+  extends: .deploy_aio_prepare
+  stage: deploy
+  environment: SYSTEMD_AIO
+  script: *deploy_aio_smoke_script
+  tags:
+    - deploy
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+    - if: '$RUN_RM_DEPLOY == "true"'
 
 deploy-aio-cloud-docker:
   stage: deploy
   environment: DOCKER_COMPOSE
-  script:
-    - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cd ~/omldeploytool/docker-compose/prod-env
+  before_script:
+    - chmod +x .gitlab/ci/*.sh 2>/dev/null || true
+    - source .gitlab/ci/lib.sh && oml_ci_init_paths
+    - bash .gitlab/ci/ansible-setup.sh
     - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-        sed -i "s/branch=main/branch=${OMLOSS_BRANCH}/g" ./deploy.sh
+      if [ -n "${DIGITALOCEAN_ACCESS_TOKEN:-}" ]; then
+        doctl auth init -t "${DIGITALOCEAN_ACCESS_TOKEN}"
       fi
+  script:
+    - bash .gitlab/ci/oml-checkout-branch.sh
+    - cd docker-compose/prod-env
     - |
-      if [ -n "${NIC}" ]; then
+      deploy_branch="${OMLOSS_BRANCH:-${CI_COMMIT_REF_NAME}}"
+      echo "Patching deploy.sh branch=${deploy_branch}"
+      sed -i "s/branch=main/branch=${deploy_branch}/g" ./deploy.sh
+    - |
+      if [ -n "${NIC:-}" ]; then
         echo "NIC is defined: ${NIC}"
         sed -i "s/oml_nic=eth0/oml_nic=${NIC}/g" ./deploy.sh
       fi
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
+    - |
+      doctl compute droplet create \
+        --image "${DIGITALOCEAN_DROPLET_IMG}" \
+        --size "${DIGITALOCEAN_DROPLET_SIZE}" \
+        --region "${DIGITALOCEAN_REGION}" \
+        --ssh-keys "${DIGITALOCEAN_SSH_KEY}" \
+        --user-data-file ./deploy.sh \
+        "cicd-docker-compose.${CI_JOB_ID}"
     - sleep 60
-    - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
-    - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
+    - OML_IPADDR=$(doctl compute droplet list | grep "cicd-docker-compose.${CI_JOB_ID}" | awk '{print $3}')
+    - echo "${OML_IPADDR} to run tests"
+    - |
+      until curl -sk --head --request GET "https://${OML_IPADDR}" | grep -q "302"; do
+        echo "Environment still being installed, sleeping 60 seconds"
+        sleep 60
+      done
+      echo "Environment is up"
     - sleep 90
-    - doctl compute droplet delete -f cicd-docker-compose.${CI_JOB_ID}
+    - doctl compute droplet delete -f "cicd-docker-compose.${CI_JOB_ID}"
+  after_script:
+    - |
+      if [ -n "${DIGITALOCEAN_ACCESS_TOKEN:-}" ]; then
+        doctl auth init -t "${DIGITALOCEAN_ACCESS_TOKEN}" 2>/dev/null || true
+        doctl compute droplet delete -f "cicd-docker-compose.${CI_JOB_ID}" 2>/dev/null || true
+      fi
   tags:
     - deploy
+  timeout: 90m
   rules:
     - if: '$RUN_RM_DEPLOY_DOCKER == "true"'
-
-deploy-aio-cloud-docker-rocky:
-  stage: deploy
-  environment: DOCKER_COMPOSE_ROCKY
-  script:
-    - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cp ~/omldeploytool/docker-compose/env ~/omldeploytool/docker-compose/prod-env/.env
-    - cd ~/omldeploytool/docker-compose/prod-env
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - sed -i "s/\${NIC}/eth0/g" ./deploy.sh
-    - sed -i "s/\BRANCH/$CI_COMMIT_REF_NAME/g" ./deploy.sh
-    - |
-      if [ -n "${OMLAPP_IMG}" ]; then
-        echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./deploy.sh
-      fi    
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_ROCKY_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
-    - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-    - sleep 90
-    - doctl compute droplet delete -f cicd-docker-compose.${CI_JOB_ID}
-  tags:
-    - deploy
-  rules:
-    - if: '$RUN_RM_DEPLOY_DOCKER == "true"'
-
-deploy-aio-cloud:
-  stage: deploy
-  environment: SYSTEMD_AIO  
-  script:
-    - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-systemd.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR=$(doctl compute droplet list |grep cicd-systemd.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests"
-    - OML_IPADDR_APPLAN=$(doctl compute droplet list |grep cicd-systemd.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR_APPLAN to run tests" 
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-    - cd ~/omldeploytool/ansible
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - cp inventory.yml instances/gitlab/inventory.yml
-    - sed -i "s/190.19.150.18/$OML_IPADDR/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/172.16.101.44/$OML_IPADDR_APPLAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_1/tenant_example_1/g" ./instances/gitlab/inventory.yml    
-    - |
-      if [ -n "${OMLAPP_IMG}" ]; then
-        echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"
-        sed -i "s/\(omnileads_version:.*\)/\1-${OMLAPP_IMG}/" ./instances/gitlab/inventory.yml
-      fi    
-    - sleep 30
-    - bash -x deploy.sh --action=install --tenant=gitlab
-    - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-    - sleep 90
-    - doctl compute droplet delete -f cicd-systemd.${CI_JOB_ID}
-  tags:
-    - deploy
-  rules:
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
-    - if: '$RUN_RM_DEPLOY == "true"'
-
-deploy-aio-cloud-rocky:
-  stage: deploy
-  environment: SYSTEMD_AIO_ROCKY
-  script:
-    - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_ROCKY_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-systemd.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR=$(doctl compute droplet list |grep cicd-systemd.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests"
-    - OML_IPADDR_APPLAN=$(doctl compute droplet list |grep cicd-systemd.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR_APPLAN to run tests" 
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-    - cd ~/omldeploytool/ansible
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - cp inventory.yml instances/gitlab/inventory.yml
-    - sed -i "s/190.19.150.18/$OML_IPADDR/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/172.16.101.44/$OML_IPADDR_APPLAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_1/tenant_example_1/g" ./instances/gitlab/inventory.yml    
-    - sleep 30
-    - bash -x deploy.sh --action=install --tenant=gitlab
-    - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-    - sleep 90
-    - doctl compute droplet delete -f cicd-systemd.${CI_JOB_ID}
-  tags:
-    - deploy
-  rules:
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
-    - if: '$RUN_RM_DEPLOY == "true"'
-    
-deploy-ait-cloud:
-  stage: deploy
-  environment: SYSTEMD_CLUSTER
-  script:
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE_SYSTEMD} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-data.${CI_JOB_ID}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE_SYSTEMD} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-voice.${CI_JOB_ID}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE_SYSTEMD} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-app.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR_DATA=$(doctl compute droplet list |grep cicd-data.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_DATALAN=$(doctl compute droplet list |grep cicd-data.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_VOICE=$(doctl compute droplet list |grep cicd-voice.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_VOICELAN=$(doctl compute droplet list |grep cicd-voice.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_APP=$(doctl compute droplet list |grep cicd-app.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_APPLAN=$(doctl compute droplet list |grep cicd-app.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR to run tests" 
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-    - cd ~/omldeploytool/ansible 
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - cp inventory.yml instances/gitlab/inventory.yml
-    - sed -i "s/179.34.22.11/$OML_IPADDR_DATA/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/192.168.0.2/$OML_IPADDR_DATALAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/179.134.12.18/$OML_IPADDR_VOICE/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/192.168.0.3/$OML_IPADDR_VOICELAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/190.134.62.33/$OML_IPADDR_APP/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/192.168.0.4/$OML_IPADDR_APPLAN/g" ./instances/gitlab/inventory.yml    
-    - sed -i "s/#tenant_example_5_data/tenant_example_6_data/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_5_voice/tenant_example_6_voice/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_5_app/tenant_example_6_app/g" ./instances/gitlab/inventory.yml
-    - sleep 30
-    - bash -x deploy.sh --action=install --tenant=gitlab
-    - until curl -sk --head --request GET https://$OML_IPADDR_APP |grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-    - sleep 120
-    - doctl compute droplet delete -f cicd-app.${CI_JOB_ID}
-    - doctl compute droplet delete -f cicd-data.${CI_JOB_ID}
-    - doctl compute droplet delete -f cicd-voice.${CI_JOB_ID}
-  tags:
-    - deploy
-  rules:
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
-    - if: '$RUN_RM_DEPLOY == "true"'
-
-
-deploy-aio-cloud-norm:
-  stage: deploy
-  environment: SYSTEMD_AIO  
-  script:
-    - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-systemd.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR=$(doctl compute droplet list |grep cicd-systemd.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests"
-    - OML_IPADDR_APPLAN=$(doctl compute droplet list |grep cicd-systemd.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR_APPLAN to run tests" 
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-    - cd ~/omldeploytool/ansible
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - cp inventory.yml instances/gitlab/inventory.yml
-    - sed -i "s/190.19.150.18/$OML_IPADDR/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/172.16.101.44/$OML_IPADDR_APPLAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_1/tenant_example_1/g" ./instances/gitlab/inventory.yml    
-    - |
-      if [ -n "${OMLAPP_IMG}" ]; then
-        echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|omnileads_img:.*|omnileads_img: ${OMLAPP_IMG}|" ./instances/gitlab/inventory.yml
-      fi    
-    - sleep 30
-    - bash -x deploy.sh --action=install --tenant=gitlab
-    - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-  tags:
-    - deploy
-  rules:
-    - if: '$RUN_NORM_DEPLOY_AIO == "true"'
-
-
-deploy-ait-cloud-norm:
-  stage: deploy
-  environment: SYSTEMD_CLUSTER
-  script:
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE_SYSTEMD} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-data.${CI_JOB_ID}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE_SYSTEMD} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-voice.${CI_JOB_ID}
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE_SYSTEMD} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} cicd-app.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR_DATA=$(doctl compute droplet list |grep cicd-data.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_DATALAN=$(doctl compute droplet list |grep cicd-data.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_VOICE=$(doctl compute droplet list |grep cicd-voice.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_VOICELAN=$(doctl compute droplet list |grep cicd-voice.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_APP=$(doctl compute droplet list |grep cicd-app.${CI_JOB_ID} |awk '{print $3}') && echo "$OML_IPADDR to run tests" 
-    - OML_IPADDR_APPLAN=$(doctl compute droplet list |grep cicd-app.${CI_JOB_ID} |awk '{print $4}') && echo "$OML_IPADDR to run tests" 
-    - rm -rf ~/omldeploytool
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-    - cd ~/omldeploytool/ansible 
-    - cp inventory.yml instances/gitlab/inventory.yml
-    - sed -i "s/179.34.22.11/$OML_IPADDR_DATA/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/192.168.0.2/$OML_IPADDR_DATALAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/179.134.12.18/$OML_IPADDR_VOICE/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/192.168.0.3/$OML_IPADDR_VOICELAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/190.134.62.33/$OML_IPADDR_APP/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/192.168.0.4/$OML_IPADDR_APPLAN/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_5_data/tenant_example_6_data/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_5_voice/tenant_example_6_voice/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_5_app/tenant_example_6_app/g" ./instances/gitlab/inventory.yml
-    - sleep 30
-    - bash -x deploy.sh --action=install --tenant=gitlab
-    - until curl -sk --head --request GET https://$OML_IPADDR_APP |grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-  tags:
-    - deploy
-  rules:
-    - if: '$RUN_NORM_DEPLOY_AIT == "true"'
-
-deploy-aio-lan-norm:
-  stage: deploy
-  environment: SYSTEMD_AIO_LAN
-  script:
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-    - cd ~/omldeploytool/ansible
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - cp inventory.yml instances/gitlab/inventory.yml
-    - sed -i "s/190.19.11.2/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/10.10.10.2/$PROXMOX_ADDR_VM_AIO/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/2234/$PROXMOX_PORT/g" ./instances/gitlab/inventory.yml
-    - sed -i "s/#tenant_example_2/tenant_example_2/g" ./instances/gitlab/inventory.yml
-    - sleep 30
-    - bash -x deploy.sh --action=install --tenant=gitlab
-    - until curl -sk --head --request GET https://$PROXMOX_ADDR:5706|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-  tags:
-    - deploy
-  rules:
-    - if: '$RUN_NORM_DEPLOY_AIO_LAN == "true"'
-
-deploy-aio-cloud-docker-norm:
-  stage: deploy
-  environment: DOCKER_COMPOSE
-  script:
-    - doctl auth init -t ${DIGITALOCEAN_ACCESS_TOKEN}
-    - rm -rf ~/omldeploytool
-    - git clone -b $CI_COMMIT_REF_NAME https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-    - cd ~/omldeploytool/docker-compose/prod-env
-    - |
-      if [ -n "${OMLOSS_BRANCH}" ]; then
-        echo "OMLOSS_BRANCH is defined: ${OMLOSS_BRANCH}"
-        git checkout ${OMLOSS_BRANCH}
-      fi
-    - sed -i "s/\${NIC}/eth0/g" ./deploy.sh
-    - sed -i "s/\BRANCH/$CI_COMMIT_REF_NAME/g" ./deploy.sh
-    - |
-      if [ -n "${OMLAPP_IMG}" ]; then
-        echo "OMLAPP_IMG is set to: ${OMLAPP_IMG}"                
-        sed -i "s|OMLAPP_IMG=.*|OMLAPP_IMG=${OMLAPP_IMG}|" ./deploy.sh
-      fi    
-    - doctl compute droplet create --image ${DIGITALOCEAN_DROPLET_IMG} --size ${DIGITALOCEAN_DROPLET_SIZE} --region ${DIGITALOCEAN_REGION} --ssh-keys ${DIGITALOCEAN_SSH_KEY} --user-data-file ./deploy.sh cicd-docker-compose.${CI_JOB_ID}
-    - sleep 60
-    - OML_IPADDR=$(doctl compute droplet list |grep cicd-docker-compose.${CI_JOB_ID} |awk '{print $3}') && echo "${OML_IPADDR} to run tests"    
-    - until curl -sk --head --request GET https://$OML_IPADDR|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-    - sleep 90
-  tags:
-    - deploy
-  rules:
-    - if: '$RUN_NORM_DEPLOY_DOCKER == "true"'  
-
-# deploy-systemd-ha:
-#   stage: deploy
-#   environment: PROXMOX_HA_SYSTEMD
-#   script:
-#     - rm -rf ~/omldeploytool
-#     - git clone --branch $CI_COMMIT_BRANCH https://gitlab.com/omnileads/omldeploytool.git ~/omldeploytool
-#     - mkdir -p ~/omldeploytool/ansible/instances/gitlab
-#     - cd ~/omldeploytool/ansible
-#     - cp inventory_ha.yml instances/gitlab/inventory.yml
-#     - sed -i "105 s/172.16.101.101/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "32 s/22/5107/g" ./instances/gitlab/inventory.yml  
-#     - sed -i "35 s/172.16.101.102/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "37 s/22/5108/g" ./instances/gitlab/inventory.yml
-#     - sed -i "40 s/172.16.101.103/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "42 s/22/5109/g" ./instances/gitlab/inventory.yml
-#     - sed -i "44 s/172.16.101.104/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "46 s/22/5110/g" ./instances/gitlab/inventory.yml
-#     - sed -i "48 s/172.16.101.105/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "50 s/22/5111/g" ./instances/gitlab/inventory.yml
-#     - sed -i "52 s/172.16.101.106/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "54 s/22/5112/g" ./instances/gitlab/inventory.yml
-#     - sed -i "56 s/172.16.101.107/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "58 s/22/5113/g" ./instances/gitlab/inventory.yml
-#     - sed -i "60 s/172.16.101.108/$PROXMOX_ADDR/g" ./instances/gitlab/inventory.yml
-#     - sed -i "62 s/22/5114/g" ./instances/gitlab/inventory.yml                    
-#     - bash -x deploy.sh --action=install --tenant=gitlab
-#     #- until curl -sk --head --request GET https://$PROXMOX_ADDR:5115|grep "302" > /dev/null; do echo "Environment still being installed, sleeping 60 seconds"; sleep 60; done; echo "Environment is up"
-#   tags:
-#     - deploy
-#   rules:
-#     - if: '$RUN_NORM_DEPLOY_HA == "true"'

@@ -13,8 +13,7 @@
     - ../group_vars/all/runtime.yml
     - ../group_vars/all/vault.yml
     - ../group_vars/all/images.yml
-    - ../group_vars/all/observability.yml
-    - ../group_vars/all/qa.yml
+    - ../group_vars/all/tenants_global.yml
   pre_tasks:
     - name: Normalize topology and component switches
       ansible.builtin.include_role:
@@ -28,10 +27,17 @@
       tags: [upgrade_from_2X, upgrade, prerequisitos]
     - role: upgrade_from_2X
       vars:
+        upgrade_from_2X_phase: prepare_apt
+      tags: [upgrade_from_2X, upgrade, prerequisitos]
+    - role: upgrade_from_2X
+      vars:
         upgrade_from_2X_phase: upgrade_to_debian13
       tags: [upgrade_from_2X, upgrade, upgrade_debian13, prerequisitos]
     - role: prerequisitos
       tags: [install, upgrade, update, prerequisitos]
+    - role: wazuh-agent
+      when: component_wazuh_agent_enabled | bool
+      tags: [install, upgrade, update, wazuh-agent]
     # No poner tags en el rol con lista desde Jinja: Ansible la anida y las tareas fallan con
     # "the field 'tags' should be a list of str/int, but the item '[...]' is a list".
     # Los tags van en cada tarea de roles/pods/tasks/main.yml (tags: "{{ pods_role_tags }}").

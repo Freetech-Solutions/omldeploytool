@@ -1,0 +1,57 @@
+
+---
+all:
+  children:
+    tenant_example_3:
+      hosts:
+        tenant_example_3_node:
+          ansible_host: "{{ vault_tenant_example_3_node_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_3_node_private_ip }}"
+        tenant_example_3_edge:
+          ansible_host: "{{ vault_tenant_example_3_edge_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_3_edge_private_ip }}"
+        tenant_example_3_data:
+          ansible_host: "{{ vault_tenant_example_3_data_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_3_data_private_ip }}"
+        tenant_example_4_acd:
+          ansible_host: "{{ vault_tenant_example_4_acd_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_4_acd_private_ip }}"
+        tenant_example_4_callrec_processor:
+          ansible_host: "{{ vault_tenant_example_4_callrec_processor_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_4_callrec_processor_private_ip }}"
+        tenant_example_4_dialer_workers:
+          ansible_host: "{{ vault_tenant_example_4_dialer_workers_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_example_4_dialer_workers_private_ip }}"
+
+
+edge:
+  hosts:
+    tenant_example_3_edge:
+
+data_statefull:
+  hosts:
+    tenant_example_3_data:
+
+data_stateless:
+  hosts:
+    tenant_example_3_data:
+
+omlapp_web:
+  hosts:
+    tenant_example_3_node:
+
+omlapp_workers:
+  hosts:
+    tenant_example_3_node:
+
+dialer_workers:
+  hosts:    
+    tenant_example_3_dialer_workers:
+
+acd:
+  hosts:
+    tenant_example_3_acd:
+
+callrec_processor:
+  hosts:
+    tenant_example_3_callrec_processor:

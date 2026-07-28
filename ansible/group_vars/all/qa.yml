@@ -1,6 +1,0 @@
----
-MYSQL_HOST: 127.0.0.1
-MYSQL_ROOT_PASS: admin123
-WOMBAT_DB: wombat
-WOMBAT_DB_USER: wombat
-WOMBAT_DB_PASS: dials

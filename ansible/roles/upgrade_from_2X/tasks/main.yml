@@ -2,5 +2,10 @@
 - name: UPGRADE_2X Dispatch phase {{ upgrade_from_2X_phase }}
   ansible.builtin.include_tasks: "{{ upgrade_from_2X_phase }}.yml"
   when: upgrade_from_2X | default(false) | bool
+  vars:
+    # Hosts 2.X suelen exponer sólo /usr/bin/python3 (symlink). Con
+    # interpreter_python=auto_silent y fact cache, Ansible puede elegir una ruta
+    # versionada inexistente (p. ej. /usr/bin/python3.11) y fallar los módulos.
+    ansible_python_interpreter: /usr/bin/python3
   tags:
     - upgrade_from_2X

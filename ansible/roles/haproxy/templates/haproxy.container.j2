@@ -11,6 +11,9 @@ User=0
 Network=host
 Volume=/etc/default/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro,Z
 Volume={{ haproxy_pem_file }}:{{ haproxy_pem_file }}:ro,Z
+{% if haproxy_backend_ssl | default(false) | bool and (haproxy_backend_ssl_verify | default('required')) != 'none' %}
+Volume={{ haproxy_backend_ssl_ca_file }}:{{ haproxy_backend_ssl_ca_file }}:ro,Z
+{% endif %}
 LogDriver=journald
 PodmanArgs=--cgroups=no-conmon
 Label=tier=edge

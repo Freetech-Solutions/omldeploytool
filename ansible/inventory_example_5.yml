@@ -1,0 +1,86 @@
+---
+#
+# Example of a cluster with the following tiers:
+# - Edge
+# - Data statefull
+# - Data stateless
+# - Dialer workers
+# - Omlapp workers
+# - Acd
+# - Callrec processor
+# - App server
+
+all:
+  children:
+    cluster_instances:
+      children:
+        tenant_z:
+          hosts:
+            tenant_z_data_statefull:
+              tenant_id: tenant_z_data_statefull
+              ansible_host: "{{ vault_tenant_z_data_statefull_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_data_statefull_omni_ip_lan }}"
+            tenant_z_data_stateless:
+              tenant_id: tenant_z_data_stateless
+              ansible_host: "{{ vault_tenant_z_data_stateless_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_data_stateless_omni_ip_lan }}"
+            tenant_z_dialer_workers:
+              tenant_id: tenant_z_dialer_workers
+              ansible_host: "{{ vault_tenant_z_dialer_workers_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_dialer_workers_omni_ip_lan }}"
+            tenant_z_omlapp_workers:
+              tenant_id: tenant_z_omlapp_workers
+              ansible_host: "{{ vault_tenant_z_omlapp_workers_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_omlapp_workers_omni_ip_lan }}"
+            tenant_z_acd:
+              tenant_id: tenant_z_acd
+              ansible_host: "{{ vault_tenant_z_acd_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_acd_omni_ip_lan }}"
+            tenant_z_callrec_processor:
+              tenant_id: tenant_z_callrec_processor
+              ansible_host: "{{ vault_tenant_z_callrec_processor_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_callrec_processor_omni_ip_lan }}"
+            tenant_z_app_server:
+              tenant_id: tenant_z_app_server
+              ansible_host: "{{ vault_tenant_z_app_server_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_app_server_omni_ip_lan }}"
+            tenant_z_edge:
+              tenant_id: tenant_z_edge
+              ansible_host: "{{ vault_tenant_z_edge_ansible_host }}"
+              omni_ip_lan: "{{ vault_tenant_z_edge_omni_ip_lan }}"
+
+##########################################################
+### Cluster: Pod groups (a host can be in multiple groups)
+##########################################################
+
+data_statefull:
+  hosts:
+    tenant_z_data_statefull:
+
+data_stateless:
+  hosts:
+    tenant_z_data_stateless:
+
+edge:
+  hosts:
+    tenant_z_edge:
+
+omlapp_web:
+  hosts:
+    tenant_z_app_server:
+
+omlapp_workers:
+  hosts:
+    tenant_z_omlapp_workers:
+
+dialer_workers:
+  hosts:    
+    tenant_z_dialer_workers:
+
+acd:
+  hosts:
+    tenant_z_acd:
+
+callrec_processor:
+  hosts:
+    tenant_z_callrec_processor:

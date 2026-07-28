@@ -18,7 +18,7 @@
 ---
 
 - name: MAIN Install required Debian packages
-  apt:
+  ansible.builtin.apt:
     name:
       - curl
       - net-tools
@@ -27,10 +27,11 @@
       - jq
       - sngrep
       - python3-boto3
-      - python3-psycopg2      
+      - python3-psycopg2
     update_cache: yes
     cache_valid_time: 3600
     state: present
+    lock_timeout: 300
   when: ansible_os_family == "Debian"
   # Mismo criterio que red Quadlet / Rocky+podman: si solo queda tag `install`, los nodos nuevos
   # no reciben podman en `upgrade|update|prerequisitos_partial_*` y systemd no genera *.network.
@@ -47,37 +48,55 @@
 - name: MAIN Install required Rocky or Alma Linux packages
   dnf:
     name:
+      - curl
+      - net-tools
+      - wget
       - python3
       - python3-pip
       - python3-psycopg2
+      - python3-boto3
       - jq
       - postgresql
     state: present
-  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux" 
-  tags: 
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  tags:
     - install
 
-- name: MAIN Install required Centos7 SQL packages
-  yum:
-    name:
-      - git 
-      - epel-release 
-      - libselinux-python3
-      - python3
-      - python3-pip
-      - podman
+- name: MAIN Install sngrep on Rocky or Alma Linux (EPEL, best-effort)
+  dnf:
+    name: sngrep
     state: present
-  when: ansible_facts['distribution'] == "CentOS" 
-  # Sin comas dentro del Jinja: Ansible parte tags en string por comas y rompe listas tipo ['a', 'b'].
-  tags: "{{ (['install'] + prerequisitos_partial_deploy_tags) | unique }}"
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  ignore_errors: true
+  tags:
+    - install
 
-- name: MAIN Install PODMAN
+- name: MAIN Install PODMAN on Rocky or Alma Linux
   dnf:
     name:
       - podman
     state: present
-  when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "AlmaLinux"
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
   tags: "{{ (['install'] + prerequisitos_partial_deploy_tags) | unique }}"
+
+- name: MAIN Get Podman version on Rocky or Alma Linux
+  ansible.builtin.shell: podman --version | awk '{print $3}'
+  register: _podman_version
+  changed_when: false
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  tags:
+    - install
+
+- name: MAIN Assert Podman >= 4.4 (required for Quadlet) on Rocky or Alma Linux
+  ansible.builtin.assert:
+    that:
+      - _podman_version.stdout is version('4.4', '>=')
+    fail_msg: >-
+      Podman {{ _podman_version.stdout }} no soporta Quadlet (mínimo 4.4).
+      Actualizar con: dnf update podman (habilitar EPEL o CRB si es necesario).
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  tags:
+    - install
 
 - name: MAIN Ensure Podman Quadlet directory exists
   file:
@@ -108,22 +127,24 @@
     daemon_reload: true
   tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
 
-- name: MAIN Restart Podman network when Quadlet file changed
-  ansible.builtin.systemd:
-    name: "{{ (item.item | regex_replace('\\.network$', '')) }}-network.service"
-    state: restarted
-    daemon_reload: true
-  loop: "{{ prerequisitos_network_quadlets.results | default([]) }}"
-  when: item.changed | default(false)
+- name: MAIN Check if omnileads network Quadlet unit is active
+  ansible.builtin.command: systemctl is-active omnileads-network.service
+  register: prerequisitos_omnileads_network_active_check
+  changed_when: false
+  failed_when: false
   tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
 
 - name: MAIN Ensure OMniLeads Podman network exists
   tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
   block:
-    - name: MAIN Start Quadlet omnileads network unit
+    - name: MAIN Start or restart Quadlet omnileads network unit
       ansible.builtin.systemd:
         name: omnileads-network.service
-        state: started
+        state: >-
+          {{ 'restarted' if (
+               (prerequisitos_network_quadlets.results | default([]) | selectattr('changed', 'defined') | selectattr('changed') | list | length > 0)
+               and (prerequisitos_omnileads_network_active_check.rc == 0)
+             ) else 'started' }}
         enabled: true
         daemon_reload: true
   rescue:

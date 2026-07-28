@@ -3,7 +3,7 @@
 upgrade_from_2X: false
 
 # Fase ejecutada por esta invocación del rol (site.yml pasa vars distintas por bloque).
-# Valores: cleanup_systemd | upgrade_to_debian13 | restore_dbs
+# Valores: cleanup_systemd | prepare_apt | upgrade_to_debian13 | restore_dbs
 upgrade_from_2X_phase: cleanup_systemd
 
 # Hosts donde corre el restore (misma convención que backup.env en prerequisitos).

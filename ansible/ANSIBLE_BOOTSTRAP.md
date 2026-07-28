@@ -101,7 +101,7 @@ Creá un archivo local con la password del Vault (fuera del repo). Ejemplo:
 ```bash
 mkdir -p ~/.config/omnileads
 printf '%s' 'TU_PASSWORD_DE_VAULT' > ~/.config/omnileads/vault_pass
-  chmod 600 ~/.config/omnileads/vault_pass
+chmod 600 ~/.config/omnileads/vault_pass
 ```
 
 Y exportalo para que Ansible lo use automáticamente:
@@ -137,12 +137,20 @@ vault_ami_password: "..."
 # --- Dialer
 vault_dialer_password: "..."
 
+# --- Django
+vault_django_secret_key: "..."
+
+# --- Telefonía WebRTC (auth efímera Kamailio + SIP_SECRET_KEY en Django)
+vault_kamailio_webrtc_auth_eph_key: "..."
+
 # --- Integraciones
 vault_google_api_key: "..."
 vault_callrec_transcriber_api_key: "..."
 
 # --- Observabilidad (Promtail → Loki central; URL base sin path de push)
 vault_loki_url: "http://loki.example.com:3100"
+# --- HAProxy edge: CIDRs permitidos para https://<fqdn>/prom
+vault_haproxy_prom_allowed_src: ["10.0.0.0/8", "192.168.0.0/16"]
 
 # --- Backups en S3
 vault_backup_bucket_access_key: "..."
@@ -239,7 +247,7 @@ chmod 600 instances/<tenant>/key.pem
 ```
 
 Si los archivos tienen otros nombres, declaralos en el host del inventario con
-`cert_file_name` y `key_file_name` (ver `README.md`).
+`ssl_cert_file_name` y `ssl_key_file_name` (ver `README.md`).
 
 ---
 

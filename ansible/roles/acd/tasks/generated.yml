@@ -68,6 +68,24 @@
   changed_when: false
   tags: [install, upgrade, update]
 
+# Workaround podman 5.x + recarga de env en upgrade (host network / acd_trunk_sip_port):
+# tras cambios en .container o /etc/default/acd-*.env hay que rearma el pod antes
+# de arrancar contenedores; un restart del .pod.service aplica la nueva red host
+# y variables (ACD_SIP_*_BIND_*, ARI_URL, etc.).
+- name: ACD Reinit acd pod (workaround podman 5.x / env upgrade)
+  ansible.builtin.systemd:
+    name: "{{ acd_pod_systemd_unit | default('acd-pod.service') }}"
+    state: restarted
+  when: (acd_quadlet_units is changed) or (acd_env_files is changed)
+  tags: [install, upgrade, update]
+
+- name: ACD Ensure acd pod is active
+  ansible.builtin.systemd:
+    name: "{{ acd_pod_systemd_unit | default('acd-pod.service') }}"
+    state: started
+    enabled: yes
+  tags: [install, upgrade, update]
+
 - name: ACD Enable and start systemd services
   systemd:
     name: "{{ item }}"

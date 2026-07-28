@@ -1,0 +1,80 @@
+---
+- name: BACKUP Run only on compute hosts with backup.env
+  when: (group_names | intersect(backup_target_host_groups)) | length > 0
+  block:
+    - name: BACKUP Assert prerequisites
+      ansible.builtin.assert:
+        that:
+          - BACKUP_RESTORE_IMG is defined
+          - BACKUP_RESTORE_IMG | length > 0
+          - backup_bucket_url is defined
+          - backup_bucket_url | length > 0
+          - backup_bucket_name is defined
+          - backup_bucket_name | length > 0
+          - backup_bucket_access_key is defined
+          - backup_bucket_access_key | length > 0
+          - backup_bucket_secret_key is defined
+          - backup_bucket_secret_key | length > 0
+          - tenant_id is defined
+        fail_msg: >-
+          Para backup on-demand defina backup_bucket_* (o bucket_* como fallback) en el inventario,
+          tenant_id y BACKUP_RESTORE_IMG en images.yml.
+
+    - name: BACKUP Check backup.env exists
+      ansible.builtin.stat:
+        path: /etc/default/backup.env
+      register: backup_env_stat
+
+    - name: BACKUP Ensure backup.env is present
+      ansible.builtin.template:
+        src: "{{ role_path }}/../prerequisitos/templates/backup.env"
+        dest: /etc/default/backup.env
+        mode: '0640'
+        owner: "{{ usuario }}"
+        group: "{{ usuario }}"
+      when: not backup_env_stat.stat.exists
+
+    - name: BACKUP generate file_timestamp
+      ansible.builtin.set_fact:
+        file_timestamp: "{{ ansible_date_time.epoch }}"
+
+    - name: BACKUP postgres OMniLeads DB .sql file and upload to the bucket
+      ansible.builtin.command:
+        argv:
+          - podman
+          - run
+          - --name
+          - "pgsql_bk_{{ file_timestamp }}"
+          - --network=host
+          - --env-file
+          - /etc/default/backup.env
+          - -e
+          - "BACKUP_FILENAME=backup/{{ tenant_id }}/pgsql-backup-{{ file_timestamp }}.sql"
+          - --rm
+          - "{{ BACKUP_RESTORE_IMG }}"
+          - python
+          - backup.py
+      register: backup_oml_result
+      changed_when: backup_oml_result.rc == 0
+
+    - name: BACKUP postgres OMniDialer DB .sql file and upload to the bucket
+      ansible.builtin.command:
+        argv:
+          - podman
+          - run
+          - --name
+          - "pgsql_bk_omd_{{ file_timestamp }}"
+          - --network=host
+          - --env-file
+          - /etc/default/backup.env
+          - -e
+          - SQL_DATABASE=omnidialer
+          - -e
+          - "BACKUP_FILENAME=backup/{{ tenant_id }}/pgsql-backup-OMD-{{ file_timestamp }}.sql"
+          - --rm
+          - "{{ BACKUP_RESTORE_IMG }}"
+          - python
+          - backup.py
+      when: dialer_engine == "omnidialer"
+      register: backup_omd_result
+      changed_when: backup_omd_result.rc == 0

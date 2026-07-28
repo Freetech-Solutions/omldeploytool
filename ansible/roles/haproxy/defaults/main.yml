@@ -8,7 +8,21 @@ haproxy_https_port: 443
 # redirige a https, el cliente vuelve a HAProxy, ...).
 haproxy_backend_port: 443
 haproxy_backend_ssl: true
-haproxy_backend_ssl_verify: none
+# ISO 27001 A.8.24: verificar cadena del certificado del backend.
+# Usar "none" solo como escape temporal (rompe la evidencia de cifrado extremo a extremo).
+haproxy_backend_ssl_verify: required
+# Trust store para verify required: selfsigned + CA del host (si existe).
+haproxy_backend_ssl_ca_file: "{{ haproxy_pem_dir }}/backend-ca.pem"
+# Vacío = no exigir CN/SAN (backends se direccionan por omni_ip_lan).
+haproxy_backend_ssl_verifyhost: ""
+# SNI hacia nginx (útil con certbot/custom ligados al FQDN).
+haproxy_backend_ssl_sni: "{{ fqdn | default('') }}"
+# TLS en edge (bind): mínimo TLS 1.2, suites modernas (NIST / buenas prácticas A.8.24).
+haproxy_ssl_min_ver: TLSv1.2
+haproxy_ssl_ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305"
+haproxy_ssl_ciphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256"
+haproxy_hsts_enabled: true
+haproxy_hsts_max_age: 31536000
 haproxy_pem_dir: /etc/omnileads/haproxy
 haproxy_pem_file: "{{ haproxy_pem_dir }}/oml.pem"
 haproxy_sticky_cookie: SRVID
@@ -23,3 +37,8 @@ haproxy_metrics_port: 8404
 # Vacío = permitir scrape desde redes privadas RFC1918. No reutiliza haproxy_prom_allowed_src
 # (ese ACL suele listar IPs públicas para /prom desde Internet).
 haproxy_metrics_allowed_src: []
+# WebSocket SIP (wss://<fqdn>/ws) directo a kamailio-webrtc en el mismo edge.
+# Kamailio escucha en KAMAILIO_IFACE (omni_ip_lan), no en 127.0.0.1.
+haproxy_kamailio_ws_enabled: true
+haproxy_kamailio_ws_backend_host: ""
+haproxy_kamailio_ws_backend_port: "{{ kamailio_wss_port | default(10060) }}"

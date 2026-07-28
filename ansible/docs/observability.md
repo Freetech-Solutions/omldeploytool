@@ -1,20 +1,26 @@
 # Stack de observabilidad OMniLeads
 
-Documentación operativa de la capa de observabilidad desplegada por Ansible en cada tenant: **métricas** (Prometheus + exporters), **logs** (journald + Promtail → Loki) y **captura SIP/QoS** (Homer HEP desde Kamailio).
+Documentación operativa de la capa de observabilidad desplegada por Ansible en cada tenant: **métricas** (Prometheus + exporters), **logs** (journald + Promtail → Loki), **captura SIP/QoS** (Homer HEP desde Kamailio) y **seguridad del host** (Wazuh Agent → Manager central).
 
 **Roles Ansible involucrados:**
 
 - `roles/observability_prometheus`
 - `roles/observability_promtail`
+- `roles/wazuh-agent`
 - `roles/pods/templates/observability.pod.j2`
 
 **Despliegue:**
 
 ```bash
+# Métricas + Promtail
 ./deploy.sh --action=observability --tenant=<tenant>
+
+# Wazuh Agent (FIM / logs SO / vulnerabilidades)
+./deploy.sh --action=wazuh-agent --tenant=<tenant>
 ```
 
-Equivale a `site.yml` con tags `observability` y `oml_observability_deploy=true`.
+- `observability` equivale a `site.yml` con tags `observability` y `oml_observability_deploy=true`.
+- `wazuh-agent` equivale a `site.yml` con tags `wazuh-agent,gather_facts`. También se incluye en `install` / `upgrade` / `update` cuando está habilitado.
 
 ---
 
@@ -22,43 +28,46 @@ Equivale a `site.yml` con tags `observability` y `oml_observability_deploy=true`
 
 OMniLeads implementa un modelo **multi-tenant de observabilidad distribuida**:
 
-1. **En cada host del tenant** corre un `observability.pod` (Podman Quadlet) con exporters locales y, opcionalmente, Promtail.
-2. **En el host de cómputo web** (`omlapp_web` o AIO) corre además el servidor **Prometheus del tenant**, que hace scrape de todos los nodos vía `omni_ip_lan`.
+1. **En cada host del tenant** corre un `observability.pod` (Podman Quadlet) con exporters locales y Promtail.
+2. **En el host de cómputo web** (`omlapp_web` o AIO) corre además el servidor **Prometheus del tenant**, que hace scrape de todos los componentes del deploy vía `omni_ip_lan`.
 3. **Logs** de los contenedores Quadlet (`*.service`) se escriben en **journald** y Promtail los reenvía a un **Loki central** (`loki_url`).
 4. **Tráfico SIP** de Kamailio PSTN y WebRTC se duplica en **HEP v3** hacia **Homer** cuando `homer_host` está definido en el inventario.
+5. **Seguridad del SO** en cada host del tenant: el **Wazuh Agent** se enrolla a un **Wazuh Manager** central cuando `wazuh_manager` está definido (FIM, logs del host, detección de vulnerabilidades). Complementa Loki/Prometheus; no reemplaza el flujo de logs de aplicación.
 
 El acceso externo a Prometheus del tenant se expone en `https://<fqdn>/prom` a través de HAProxy en el host edge, restringido por `haproxy_prom_allowed_src`.
 
-Grafana, Loki y Homer suelen operarse como **centro de observabilidad central** que consume datos de uno o más tenants. Los dashboards Grafana provisionados en el rol `observability_prometheus` están pensados para ese centro (métricas `heplify_*`, SIP KPIs, PostgreSQL, Redis, etc.).
+Grafana, Loki, Homer y el Wazuh Manager suelen operarse como **centro de observabilidad/seguridad central** que consume datos de uno o más tenants. Los dashboards Grafana provisionados en el rol `observability_prometheus` están pensados para ese centro (métricas `heplify_*`, SIP KPIs, PostgreSQL, Redis, etc.).
 
 ### Diagrama de componentes (tenant)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           TENANT OMniLeads                                  │
-│                                                                             │
-│  ┌──────── edge ────────┐    ┌──── omlapp_web / AIO ────────────────────┐  │
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           TENANT OMniLeads                                │
+│                                                                           │
+│  ┌──────── edge ────────┐    ┌──── omlapp_web / AIO ───────────────────┐  │
 │  │ HAProxy :443 /prom   │    │ Prometheus :9090 (scrape all nodes)     │  │
 │  │ Kamailio PSTN :9273  │    │ uwsgi_exporter :9117                    │  │
-│  │ Kamailio WebRTC:9274 │    │ observability.pod                         │  │
-│  │ RTPengine :22223     │    └──────────────────────────────────────────┘  │
-│  │ HEP ─────────────────┼──┐                                                 │
-│  │ observability.pod    │  │    ┌── data_statefull ──┐  ┌ data_stateless ┐ │
-│  └──────────────────────┘  │    │ postgres_exp :9187│  │ redis_exp :9121│ │
-│                             │    │ observability.pod │  │ gearman :9418  │ │
-│  ┌──────── acd ──────────┐  │    └───────────────────┘  │ observability  │ │
-│  │ Asterisk :7088        │  │                           └────────────────┘ │
-│  │ observability.pod     │  │                                              │
-│  └───────────────────────┘  │    Cada host: Promtail → journald → Loki    │
-│                              │                                              │
-└──────────────────────────────┼──────────────────────────────────────────────┘
-                               │ HEP v3
-                               ▼
-                  ┌────────────────────────────┐
-                  │  CENTRO OBSERVABILIDAD     │
-                  │  Loki | Grafana | Homer    │
-                  │  (heplify → heplify_* metrics)
-                  └────────────────────────────┘
+│  │ Kamailio WebRTC:9274 │    │ observability.pod                       │  │
+│  │ RTPengine :22223     │    └─────────────────────────────────────────┘  │
+│  │ HEP                                               │
+│  │ observability.pod    │       ┌── data_statefull ─┐  ┌data_stateless  ┐ │
+│  └──────────────────────┘       │ postgres_exp :9187│  │ redis_exp :9121│ │
+│                                 │ observability.pod │  │ gearman :9418  │ │
+│  ┌──────── acd ──────────┐      └───────────────────┘  │ observability  │ │
+│  │ Asterisk :7088        │                             └────────────────┘ │
+│  │ observability.pod     │                                                │
+│  └───────────────────────┘     Cada host: Promtail → journald → Loki      │
+│                                Cada host: wazuh-agent → Manager (si ON)   │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+                             |                              |
+                             |                              |
+                  ┌─────────────────────────────┐  ┌──────────────────────┐
+                  │  CENTRO OBSERVABILIDAD      │  │  WAZUH MANAGER       │
+                  │  Loki | Grafana | Homer     │  │  (SIEM / FIM / CVE)  │
+                  |(heplify → heplify_* metrics)│  │  grupo agentes       │
+                  └─────────────────────────────┘  └──────────────────────┘
+
 ```
 
 ---
@@ -71,15 +80,15 @@ El pod se crea automáticamente en **todo host** que ejecute algún pod de cómp
 
 Plantilla: `roles/pods/templates/observability.pod.j2`
 
-| Puerto | Servicio | Hosts |
-|--------|----------|-------|
-| 9100 | node_exporter | todos |
-| 9882 | podman_exporter | todos |
-| 9090 | prometheus | omlapp_web \| omnileads_aio |
-| 9117 | uwsgi_exporter | omlapp_web \| omnileads_aio |
-| 9187 | postgres_exporter | data_statefull \| omnileads_aio |
-| 9121 | redis_exporter | data_stateless \| omnileads_aio |
-| 9418 | gearman_exporter | data_stateless \| omnileads_aio |
+| Puerto | Servicio         | Hosts |
+|--------|-----------------|-------|
+| 9100   | node_exporter    | todos |
+| 9882   | podman_exporter  | todos |
+| 9090   | prometheus | omlapp_web \| omnileads_aio |
+| 9117   | uwsgi_exporter | omlapp_web \| omnileads_aio |
+| 9187   | postgres_exporter | data_statefull \| omnileads_aio |
+| 9121   | redis_exporter | data_stateless \| omnileads_aio |
+| 9418   | gearman_exporter | data_stateless \| omnileads_aio |
 
 ### Prometheus del tenant
 
@@ -117,7 +126,7 @@ El rol `observability_prometheus` se habilita cuando el host ejecuta algún tier
 | data_statefull | + postgres_exporter |
 | data_stateless | + redis_exporter + gearman_exporter |
 
-Además, Prometheus scrapea endpoints nativos en edge, ACD y telephony que no viven en `observability.pod`.
+Además, Prometheus scrapea endpoints nativos (no presisan de un container exporter) en edge, ACD y telephony que no viven en `observability.pod`.
 
 ### Exporters en `observability.pod`
 
@@ -174,9 +183,17 @@ Además, Prometheus scrapea endpoints nativos en edge, ACD y telephony que no vi
 #### asterisk_metrics (7088)
 
 - **Host:** acd
-- **Propósito:** Métricas nativas expuestas por el módulo ARI/metrics de Asterisk (acd-server). No es un exporter sidecar: es el endpoint HTTP del ACD.
+- **Propósito:** Métricas nativas expuestas por el módulo `res_prometheus` de Asterisk (acd-server).
 - **Job Prometheus:** `{{ tenant_id }}_asterisk`
 - **Labels:** `tenant`, `component=asterisk`
+
+#### acd_app_metrics (7098)
+
+- **Host:** acd (contenedor `acd-app`, pod `acd`)
+- **Propósito:** Métricas ARI del proceso Python: cola de eventos, eventos recibidos/procesados/descartados, latencias.
+- **Job Prometheus:** `{{ tenant_id }}_acd_app`
+- **Labels:** `tenant`, `component=acd_app`
+- **Puerto:** `acd_app_metrics_port` (default `7098`), publicado en `omni_ip_lan` vía `acd.pod`
 
 #### rtpengine_metrics (22223)
 
@@ -448,6 +465,117 @@ Origen: `heplify-server` exporta métricas Prometheus (prefijo `heplify_`).
 
 ---
 
+## Wazuh Agent — seguridad del host
+
+### Cómo funciona
+
+Wazuh aporta la capa de **monitoreo de seguridad del sistema operativo** en cada nodo del tenant. El rol Ansible `wazuh-agent` instala el paquete oficial (`wazuh-agent` 4.x) desde los repos de Wazuh (apt/yum), enrolla el agente contra un **Manager externo** y deja el servicio `wazuh-agent` habilitado en systemd.
+
+No corre dentro de `observability.pod`: es un agente nativo del host (Debian/RedHat). El Manager (fuera del tenant) centraliza:
+
+- **FIM** (integridad de archivos)
+- **Logs del SO** y detección de eventos
+- **Vulnerabilidades** (CVE) reportadas desde el agente
+
+```
+┌─────────────────┐     enroll + report      ┌─────────────────┐
+│ Host tenant     │ ───────────────────────▶ │ Wazuh Manager   │
+│ wazuh-agent     │   (authd :1515, agent)   │ grupo agentes   │
+│ (systemd)       │                          │ FIM / logs / CVE│
+└─────────────────┘                          └─────────────────┘
+```
+
+Relación con el resto del stack:
+
+| Capa | Qué monitorea | Destino |
+|------|---------------|---------|
+| Prometheus + exporters | Métricas de app/infra | Prometheus tenant → Grafana |
+| Promtail + journald | Logs de contenedores Quadlet | Loki central |
+| Homer HEP | Señalización SIP | Homer / heplify |
+| **Wazuh Agent** | **SO del host (FIM, logs, CVE)** | **Wazuh Manager** |
+
+### Activación
+
+Flag de topología: `component_wazuh_agent_enabled` (`topology_normalize`).
+
+Se habilita cuando:
+
+1. `wazuh` es verdadero (default `true` en `tenants_global.yml`), **y**
+2. `wazuh_manager` tiene un valor no vacío, **o** se ejecuta con tag `wazuh-agent` (acción dedicada; el assert del rol falla si falta el manager).
+
+Desactivar por tenant o por host:
+
+```yaml
+# inventory.yml o instances/<tenant>/vars.yml
+wazuh: false
+```
+
+### Variables necesarias
+
+Fuente operativa: `group_vars/all/tenants_global.yml` (defaults del rol en `roles/wazuh-agent/defaults/main.yml`). Override por tenant en `instances/<tenant>/vars.yml` o en el inventario. Secretos vía Vault.
+
+| Variable | Obligatoria | Default | Descripción |
+|----------|-------------|---------|-------------|
+| `wazuh_manager` | **Sí** (para instalar) | `""` | IP o FQDN del Wazuh Manager. Preferible por tenant o `{{ vault_wazuh_manager }}`. |
+| `wazuh` | No | `true` | Master switch. `false` desactiva el rol aunque exista `wazuh_manager`. |
+| `wazuh_agent_group` | No | `omnileads_prod` | Grupo de agentes en el Manager. **Debe existir exactamente** antes del enrollment. |
+| `wazuh_registration_password` | Condicional | `""` | Password de authd. Usar Vault (`vault_wazuh_registration_password`). Vacío si el Manager no exige password. |
+| `wazuh_agent_name` | No | `{{ inventory_hostname }}` | Nombre del agente en el Manager. |
+| `wazuh_agent_authd_port` | No | `1515` | Puerto authd; solo si el paquete ya estaba instalado sin `client.keys`. |
+| `wazuh_agent_package_state` | No | `present` | Estado del paquete (`present` / `absent`). |
+| `wazuh_agent_service_enabled` | No | `true` | Servicio systemd enabled. |
+| `wazuh_agent_service_state` | No | `started` | Estado deseado del servicio. |
+
+Ejemplo mínimo en `instances/<tenant>/vars.yml`:
+
+```yaml
+wazuh_manager: "{{ vault_wazuh_manager }}"
+wazuh_agent_group: omnileads_prod
+wazuh_registration_password: "{{ vault_wazuh_registration_password }}"
+```
+
+### Flujo de enrollment (idempotente)
+
+1. **Assert:** `wazuh_manager` definido y no vacío.
+2. **Estado:** package facts + existencia de `/var/ossec/etc/client.keys` (agente ya registrado).
+3. **Si no hay paquete:** añade repo oficial 4.x (GPG), instala `wazuh-agent` con env de postinst:
+   - `WAZUH_MANAGER`
+   - `WAZUH_AGENT_GROUP`
+   - `WAZUH_AGENT_NAME` (si está definido)
+   - `WAZUH_REGISTRATION_PASSWORD` (si está definido)
+4. **Si hay paquete pero no `client.keys`:** enrollment diferido con `/var/ossec/bin/agent-auth` contra authd (`-m`, `-p`, `-G`, opcional `-A` / `-P`).
+5. **Si ya instalado y registrado:** no reintenta enrollment (idempotente).
+6. **Servicio:** `wazuh-agent` enabled + started.
+
+Las variables `WAZUH_*` del entorno **solo aplican en el postinst del primer install**; por eso existe el camino `agent-auth` para hosts con paquete previo sin registro.
+
+### Despliegue
+
+```bash
+# Solo Wazuh (todos los hosts del inventario del tenant)
+./deploy.sh --action=wazuh-agent --tenant=<tenant>
+
+# Incluido automáticamente en install / upgrade / update
+# cuando component_wazuh_agent_enabled es true
+./deploy.sh --action=install --tenant=<tenant>
+```
+
+Playbook: `site_core.yml` → rol `wazuh-agent` (tags `install`, `upgrade`, `update`, `wazuh-agent`).
+
+### Validación post-deploy
+
+En cada host del tenant:
+
+```bash
+systemctl status wazuh-agent
+# Agente registrado si client.keys tiene contenido
+sudo test -s /var/ossec/etc/client.keys && echo registered
+```
+
+En el Manager: el agente debe aparecer en el grupo `wazuh_agent_group` (p. ej. `omnileads_prod`) con el nombre `wazuh_agent_name`.
+
+---
+
 ## Variables de referencia rápida
 
 ### Observabilidad
@@ -459,6 +587,11 @@ Origen: `heplify-server` exporta métricas Prometheus (prefijo `heplify_`).
 | `homer_host` / `homer_port` | Activa HEP en Kamailio PSTN + WebRTC |
 | `haproxy_prom_allowed_src` | CIDRs permitidos para `https://<fqdn>/prom` |
 | `haproxy_metrics_allowed_src` | CIDRs para `:8404/metrics` en edge |
+| `wazuh_manager` | Activa e enrolla Wazuh Agent (IP/FQDN del Manager) |
+| `wazuh` | `false` desactiva Wazuh aunque exista `wazuh_manager` |
+| `wazuh_agent_group` | Grupo de agentes en el Manager (default `omnileads_prod`) |
+| `wazuh_registration_password` | Password authd (Vault); opcional |
+| `wazuh_agent_name` | Nombre del agente (default `inventory_hostname`) |
 
 ### Puertos de exporters
 
@@ -473,6 +606,7 @@ Fuente: `group_vars/all/runtime.yml`
 | `prometheus_redis_exporter_port` | 9121 |
 | `prometheus_gearman_exporter_port` | 9418 |
 | `prometheus_uwsgi_exporter_port` | 9117 |
+| `acd_app_metrics_port` | 7098 |
 | `kamailio_pstn_metrics_port` | 9273 |
 | `kamailio_webrtc_metrics_port` | 9274 |
 | `haproxy_metrics_port` | 8404 |

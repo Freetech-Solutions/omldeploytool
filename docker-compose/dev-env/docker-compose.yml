@@ -105,6 +105,16 @@ x-django-common: &django-common
     PGHOSTRO: ${POSTGRES_NODE_RO}
     REDIS_HOSTNAME: ${REDIS_HOSTNAME}
     SESSION_COOKIE_AGE: ${SESSION_COOKIE_AGE}
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+    DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
+    SECRET_KEY: ${DJANGO_SECRET_KEY}
+    SIP_SECRET_KEY: ${SIP_SECRET_KEY}
+    PRESENCE_LOG_RECONNECT_COOLDOWN_MS: ${PRESENCE_LOG_RECONNECT_COOLDOWN_MS:-1500}
+    PRESENCE_HEARTBEAT_INTERVAL_SEC: ${PRESENCE_HEARTBEAT_INTERVAL_SEC:-15}
+    PRESENCE_HEARTBEAT_TIMEOUT_SEC: ${PRESENCE_HEARTBEAT_TIMEOUT_SEC:-60}
+    PRESENCE_HEARTBEAT_SWEEP_SEC: ${PRESENCE_HEARTBEAT_SWEEP_SEC:-15}
+    PRESENCE_HEARTBEAT_LOGOUT_RECENT_SEC: ${PRESENCE_HEARTBEAT_LOGOUT_RECENT_SEC:-90}
+    PRESENCE_HEARTBEAT_GUARD_TTL_SEC: ${PRESENCE_HEARTBEAT_GUARD_TTL_SEC:-90}
     TZ: ${TZ}
     UWSGI_PORT: ${UWSGI_PORT}
     WEBSOCKET_HOST: ${WEBSOCKET_HOSTNAME}
@@ -355,6 +365,7 @@ volumes:
   faster_whisper_cache:
   redis_redisinsight:
   pgadmin:
+  sonarqube_data:
 
 # ============================================================================
 # SERVICES
@@ -1116,4 +1127,20 @@ services:
       postgresql:
         condition: service_healthy
       dialer-postgresql:
+        condition: service_healthy
+
+  sonarqube:
+    image: sonarqube:latest
+    <<: *optional-service-common
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://${POSTGRES_HOSTNAME}:${POSTGRES_PORT}/sonarqube
+      SONAR_JDBC_USERNAME: ${POSTGRES_USER}
+      SONAR_JDBC_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    ports:
+      - '127.0.0.1:9000:9000'
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+    depends_on:
+      postgresql:
         condition: service_healthy

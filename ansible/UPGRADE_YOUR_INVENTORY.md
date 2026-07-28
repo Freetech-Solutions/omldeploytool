@@ -21,7 +21,8 @@ Se han modificado los parámetros básicos de conexión por SSH para utilizar un
    upgrade_from_2X: true
    ```
 4. **Limpieza:** Elimine la variable `infra_env`, ya que no se utiliza más en la arquitectura 3.X.
-5. **FQDN:** Asegúrese de descomentar y definir la variable `fqdn` si accede mediante nombre de dominio (ej. `fqdn: omnileads.midominio.com`).
+5. **FQDN (obligatorio):** Defina `fqdn` por tenant/cluster (ej. `fqdn: omnileads.midominio.com`). Se usa para TLS, HAProxy y `DJANGO_ALLOWED_HOSTS` en producción.
+6. **Dominios adicionales (opcional):** Si el tenant usa alias o white-label, declare `django_allowed_hosts_extra` como lista coma-separada (ej. `django_allowed_hosts_extra: "alias.cliente.com,otro.dominio.com"`).
 
 ## Paso 2: Centralización de Secretos con Ansible Vault
 
@@ -37,6 +38,9 @@ Todas las contraseñas, claves y tokens que antes se guardaban en texto plano en
     *   `ami_password: "{{ vault_ami_password }}"`
 *   **Campañas (Dialer):**
     *   `dialer_password: "{{ vault_dialer_password }}"`
+*   **Django y WebRTC (auth efímera SIP):**
+    *   `django_secret_key: "{{ vault_django_secret_key }}"` (expuesto al contenedor como `SECRET_KEY`)
+    *   `kamailio_webrtc_auth_eph_key: "{{ vault_kamailio_webrtc_auth_eph_key }}"` (Kamailio `AUTHEPH_SK`; Django `SIP_SECRET_KEY`)
 *   **Integraciones y Transcripción:**
     *   `google_api_key: "{{ vault_google_api_key }}"`
     *   `callrec_transcriber_api_key: "{{ vault_callrec_transcriber_api_key }}"`

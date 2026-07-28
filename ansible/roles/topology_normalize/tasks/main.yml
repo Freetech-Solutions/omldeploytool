@@ -41,7 +41,6 @@
   ansible.builtin.set_fact:
     postgres_out: "{{ postgres_host is defined }}"
     rtpengine_out: "{{ rtpengine_host is defined }}"
-    kamailio_pstn_out: "{{ kamailio_pstn_host is defined }}"
     bucket_out: "{{ bucket_url is defined }}"
   tags:
     - always
@@ -167,30 +166,33 @@
       {% endif %}
     kamailio_host: "{{ kamailio_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
     acd_host: >-
-      {{ acd_host | default(
+      {{
         omni_ip_lan if oml_is_aio_only
         else (
           hostvars[acd_peers | first].omni_ip_lan
           if (acd_peers | default([]) | length > 0)
           else aio_host
         )
-      ) }}
-    # ACD_NODES (kamailio_pstn.env): lista comma-separated <ip:5060> con todos
-    # los hosts del mismo tenant declarados bajo el grupo 'acd'. En AIO no hay
-    # 'acd' group: kamailio_pstn corre en host network y el ACD publica 5060/udp
-    # sobre 127.0.0.1 (ver pods/templates/acd.pod.j2). En cluster sin acd_peers
-    # caemos al acd_host ya resuelto.
+      }}
+    # ACD_NODES (kamailio_pstn.env): 127.0.0.1:<acd_trunk_sip_port> solo si Kamailio PSTN
+    # y ACD comparten host (AIO puro o edge+acd co-localizados); en cluster con ACD remoto, acd_peers.
     acd_nodes: >-
-      {{ acd_nodes | default(
-        '127.0.0.1:5060' if oml_is_aio_only
+      {{
+        ('127.0.0.1:' ~ (acd_trunk_sip_port | default(5070) | string)) if (
+          oml_is_aio_only
+          or (
+            (oml_runs_edge | default(false) | bool)
+            and (oml_runs_acd | default(false) | bool)
+          )
+        )
         else (
           (acd_peers | map('extract', hostvars, 'omni_ip_lan')
-                     | map('regex_replace', '$', ':5060')
+                     | map('regex_replace', '$', ':' ~ (acd_trunk_sip_port | default(5070) | string))
                      | list | join(','))
           if (acd_peers | default([]) | length > 0)
-          else (acd_host ~ ':5060')
+          else (aio_host ~ ':' ~ (acd_trunk_sip_port | default(5070) | string))
         )
-      ) }}
+      }}
     rtpengine_host: "{{ rtpengine_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
     nginx_host: >-
       {{ nginx_host | default(
@@ -232,6 +234,16 @@
   tags:
     - always
 
+# Si no hay bucket de backup dedicado, reutilizar el bucket de aplicación (callrec, etc.).
+- name: TOPOLOGY Normalize backup bucket configuration
+  ansible.builtin.set_fact:
+    backup_bucket_url: "{{ backup_bucket_url | default(bucket_url, true) }}"
+    backup_bucket_name: "{{ backup_bucket_name | default(bucket_name, true) }}"
+    backup_bucket_access_key: "{{ backup_bucket_access_key | default(bucket_access_key, true) }}"
+    backup_bucket_secret_key: "{{ backup_bucket_secret_key | default(bucket_secret_key, true) }}"
+  tags:
+    - always
+
 # ACD (acd.env SIP_PROXY): en cómputo apunta al Kamailio del edge; en edge/AIO es local.
 - name: TOPOLOGY Default kamailio_pstn_host when not set in inventory
   ansible.builtin.set_fact:
@@ -239,6 +251,19 @@
   when:
     - kamailio_pstn_host is not defined
     - oml_runs_edge or oml_is_aio or oml_runs_omlapp_web or oml_runs_omlapp_workers or oml_runs_dialer_workers or oml_runs_acd or oml_runs_callrec_processor
+  tags:
+    - always
+
+# Kamailio PSTN externo = edge NO corre en este host y hay host resuelto (p. ej. edge remoto).
+# No usar "kamailio_pstn_host is defined": topology_normalize lo define siempre y en plays
+# posteriores (site.yml) el play de cómputo vería PSTN "externo" aunque Kamailio sea local.
+- name: TOPOLOGY Resolve kamailio_pstn_out (external PSTN edge)
+  ansible.builtin.set_fact:
+    kamailio_pstn_out: >-
+      {{
+        (not (oml_runs_edge | default(false) | bool))
+        and (kamailio_pstn_host is defined)
+      }}
   tags:
     - always
 
@@ -279,7 +304,22 @@
         or oml_runs_callrec_processor
       }}
     component_observability_promtail_enabled: "{{ loki_url is defined or (oml_observability_deploy | default(false) | bool) }}"
-    component_addons_enabled: "{{ oml_runs_omlapp_web }}"
+    # Wazuh agent: on by default when wazuh_manager is set; inventory can set wazuh: false.
+    # Dedicated --action=wazuh-agent still includes the role (assert clarifies missing manager).
+    component_wazuh_agent_enabled: >-
+      {{
+        (wazuh | default(true) | bool)
+        and (
+          (wazuh_manager | default('') | string | length > 0)
+          or ('wazuh-agent' in ansible_run_tags)
+        )
+      }}
+    # Addons (pod enterprise + rol addons) solo con imagen omlapp *-enterprise.
+    component_addons_enabled: >-
+      {{
+        (oml_runs_omlapp_web | bool)
+        and ((APP_IMG | default('') | regex_search('-enterprise$')) is not none)
+      }}
     component_qa_enabled: "{{ qa_env is defined }}"
   tags:
     - always

@@ -1,0 +1,17 @@
+
+---
+# Example of an All in One "AIO"
+all:
+  children:
+    aio_instances:
+      hosts:
+        test_aio:
+          ansible_host: "{{ vault_tenant_test_aio_ansible_host }}"
+          omni_ip_lan: "{{ vault_tenant_test_aio_omni_ip_lan }}"
+
+##########################################################
+### All in One "AIO"
+##########################################################
+omnileads_aio:
+  hosts:
+    test_aio:

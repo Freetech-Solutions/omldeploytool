@@ -1,0 +1,61 @@
+---
+# Instancias Quadlet @N para dialer_process_{campaign,contact,event} (invocado con loop_var dialer_process_worker).
+- name: "DIALER | Remove legacy process_{{ dialer_process_worker.worker_type }} container (pre-@N instancing)"
+  ansible.builtin.command:
+    argv:
+      - podman
+      - rm
+      - -f
+      - "dialer-process-{{ dialer_process_worker.worker_type }}-dialer_workers-pod"
+  register: dialer_process_worker_legacy_container_removed
+  changed_when: dialer_process_worker_legacy_container_removed.rc == 0
+  failed_when: false
+
+- name: "DIALER | Listar symlinks process_{{ dialer_process_worker.worker_type }} instanciados"
+  ansible.builtin.find:
+    paths: /etc/containers/systemd
+    patterns: "dialer_process_{{ dialer_process_worker.worker_type }}@[0-9]*.container"
+  register: dialer_process_worker_instance_files
+
+- name: "DIALER | Calcular instancias process_{{ dialer_process_worker.worker_type }} obsoletas"
+  ansible.builtin.set_fact:
+    dialer_process_worker_obsolete_instances: >-
+      {{
+        (
+          dialer_process_worker_instance_files.files | default([])
+          | map(attribute='path')
+          | map('basename')
+          | map('regex_replace', '^dialer_process_' ~ dialer_process_worker.worker_type ~ '@', '')
+          | map('regex_replace', '\\.container$', '')
+          | map('int')
+          | list
+        )
+        | difference(range(1, (dialer_process_worker.replicas | int) + 1) | list)
+        | list
+      }}
+  changed_when: false
+
+- name: "DIALER | Detener instancias process_{{ dialer_process_worker.worker_type }} obsoletas"
+  ansible.builtin.systemd:
+    name: "dialer_process_{{ dialer_process_worker.worker_type }}@{{ item }}.service"
+    state: stopped
+  loop: "{{ dialer_process_worker_obsolete_instances | default([]) }}"
+  when: (dialer_process_worker_obsolete_instances | default([]) | length) > 0
+  failed_when: false
+
+- name: "DIALER | Eliminar symlinks process_{{ dialer_process_worker.worker_type }} obsoletos"
+  ansible.builtin.file:
+    path: "/etc/containers/systemd/dialer_process_{{ dialer_process_worker.worker_type }}@{{ item }}.container"
+    state: absent
+  loop: "{{ dialer_process_worker_obsolete_instances | default([]) }}"
+  register: dialer_process_worker_removed_instances
+  when: (dialer_process_worker_obsolete_instances | default([]) | length) > 0
+
+- name: "DIALER | Crear symlinks process_{{ dialer_process_worker.worker_type }} según réplicas"
+  ansible.builtin.file:
+    src: "{{ dialer_process_worker_quadlet_dir }}/dialer_process_{{ dialer_process_worker.worker_type }}@.container"
+    dest: "/etc/containers/systemd/dialer_process_{{ dialer_process_worker.worker_type }}@{{ item }}.container"
+    state: link
+  loop: "{{ range(1, (dialer_process_worker.replicas | int) + 1) | list }}"
+  register: dialer_process_worker_instance_symlinks
+  when: (dialer_process_worker.replicas | int) > 0

@@ -50,8 +50,10 @@
       - MINIO_MC_IMG is defined
       - GEARMAN_IMG is defined
       - HAPROXY_IMG is defined
-      # Vault (autheph_sk se referencia desde runtime.yml -> vault_autheph_sk)
-      - autheph_sk is defined and (autheph_sk | string | length) > 0
+      # Vault (kamailio_webrtc_auth_eph_key se referencia desde runtime.yml -> vault_kamailio_webrtc_auth_eph_key)
+      - kamailio_webrtc_auth_eph_key is defined and (kamailio_webrtc_auth_eph_key | string | length) > 0
+      - django_secret_key is defined and (django_secret_key | string | length) > 0
+      - fqdn is defined and (fqdn | string | length) > 0
     fail_msg: >-
       Faltan variables globales requeridas en el inventario, group_vars/all/images.yml
       o group_vars/all/vault.yml. Revisá el inventario de referencia
@@ -82,10 +84,10 @@
 - name: CHECKS Validate cert files when certs == 'custom'
   ansible.builtin.assert:
     that:
-      - cert_file_name is defined and (cert_file_name | string | length) > 0
-      - key_file_name is defined and (key_file_name | string | length) > 0
+      - ssl_cert_file_name is defined and (ssl_cert_file_name | string | length) > 0
+      - ssl_key_file_name is defined and (ssl_key_file_name | string | length) > 0
     fail_msg: >-
-      Con certs=custom hay que declarar cert_file_name y key_file_name (y copiarlos
+      Con certs=custom hay que declarar ssl_cert_file_name y ssl_key_file_name (y copiarlos
       bajo instances/<tenant>/). Ver ANSIBLE_BOOTSTRAP.md > Certificados TLS por tenant.
   when: (certs | default('selfsigned')) == 'custom'
   tags:
@@ -111,6 +113,8 @@
       - ami_password is defined and (ami_password | string | length) > 0
       - acd_rtp_port_min is defined
       - acd_rtp_port_max is defined
+      - acd_agent_sip_port is defined
+      - acd_trunk_sip_port is defined
       - acd_log_level is defined
     fail_msg: >-
       El componente ACD está habilitado (acd / omnileads_aio) pero faltan ami_user,
@@ -217,8 +221,6 @@
     _oml_inventory_warnings: >-
       {{
         []
-        + (['fqdn (recomendado para producción / certbot / HAProxy edge)']
-           if (fqdn is not defined) or ((fqdn | default('') | string | length) == 0) else [])
         + (['notification_email (sigue con el placeholder por defecto)']
            if (notification_email | default('')) in ['', 'your_email@domain.com'] else [])
         + (['swap_space (recomendado fijar el swap del SO, p.ej. 4G)']
@@ -249,6 +251,9 @@
               and (ansible_become | default(false) | bool) is false else [])
         + (['upgrade_from_2X (declarar true sólo si migrás desde 2.X)']
            if upgrade_from_2X is not defined else [])
+        + (['acd host network: Kamailio PSTN escucha en :5060; Asterisk trunk en acd_trunk_sip_port (default 5070). Verificar firewall y acd_nodes si edge y ACD comparten host.']
+           if (oml_runs_edge | default(false) | bool)
+              and (oml_runs_acd | default(false) | bool) else [])
       }}
   changed_when: false
   tags:

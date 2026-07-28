@@ -1,0 +1,9 @@
+---
+tenant_id: test_aio
+bucket_name: "{{ vault_tenant_test_aio_bucket_name }}"
+fqdn: "{{ vault_tenant_test_aio_fqdn }}"
+itsp_nodes: "{{ vault_tenant_test_aio_itsp_nodes }}"
+kamailio_webrtc_iface: eth1
+certs: custom
+ssl_cert_file_name: cert.pem
+ssl_key_file_name: key.pem

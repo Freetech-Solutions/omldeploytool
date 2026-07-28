@@ -5,6 +5,10 @@
   vars:
     oml_play_hosts: "data_statefull:data_stateless"
 
+- import_playbook: site_restore.yml
+  vars:
+    oml_play_hosts: "omlapp_web:omnileads_aio"
+
 - import_playbook: site_core.yml
   vars:
     oml_play_hosts: "edge"

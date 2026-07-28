@@ -1,0 +1,104 @@
+---
+- name: UPGRADE_2X Refrescar facts de distribución (evitar caché de otro host/IP)
+  ansible.builtin.setup:
+    gather_subset:
+      - min
+  tags:
+    - upgrade
+    - upgrade_from_2X
+
+- name: UPGRADE_2X Preparar APT en host legacy Debian
+  become: true
+  when:
+    - ansible_os_family == "Debian"
+  vars:
+    upgrade_from_2x_apt_codename: "{{ ansible_distribution_release }}"
+    upgrade_from_2x_apt_components: >-
+      main contrib non-free{{ ' non-free-firmware' if (ansible_distribution_major_version | int) >= 12 else '' }}
+    upgrade_from_2x_apt_lock_timeout_seconds: 300
+  tags:
+    - upgrade
+    - upgrade_from_2X
+  block:
+    - name: UPGRADE_2X Detener timers y servicios automáticos de APT
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - apt-daily.timer
+        - apt-daily-upgrade.timer
+        - apt-daily.service
+        - apt-daily-upgrade.service
+        - unattended-upgrades.service
+      failed_when: false
+
+    - name: UPGRADE_2X Respaldar configuración APT
+      community.general.archive:
+        path:
+          - /etc/apt
+        dest: "/root/oml_upgrade_apt_backup_{{ ansible_date_time.epoch }}.tar.gz"
+        mode: "0600"
+      failed_when: false
+
+    - name: UPGRADE_2X Deshabilitar sources.list.d legacy (.list) de instalación 2.X
+      ansible.builtin.shell: |
+        set -euo pipefail
+        shopt -s nullglob
+        changed=0
+        for f in /etc/apt/sources.list.d/*.list; do
+          base="$(basename "$f")"
+          case "$base" in
+            debian.list) continue ;;
+          esac
+          mv -v "$f" "${f}.disabled"
+          changed=1
+        done
+        if [ "$changed" -eq 0 ]; then
+          echo "no legacy .list sources to disable"
+        fi
+      args:
+        executable: /bin/bash
+      register: upgrade_from_2x_disable_legacy_sources
+      changed_when: >-
+        'disabled' in (upgrade_from_2x_disable_legacy_sources.stdout | default(''))
+      failed_when: false
+
+    - name: UPGRADE_2X Eliminar sources.list one-line legacy si existe
+      ansible.builtin.file:
+        path: /etc/apt/sources.list
+        state: absent
+
+    - name: UPGRADE_2X Desplegar repositorios Debian oficiales (deb822) para {{ upgrade_from_2x_apt_codename }}
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/debian.sources
+        content: |
+          Types: deb
+          URIs: https://deb.debian.org/debian
+          Suites: {{ upgrade_from_2x_apt_codename }} {{ upgrade_from_2x_apt_codename }}-updates
+          Components: {{ upgrade_from_2x_apt_components }}
+          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+          Types: deb
+          URIs: https://security.debian.org/debian-security
+          Suites: {{ upgrade_from_2x_apt_codename }}-security
+          Components: {{ upgrade_from_2x_apt_components }}
+          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: UPGRADE_2X Actualizar caché APT (prepare)
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 0
+        lock_timeout: "{{ upgrade_from_2x_apt_lock_timeout_seconds }}"
+
+    - name: UPGRADE_2X Verificar versión Debian para migración 3.X
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution_major_version | int in [12, 13]
+        fail_msg: >-
+          Host {{ inventory_hostname }} corre Debian {{ ansible_distribution_version }}
+          ({{ ansible_distribution_release }}). upgrade_from_2X asume Debian 12 (bookworm) como base
+          para el salto automatizado a Debian 13 (trixie). Si el nodo está en Bullseye (11),
+          actualice manualmente a Bookworm antes de continuar.

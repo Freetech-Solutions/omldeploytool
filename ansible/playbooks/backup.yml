@@ -1,2 +1,23 @@
 ---
-- import_playbook: ../components/backup_restore/backup.yml
+- name: OMniLeads backup on demand
+  hosts: "{{ (groups.get('omnileads_aio', []) + groups.get('omlapp_web', [])) | unique }}"
+  gather_facts: true
+  gather_subset:
+    - "!hardware"
+    - "!virtual"
+    - "!facter"
+    - "!ohai"
+  vars_files:
+    - ../group_vars/all/runtime.yml
+    - ../group_vars/all/vault.yml
+    - ../group_vars/all/images.yml
+    - ../group_vars/all/tenants_global.yml
+  pre_tasks:
+    - name: Normalize topology and component switches
+      ansible.builtin.include_role:
+        name: topology_normalize
+      tags:
+        - always
+  roles:
+    - role: backup
+      tags: [backup]

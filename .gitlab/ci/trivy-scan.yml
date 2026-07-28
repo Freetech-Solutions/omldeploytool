@@ -1,0 +1,41 @@
+---
+# Template reutilizable de DevSecOps para escaneo de malas configuraciones en Ansible con Trivy.
+# Este template analiza playbooks, roles y archivos YAML de Ansible en búsqueda de configuraciones inseguras.
+
+stages:
+  - test
+
+trivy-ansible-scan:
+  stage: test
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  variables:
+    # Variable para controlar si el pipeline falla ante vulnerabilidades (1 para bloquear, 0 para auditar/prevenir)
+    TRIVY_EXIT_CODE: "0"
+  script:
+    - echo "Iniciando escaneo de seguridad de Ansible con Trivy..."
+    
+    # 1. Generación de reporte JSON obligatorio para auditorías de calidad y seguridad (ISO 27001).
+    # Este comando siempre finaliza con exit-code 0 para garantizar la generación completa del reporte.
+    - trivy config ansible --severity HIGH,CRITICAL --format json --output trivy-ansible-report.json --exit-code 0
+    
+    # 2. Escaneo visible en consola para los desarrolladores.
+    # Modo Preventivo/Auditoría: Por defecto TRIVY_EXIT_CODE=0 (no rompe el pipeline).
+    # Modo Bloqueante (para ramas protegidas/producción): Cambiar variable TRIVY_EXIT_CODE a "1" o descomentar la siguiente línea de ejemplo.
+    # - trivy config ansible --severity HIGH,CRITICAL --exit-code 1
+    - trivy config ansible --severity HIGH,CRITICAL --exit-code ${TRIVY_EXIT_CODE}
+    
+  artifacts:
+    name: "trivy-ansible-report-$CI_COMMIT_REF_SLUG"
+    when: always
+    paths:
+      - trivy-ansible-report.json
+    expire_in: 1 week
+  rules:
+    # Se ejecuta de forma automática ante eventos de Merge Request
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # Se ejecuta de forma automática ante commits en la rama protegida master
+    - if: $CI_COMMIT_BRANCH == "master"
+    # Se ejecuta de forma automática ante commits en la rama protegida develop
+    - if: $CI_COMMIT_BRANCH == "develop"

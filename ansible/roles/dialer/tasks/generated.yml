@@ -21,7 +21,21 @@
   changed_when: false
   tags: [install, upgrade, update]
 
-- name: DIALER Set environment variables for this installation
+- name: DIALER ensure dialer.env is available (dialer-only hosts)
+  ansible.builtin.template:
+    src: dialer.env
+    dest: /etc/default/dialer.env
+    mode: "0640"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  register: dialer_standalone_env_file
+  notify: Restart dialer pods
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - not (component_omlapp_enabled | default(false) | bool)
+  tags: [install, upgrade, update]
+
+- name: DIALER Set environment variables for this installation (co-located with omlapp)
   ansible.builtin.template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
@@ -30,6 +44,7 @@
     group: "{{ usuario }}"
   register: dialer_env_files
   notify: Restart dialer pods
+  when: component_omlapp_enabled | default(false) | bool
   loop:
     - { src: dialer.env, dest: /etc/default/dialer.env }
   tags: [install, upgrade, update]
@@ -56,6 +71,58 @@
   when: oml_has_omlapp_web | default(false) | bool
   tags: [install, upgrade, update]
 
+- name: DIALER Ensure process worker Quadlet template directory exists
+  ansible.builtin.file:
+    path: "{{ dialer_process_worker_quadlet_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ usuario }}"
+    group: "{{ usuario }}"
+  when: oml_has_dialer_workers | default(false) | bool
+  tags: [install, upgrade, update]
+
+# Quadlet escanea /etc/containers/systemd: la plantilla @. aquí genera dialer_process_*@.service
+# ( %i inválido → contenedor dialer-process-*-dialer_workers-pod ). Solo deben existir symlinks @N.
+- name: DIALER Deploy process worker Quadlet templates (outside systemd scan path)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  register: dialer_quadlet_process_templates
+  notify: Restart dialer pods
+  loop:
+    - { src: "process_campaign@.container", dest: "{{ dialer_process_worker_quadlet_dir }}/dialer_process_campaign@.container" }
+    - { src: "process_contact@.container", dest: "{{ dialer_process_worker_quadlet_dir }}/dialer_process_contact@.container" }
+    - { src: "process_event@.container", dest: "{{ dialer_process_worker_quadlet_dir }}/dialer_process_event@.container" }
+  when: oml_has_dialer_workers | default(false) | bool
+  tags: [install, upgrade, update]
+
+- name: DIALER Mask bare process worker template units (legacy layout)
+  ansible.builtin.systemd:
+    name: "dialer_process_{{ item }}@.service"
+    state: stopped
+    enabled: false
+    masked: true
+  loop:
+    - campaign
+    - contact
+    - event
+  when: oml_has_dialer_workers | default(false) | bool
+  failed_when: false
+  tags: [install, upgrade, update]
+
+- name: DIALER Remove bare process worker Quadlet files from systemd directory
+  ansible.builtin.file:
+    path: "/etc/containers/systemd/dialer_process_{{ item }}@.container"
+    state: absent
+  loop:
+    - campaign
+    - contact
+    - event
+  register: dialer_process_worker_bare_quadlets_removed
+  when: oml_has_dialer_workers | default(false) | bool
+  tags: [install, upgrade, update]
+
 - name: DIALER Deploy Quadlet dialer workers (dialer_workers pod)
   ansible.builtin.template:
     src: "{{ item.src }}"
@@ -66,9 +133,6 @@
   loop:
     - { src: incidence_rules.container, dest: /etc/containers/systemd/dialer_incidence_rules.container, mode: "0644" }
     - { src: manage_campaign.container, dest: /etc/containers/systemd/dialer_manage_campaign.container, mode: "0644" }
-    - { src: "process_campaign@.container", dest: "/etc/containers/systemd/dialer_process_campaign@.container", mode: "0644" }
-    - { src: "process_contact@.container", dest: "/etc/containers/systemd/dialer_process_contact@.container", mode: "0644" }
-    - { src: "process_event@.container", dest: "/etc/containers/systemd/dialer_process_event@.container", mode: "0644" }
     - { src: render_template.container, dest: /etc/containers/systemd/dialer_render_template.container, mode: "0644" }
     - { src: schedule_agenda.container, dest: /etc/containers/systemd/dialer_scheduler.container, mode: "0644" }
     - { src: send_reports.container, dest: /etc/containers/systemd/dialer_send_reports.container, mode: "0644" }
@@ -85,6 +149,19 @@
   when: oml_has_dialer_workers | default(false) | bool
   tags: [install, upgrade]
 
+# Quadlet no permite systemctl enable en plantillas @.; instancias vía symlinks @N.container → @.container
+- name: DIALER | Manage process worker replica symlinks and units
+  ansible.builtin.include_tasks: process_worker_replicas.yml
+  loop:
+    - { worker_type: campaign, replicas: "{{ dialer_process_campaign_replicas | int }}" }
+    - { worker_type: contact, replicas: "{{ dialer_process_contact_replicas | int }}" }
+    - { worker_type: event, replicas: "{{ dialer_process_event_replicas | int }}" }
+  loop_control:
+    loop_var: dialer_process_worker
+  register: dialer_process_worker_replica_runs
+  when: oml_has_dialer_workers | default(false) | bool
+  tags: [install, upgrade, update]
+
 # Quadlet genera unidades en daemon-reload; una sola recarga antes de start/restart.
 - name: DIALER | systemd daemon-reload (Quadlet + unidades clásicas)
   ansible.builtin.systemd:
@@ -92,6 +169,48 @@
   when: >-
     ((dialer_quadlet_api | default({})).changed | default(false))
     or ((dialer_quadlet_workers | default({})).changed | default(false))
+    or ((dialer_quadlet_process_templates | default({})).changed | default(false))
+    or (dialer_process_worker_bare_quadlets_removed | default({})).changed | default(false)
+    or (dialer_process_worker_replica_runs | default({})).changed | default(false)
+  tags: [install, upgrade, update]
+
+- name: DIALER Build process worker replica service names
+  ansible.builtin.set_fact:
+    dialer_process_worker_replica_services: >-
+      {{
+        (
+          (
+            range(1, (dialer_process_campaign_replicas | int) + 1)
+            | map('string')
+            | map('regex_replace', '^', 'dialer_process_campaign@')
+            | map('regex_replace', '$', '.service')
+            | list
+            if (dialer_process_campaign_replicas | int) > 0 else []
+          )
+          +
+          (
+            range(1, (dialer_process_contact_replicas | int) + 1)
+            | map('string')
+            | map('regex_replace', '^', 'dialer_process_contact@')
+            | map('regex_replace', '$', '.service')
+            | list
+            if (dialer_process_contact_replicas | int) > 0 else []
+          )
+          +
+          (
+            range(1, (dialer_process_event_replicas | int) + 1)
+            | map('string')
+            | map('regex_replace', '^', 'dialer_process_event@')
+            | map('regex_replace', '$', '.service')
+            | list
+            if (dialer_process_event_replicas | int) > 0 else []
+          )
+        )
+        | unique
+        | list
+      }}
+  when: oml_has_dialer_workers | default(false) | bool
+  changed_when: false
   tags: [install, upgrade, update]
 
 - name: DIALER Determine changed services
@@ -101,12 +220,16 @@
         (
           (
             dialer_managed_services
-            if dialer_env_files is changed else []
+            if (
+              (dialer_env_files.changed | default(false))
+              or (dialer_standalone_env_file.changed | default(false))
+            ) else []
           )
           +
           (
             dialer_quadlet_api.results | default([])
             | selectattr('changed', 'equalto', true)
+            | map(attribute='item')
             | map(attribute='dest')
             | map('basename')
             | map('replace', '.container', '.service')
@@ -117,6 +240,7 @@
           (
             dialer_quadlet_workers.results | default([])
             | selectattr('changed', 'equalto', true)
+            | map(attribute='item')
             | map(attribute='dest')
             | map('basename')
             | map('replace', '.container', '.service')
@@ -136,4 +260,33 @@
     state: started
     enabled: yes
   loop: "{{ dialer_managed_services }}"
+  tags: [install, upgrade, update]
+
+# state:started no recrea contenedores si la unidad ya corre con imagen vieja; restarted tras daemon-reload.
+- name: DIALER Restart process worker replicas to apply Quadlet image
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  loop: "{{ dialer_process_worker_replica_services | default([]) }}"
+  when:
+    - oml_has_dialer_workers | default(false) | bool
+    - (dialer_process_worker_replica_services | default([]) | length) > 0
+  tags: [install, upgrade, update]
+
+- name: DIALER Remove legacy process worker containers (orphan dialer_workers-pod instances)
+  ansible.builtin.command:
+    argv:
+      - podman
+      - rm
+      - -f
+      - "dialer-process-{{ item }}-dialer_workers-pod"
+  loop:
+    - campaign
+    - contact
+    - event
+  register: dialer_process_worker_legacy_cleanup
+  changed_when: dialer_process_worker_legacy_cleanup.rc == 0
+  when: oml_has_dialer_workers | default(false) | bool
+  failed_when: false
   tags: [install, upgrade, update]

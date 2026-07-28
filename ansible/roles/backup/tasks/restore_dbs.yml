@@ -1,0 +1,245 @@
+---
+- name: RESTORE Run only on compute hosts when backup_filename is set
+  when:
+    - (group_names | intersect(backup_target_host_groups)) | length > 0
+    - backup_filename is defined
+    - (backup_filename | length) > 0
+  block:
+    - name: RESTORE Assert variables requeridas
+      ansible.builtin.assert:
+        that:
+          - BACKUP_RESTORE_IMG is defined
+          - BACKUP_RESTORE_IMG | length > 0
+          - backup_bucket_url is defined
+          - backup_bucket_url | length > 0
+          - backup_bucket_name is defined
+          - backup_bucket_name | length > 0
+          - backup_bucket_access_key is defined
+          - backup_bucket_access_key | length > 0
+          - backup_bucket_secret_key is defined
+          - backup_bucket_secret_key | length > 0
+        fail_msg: >-
+          Para restore defina backup_filename, backup_bucket_* (o bucket_* como fallback)
+          y BACKUP_RESTORE_IMG en images.yml. backup_filename_OMD es opcional.
+
+    - name: RESTORE Check backup.env exists
+      ansible.builtin.stat:
+        path: /etc/default/backup.env
+      register: oml_restore_backup_env_stat
+
+    - name: RESTORE Ensure backup.env is present
+      ansible.builtin.template:
+        src: "{{ role_path }}/../prerequisitos/templates/backup.env"
+        dest: /etc/default/backup.env
+        mode: '0640'
+        owner: "{{ usuario }}"
+        group: "{{ usuario }}"
+      when: not oml_restore_backup_env_stat.stat.exists
+
+    # postgresql.container declara Pod=data_statefull.pod; MinIO también. El restore debe correr
+    # cuando el pod ya está desplegado (roles/pods). Esto refuerza el orden si se usan
+    # tags parciales y cubre AIO vs cluster (delegación al nodo data_statefull).
+    - name: RESTORE Asegurar pod data_statefull activo en este host (AIO)
+      ansible.builtin.systemd:
+        name: "{{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+      when:
+        - not postgres_out | bool
+        - "'omnileads_aio' in group_names"
+        - oml_is_aio_only | default(false) | bool
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: "RESTORE Asegurar pod data_statefull activo en nodo de datos (cluster)"
+      ansible.builtin.systemd:
+        name: "{{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+      delegate_to: "{{ (groups['data_statefull'] | default([])) | first }}"
+      when:
+        - not postgres_out | bool
+        - (group_names | intersect(['omnileads_aio', 'omlapp_web'])) | length > 0
+        - not (oml_is_aio_only | default(true) | bool)
+        - groups['data_statefull'] | default([]) | length > 0
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Resolver host PostgreSQL
+      ansible.builtin.set_fact:
+        oml_restore_postgres_host: >-
+          {{ (omni_ip_lan | trim) if (oml_is_aio_only | default(false) | bool) else (postgres_host | trim) }}
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Esperar readiness de PostgreSQL con pg_isready
+      ansible.builtin.command:
+        argv:
+          - pg_isready
+          - -h
+          - "{{ oml_restore_postgres_host }}"
+          - -p
+          - "{{ postgres_port | string }}"
+          - -U
+          - "{{ postgres_user }}"
+      register: oml_restore_pg_isready
+      changed_when: false
+      failed_when: false
+      retries: 45
+      delay: 4
+      until: oml_restore_pg_isready.rc == 0
+      when: postgres_out | bool
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Esperar a que PostgreSQL abra el puerto local (pod interno)
+      ansible.builtin.wait_for:
+        host: "{{ oml_restore_postgres_host }}"
+        port: "{{ postgres_port | int }}"
+        connect_timeout: 5
+        sleep: 2
+        delay: 5
+        timeout: 240
+        msg: "PostgreSQL no acepto conexiones en {{ oml_restore_postgres_host }}:{{ postgres_port }} dentro del timeout."
+      when: not postgres_out | bool
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    # omnileads siempre se restaura. omnidialer es opcional.
+    - name: RESTORE Definir lista base de bases a restaurar (omnileads)
+      ansible.builtin.set_fact:
+        oml_restore_db_list:
+          - name: omnileads
+            backup_file: "{{ backup_filename }}"
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Agregar omnidialer a la lista si backup_filename_OMD está definido
+      ansible.builtin.set_fact:
+        oml_restore_db_list: >-
+          {{
+            oml_restore_db_list
+            + [{'name': 'omnidialer', 'backup_file': backup_filename_OMD}]
+          }}
+      when:
+        - backup_filename_OMD is defined
+        - (backup_filename_OMD | default('') | length) > 0
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Informar omisión de restore omnidialer
+      ansible.builtin.debug:
+        msg: >-
+          backup_filename_OMD no fue definido en el inventario; se omite el restore de la
+          base omnidialer.
+      when:
+        - (backup_filename_OMD is not defined) or ((backup_filename_OMD | default('') | length) == 0)
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Eliminar base {{ item.name }} (si existe)
+      postgresql_db:
+        name: "{{ item.name }}"
+        login_host: "{{ oml_restore_postgres_host }}"
+        login_password: "{{ postgres_password }}"
+        login_user: "{{ postgres_user }}"
+        port: "{{ postgres_port }}"
+        maintenance_db: "{{ postgres_maintenance_db }}"
+        state: absent
+        force: true
+      loop: "{{ oml_restore_db_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Crear base vacía {{ item.name }}
+      postgresql_db:
+        name: "{{ item.name }}"
+        login_host: "{{ oml_restore_postgres_host }}"
+        login_password: "{{ postgres_password }}"
+        login_user: "{{ postgres_user }}"
+        port: "{{ postgres_port }}"
+        maintenance_db: "{{ postgres_maintenance_db }}"
+        state: present
+      loop: "{{ oml_restore_db_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Restaurar dump en {{ item.name }} desde S3
+      ansible.builtin.command:
+        argv:
+          - podman
+          - run
+          - --rm
+          - --name
+          - "pgsql_restore_{{ item.name }}_{{ ansible_date_time.epoch | int }}"
+          - --network=host
+          - --env-file
+          - /etc/default/backup.env
+          - -e
+          - "BACKUP_FILENAME={{ item.backup_file }}"
+          - -e
+          - "SQL_DATABASE={{ item.name }}"
+          - -e
+          - RESTORE_NO_OWNER=true
+          - -e
+          - RESTORE_NO_PRIVILEGES=true
+          - "{{ BACKUP_RESTORE_IMG }}"
+          - python
+          - restore.py
+      loop: "{{ oml_restore_db_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: oml_restore_runs
+      changed_when: true
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore

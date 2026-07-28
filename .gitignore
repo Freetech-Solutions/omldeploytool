@@ -2,6 +2,7 @@ ansible/group_vars/all/vault.yml
 ansible/instances
 ansible/.inventory.yml
 ansible/venv
+ansible/.ci-venv/
 ansible/.venv/
 ansible/.ansible/
 ansible/__pycache__/
@@ -29,3 +30,12 @@ docker-compose/observability/.env
 docker-compose/backend/.env
 
 components-git-repo/custom_app/
+components-git-repo/voice_ai/
+components-git-repo/whisper-vm-finetune/
+
+.ci-omnileads/
+.cache/
+
+CLAUDE.md
+docker-compose/CLAUDE.md
+ansible/CLAUDE.md

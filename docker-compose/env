@@ -65,8 +65,24 @@ SESSION_COOKIE_AGE=3600
 #to authenticate a SIP user in the telephony system (by default 8 hours)
 EPHEMERAL_USER_TTL=28800
 
+# Presence log/heartbeat (optional; defaults apply if unset)
+PRESENCE_LOG_RECONNECT_COOLDOWN_MS=1500
+PRESENCE_HEARTBEAT_INTERVAL_SEC=15
+PRESENCE_HEARTBEAT_TIMEOUT_SEC=60
+PRESENCE_HEARTBEAT_SWEEP_SEC=15
+PRESENCE_HEARTBEAT_LOGOUT_RECENT_SEC=90
+PRESENCE_HEARTBEAT_GUARD_TTL_SEC=90
+
 # Secret Key for creating auth ephemeral credentials
 AUTHEPH_SK=SUp3rS3cr3tK3y
+SIP_SECRET_KEY=${AUTHEPH_SK}
+
+# Django SECRET_KEY (sessions, CSRF, signed cookies)
+DJANGO_SECRET_KEY=s1+*bfrvb@=k@c&9=pm!0sijjewneu5p5rojil#q+!a2y&as-4
+
+# Django ALLOWED_HOSTS (fqdn + host IP + localhost; optional extra hosts comma-separated)
+DJANGO_ALLOWED_HOSTS=${FQDN},${OML_HOSTNAME},127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=https://${FQDN}
 
 # Django logs (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 DJANGO_LOG_LEVEL=INFO
@@ -136,6 +152,8 @@ ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
 ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
 ACD_WEBHOOK_TRANSFER_TTL=5
+ACD_PENDING_DIAL_TTL_SEC=7200
+
 ACD_REC_PATH=/var/spool/asterisk/recording
 # --- Asterisk scale parameters
 # Scale var "True" or "False"
@@ -312,7 +330,7 @@ DIALER_DCHANNELS_URL=wss://${NGINX_HOSTNAME}/channels/omnidialer/${DIALER_PASSWO
 
 # --- Postgres dialer conn params
 DIALER_POSTGRES_USER=omnidialer
-DIALER_POSTGRES_PASSWORD=dialer456
+DIALER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 DIALER_POSTGRES_SERVER=dialer-postgresql
 DIALER_POSTGRES_PORT=5433
 DIALER_POSTGRES_DB=omnidialer
@@ -332,6 +350,10 @@ DIALER_TIME_BETWEEN_CALLS=1
 DIALER_PROCESS_CAMPAIGN_REPLICAS=5
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
+
+DIALER_CHANNEL_AUDIT_INTERVAL_SEC=60
+DIALER_RESERVE_GRACE_SEC=30
+
 
 #########################################################################################################
 #                                          VoIP WebRTC Monitoring                                       #
@@ -373,6 +395,13 @@ PSTN_EMULATOR_IP=10.22.72.99
 # ---       9: CONGESTION
 
 PSTN_EMULATOR_MODE=default
+
+# --- dial2softphone
+# ---SIP_REFER: 100% of the calls are sent to the SIP REFER.
+# ---OML_API: 100% of the calls are sent to the OML API.
+# ---SIP_REFER_OML_API: 100% of the calls are sent to the SIP REFER and the OML API.
+# ---SIP_REFER_OML_API_DIALED: 100% of the calls are sent to the SIP REFER and the OML API and the dialed number is the OML API.
+# ---SIP_REFER_OML_API_DIALED: 100% of the calls are sent to the SIP REFER and the OML API and the dialed number is the OML API.
 
 VOICEBOT_CALL_MODE=SIP_REFER
 VOICEBOT_USERNAME=voicebot

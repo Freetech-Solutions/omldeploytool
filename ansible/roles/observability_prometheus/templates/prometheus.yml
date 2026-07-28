@@ -54,10 +54,17 @@ scrape_configs:
 
   - job_name: '{{ tenant_id }}_asterisk'
     static_configs:
-      - targets: ['{{ acd_host | trim }}:7088']
+      - targets: ['{{ acd_host | trim }}:{{ acd_ari_port | default(7088) }}']
         labels:
           tenant: '{{ tenant_id }}'
           component: 'asterisk'
+
+  - job_name: '{{ tenant_id }}_acd_app'
+    static_configs:
+      - targets: ['{{ acd_host | trim }}:{{ acd_app_metrics_port | default(7098) }}']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'acd_app'
 
   - job_name: '{{ tenant_id }}_rtpengine'
     static_configs:
