@@ -1,18 +1,38 @@
 #!/bin/bash
-# Patch vault_tenant_test_aio_* keys in an encrypted vault.yml for ephemeral CI droplets.
+# Patch vault tenant keys in an encrypted vault.yml for ephemeral CI droplets.
+#
+# Modes:
+#   AIO (inventory_example_1): --ansible-host + --omni-ip-lan [--fqdn]
+#   Edge+node (inventory_example_2): --node-ansible-host + --node-omni-ip-lan
+#                                    + --edge-ansible-host + --edge-omni-ip-lan [--fqdn]
 set -euo pipefail
 
 vault_file=""
 ansible_host=""
 omni_ip_lan=""
 fqdn=""
+node_ansible_host=""
+node_omni_ip_lan=""
+edge_ansible_host=""
+edge_omni_ip_lan=""
 
 usage() {
   cat <<'EOF'
-Usage: patch_vault_cicd.sh --vault-file PATH --ansible-host IP --omni-ip-lan IP [--fqdn HOST]
+Usage:
+  AIO (inventory_example_1):
+    patch_vault_cicd.sh --vault-file PATH --ansible-host IP --omni-ip-lan IP [--fqdn HOST]
 
-Patches vault_tenant_test_aio_ansible_host, vault_tenant_test_aio_omni_ip_lan and
-vault_tenant_test_aio_fqdn (defaults fqdn to ansible-host) in an Ansible Vault file.
+  Edge+node (inventory_example_2):
+    patch_vault_cicd.sh --vault-file PATH \
+      --node-ansible-host IP --node-omni-ip-lan IP \
+      --edge-ansible-host IP --edge-omni-ip-lan IP \
+      [--fqdn HOST]
+
+AIO patches vault_tenant_test_aio_ansible_host, vault_tenant_test_aio_omni_ip_lan and
+vault_tenant_test_aio_fqdn (defaults fqdn to ansible-host).
+
+Edge+node patches vault_tenant_example_2_node_*, vault_tenant_example_2_edge_* and
+vault_tenant_example_2_fqdn (defaults fqdn to edge ansible-host).
 
 Requires ANSIBLE_VAULT_PASSWORD_FILE (or vault_password_file in ansible.cfg).
 EOF
@@ -32,6 +52,22 @@ while [ $# -gt 0 ]; do
       omni_ip_lan="$2"
       shift 2
       ;;
+    --node-ansible-host)
+      node_ansible_host="$2"
+      shift 2
+      ;;
+    --node-omni-ip-lan)
+      node_omni_ip_lan="$2"
+      shift 2
+      ;;
+    --edge-ansible-host)
+      edge_ansible_host="$2"
+      shift 2
+      ;;
+    --edge-omni-ip-lan)
+      edge_omni_ip_lan="$2"
+      shift 2
+      ;;
     --fqdn)
       fqdn="$2"
       shift 2
@@ -48,14 +84,37 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "$vault_file" ] || [ -z "$ansible_host" ] || [ -z "$omni_ip_lan" ]; then
+edge_node_mode=0
+if [ -n "$node_ansible_host" ] || [ -n "$node_omni_ip_lan" ] \
+  || [ -n "$edge_ansible_host" ] || [ -n "$edge_omni_ip_lan" ]; then
+  edge_node_mode=1
+fi
+
+if [ -z "$vault_file" ]; then
   echo "Missing required arguments." >&2
   usage >&2
   exit 1
 fi
 
-if [ -z "$fqdn" ]; then
-  fqdn="$ansible_host"
+if [ "$edge_node_mode" -eq 1 ]; then
+  if [ -z "$node_ansible_host" ] || [ -z "$node_omni_ip_lan" ] \
+    || [ -z "$edge_ansible_host" ] || [ -z "$edge_omni_ip_lan" ]; then
+    echo "Edge+node mode requires --node-ansible-host, --node-omni-ip-lan, --edge-ansible-host and --edge-omni-ip-lan." >&2
+    usage >&2
+    exit 1
+  fi
+  if [ -z "$fqdn" ]; then
+    fqdn="$edge_ansible_host"
+  fi
+else
+  if [ -z "$ansible_host" ] || [ -z "$omni_ip_lan" ]; then
+    echo "Missing required arguments." >&2
+    usage >&2
+    exit 1
+  fi
+  if [ -z "$fqdn" ]; then
+    fqdn="$ansible_host"
+  fi
 fi
 
 if [ ! -f "$vault_file" ]; then
@@ -123,10 +182,22 @@ patch_var() {
   fi
 }
 
-patch_var vault_tenant_test_aio_ansible_host "$ansible_host" "$tmp_file"
-patch_var vault_tenant_test_aio_omni_ip_lan "$omni_ip_lan" "$tmp_file"
-patch_var vault_tenant_test_aio_fqdn "$fqdn" "$tmp_file"
+if [ "$edge_node_mode" -eq 1 ]; then
+  patch_var vault_tenant_example_2_node_ansible_host "$node_ansible_host" "$tmp_file"
+  patch_var vault_tenant_example_2_node_private_ip "$node_omni_ip_lan" "$tmp_file"
+  patch_var vault_tenant_example_2_edge_ansible_host "$edge_ansible_host" "$tmp_file"
+  patch_var vault_tenant_example_2_edge_private_ip "$edge_omni_ip_lan" "$tmp_file"
+  patch_var vault_tenant_example_2_fqdn "$fqdn" "$tmp_file"
+else
+  patch_var vault_tenant_test_aio_ansible_host "$ansible_host" "$tmp_file"
+  patch_var vault_tenant_test_aio_omni_ip_lan "$omni_ip_lan" "$tmp_file"
+  patch_var vault_tenant_test_aio_fqdn "$fqdn" "$tmp_file"
+fi
 
 ansible-vault encrypt "$tmp_file" --output "$vault_file" --vault-password-file "$_vault_pass_file"
 
-echo "Patched vault tenant keys for CI: ansible_host=${ansible_host} omni_ip_lan=${omni_ip_lan} fqdn=${fqdn}"
+if [ "$edge_node_mode" -eq 1 ]; then
+  echo "Patched vault tenant keys for CI (edge+node): node=${node_ansible_host}/${node_omni_ip_lan} edge=${edge_ansible_host}/${edge_omni_ip_lan} fqdn=${fqdn}"
+else
+  echo "Patched vault tenant keys for CI: ansible_host=${ansible_host} omni_ip_lan=${omni_ip_lan} fqdn=${fqdn}"
+fi

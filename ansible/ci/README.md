@@ -21,7 +21,9 @@ En ambos casos el entorno Ansible queda en `ansible/.ci-venv/` (no hace falta `b
 | -------- | ---- | --------- |
 | `DIGITALOCEAN_ACCESS_TOKEN` | Variable (masked) | Sí |
 | `DIGITALOCEAN_DROPLET_IMG` | Variable | Sí |
-| `DIGITALOCEAN_DROPLET_SIZE` | Variable | Sí |
+| `DIGITALOCEAN_DROPLET_SIZE` | Variable | Sí (jobs AIO de un solo droplet en este repo) |
+| `DIGITALOCEAN_DROPLET_SIZE_AIO` | Variable | Sí (enterprise QA: droplet compute / AIO+Edge) |
+| `DIGITALOCEAN_DROPLET_SIZE_EDGE` | Variable | Sí (enterprise QA: droplet edge) |
 | `DIGITALOCEAN_REGION` | Variable | Sí |
 | `DIGITALOCEAN_SSH_KEY` | Variable | Sí |
 | `DIGITALOCEAN_DROPLET_ROCKY_IMG` | Variable | Solo `deploy-aio-cloud-rocky` |
@@ -44,7 +46,26 @@ En ambos casos el entorno Ansible queda en `ansible/.ci-venv/` (no hace falta `b
 
 Override: `ANSIBLE_VAULT_PASSWORD_FILE`, `OML_ANSIBLE_VAULT_FILE`.
 
-El vault debe incluir `vault_tenant_test_aio_*` (ver `inventory_example_1.yml`). El job parchea las IPs del droplet con [`patch_vault_cicd.sh`](patch_vault_cicd.sh).
+El vault debe incluir `vault_tenant_test_aio_*` (ver `inventory_example_1.yml`) para jobs AIO de un solo host. El job enterprise QA `deploy-qa-aio-digitalocean` usa `inventory_example_2.yml` (AIO+Edge: 2 droplets) y parchea `vault_tenant_example_2_node_*`, `vault_tenant_example_2_edge_*` y `vault_tenant_example_2_fqdn` vía [`patch_vault_cicd.sh`](patch_vault_cicd.sh) (`--node-*` / `--edge-*`).
+
+`DO_URL` es el FQDN que el job escribe en `vault_tenant_example_2_fqdn` y usa en la verificación HTTPS final. El pipeline **no** crea ni modifica registros DNS en DigitalOcean (`doctl compute domain records` quedó fuera del job); el registro A correspondiente a `DO_URL` debe administrarse fuera del pipeline y resolver a la IP pública del **edge** (HAProxy con TLS custom).
+
+### Overrides del tenant QA (`vars.yml`)
+
+El job enterprise `deploy-qa-aio-digitalocean` requiere un archivo persistente
+en el runner:
+
+```text
+$HOME/.config/omnileads/instances/gitlab/vars.yml
+```
+
+En cada corrida lo copia a `ansible/instances/gitlab/vars.yml`, donde
+`deploy.sh --tenant=gitlab` lo carga automáticamente como `extra-vars`. La
+variable CI `OML_CI_TENANT_VARS_FILE` permite indicar otra ruta.
+
+El archivo debe contener configuración común al tenant y referencias a Vault,
+pero no secretos en claro. Las variables exclusivas del node o edge deben
+permanecer en `inventory.yml`.
 
 ### Certificados TLS (`certs: custom`)
 
@@ -58,6 +79,13 @@ El vault debe incluir `vault_tenant_test_aio_*` (ver `inventory_example_1.yml`).
 | `OML_CI_KEY_FILE_NAME` | Variable | Nombre extra de la key (default `key.pem`) |
 
 Los archivos se copian a `ansible/instances/<tenant>/cert.pem` y `key.pem`. En inventario, `ssl_cert_file_name` / `ssl_key_file_name` en `group_vars` deben coincidir (default global: `cert.pem` / `key.pem`).
+
+El job enterprise QA `deploy-qa-aio-digitalocean` **exige** esos PEM persistentes
+en `$HOME/.config/omnileads/instances/gitlab/` (o las variables File equivalentes).
+Tras `ansible-vault-setup.sh` valida que no estén vacíos y genera el inventario con
+`certs: custom` + `ssl_cert_file_name` / `ssl_key_file_name` en **node y edge**.
+Usar el mismo certificado en ambos hosts alinea la verificación TLS de HAProxy
+hacia Nginx (`node:443`) y evita backends DOWN por certificados distintos.
 
 ### Disparo manual del pipeline
 

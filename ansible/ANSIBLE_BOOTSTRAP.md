@@ -207,10 +207,12 @@ ansible/
 └── instances/                    # ignorado por git
     ├── tenant_aio_demo/
     │   ├── inventory.yml         # copia personalizada para el tenant
+    │   ├── vars.yml              # overrides comunes a todo el tenant (opcional)
     │   ├── cert.pem              # opcional, si certs: custom
     │   └── key.pem               # opcional, si certs: custom
     └── cluster_prod/
-        └── inventory.yml
+        ├── inventory.yml
+        └── vars.yml
 ```
 
 ### 3.2 Crear un tenant nuevo
@@ -236,7 +238,85 @@ Editá `instances/<tenant>/inventory.yml` y ajustá como mínimo:
 > automáticamente con las variables del `vault.yml` del paso anterior. No hay
 > que duplicar nada por tenant — el vault es global a `group_vars/all/`.
 
-### 3.3 Certificados TLS por tenant (opcional)
+### 3.3 Variables particulares del tenant (`vars.yml`)
+
+El archivo `instances/<tenant>/vars.yml` es opcional y contiene los **overrides
+comunes a todos los hosts del tenant**. Sirve para separar responsabilidades:
+
+- `inventory.yml`: hosts, IPs y membresía de grupos (topología).
+- `group_vars/all/tenants_global.yml`: configuración predeterminada para todos
+  los tenants.
+- `group_vars/all/vault.yml`: secretos cifrados.
+- `instances/<tenant>/vars.yml`: configuración y tuning particulares del tenant.
+
+`deploy.sh` detecta este archivo automáticamente y lo carga mediante
+`--extra-vars=@instances/<tenant>/vars.yml`. Por usar `extra-vars`, sus valores
+tienen precedencia sobre `tenants_global.yml`, el inventario y los defaults de
+los roles. Si el archivo no existe, el deploy continúa con los valores globales.
+
+Ejemplo:
+
+```yaml
+---
+tenant_id: tenant_aio_demo
+fqdn: "{{ vault_tenant_aio_demo_fqdn }}"
+TZ: America/Argentina/Cordoba
+
+# TLS
+certs: custom
+ssl_cert_file_name: cert.pem
+ssl_key_file_name: key.pem
+
+# Telefonía
+itsp_nodes: "{{ vault_tenant_aio_demo_itsp_nodes }}"
+
+# Capacidad y tuning
+dialer_caps: 3
+dialer_process_campaign_replicas: 5
+uwsgi_processes: 8
+uwsgi_threads: 2
+postgres_max_connections: 200
+postgres_shared_buffers: 2GB
+
+# Integración opcional
+wazuh_manager: "{{ vault_wazuh_manager }}"
+wazuh_agent_group: omnileads_prod
+```
+
+Para un tenant que usa Object Storage externo, los endpoints y credenciales
+también pueden sobreescribirse aquí:
+
+```yaml
+bucket_url: "{{ vault_tenant_aio_demo_bucket_url }}"
+bucket_name: "{{ vault_tenant_aio_demo_bucket_name }}"
+bucket_access_key: "{{ vault_tenant_aio_demo_bucket_access_key }}"
+bucket_secret_key: "{{ vault_tenant_aio_demo_bucket_secret_key }}"
+bucket_region: us-east-1
+```
+
+Si el tenant utiliza el MinIO desplegado por OMniLeads, no declares
+`bucket_url`: `topology_normalize` deriva el endpoint desde el host del grupo
+`data_statefull`.
+
+> [!IMPORTANT]
+> No guardes passwords, tokens ni claves directamente en `vars.yml`. Declaralos
+> en el Vault y referencialos como `{{ vault_<nombre> }}`. Aunque `instances/`
+> está ignorado por Git, mantener los secretos centralizados en Vault evita
+> filtraciones y facilita su rotación.
+
+Las variables de `vars.yml` se aplican a todos los hosts. Si un valor debe ser
+distinto para el edge, ACD u otro nodo, declaralo como variable del host
+correspondiente en `inventory.yml`.
+
+Al invocar `ansible-playbook` manualmente (sin `deploy.sh`), el archivo no se
+carga de forma automática; agregalo explícitamente:
+
+```bash
+ansible-playbook -i instances/<tenant>/inventory.yml playbooks/site.yml \
+  --extra-vars=@instances/<tenant>/vars.yml
+```
+
+### 3.4 Certificados TLS por tenant (opcional)
 
 Si vas a usar `certs: custom` en el inventario, copiá los archivos al tenant:
 

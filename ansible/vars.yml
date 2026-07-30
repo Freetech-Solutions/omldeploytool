@@ -1,0 +1,30 @@
+---
+backup_bucket_region: "{{ vault_digital_ocean_bucket_region }}"
+bucket_url: "{{ vault_digital_ocean_bucket_url }}"
+bucket_name: "{{ vault_tenant_example_1_bucket_name }}"
+bucket_access_key: "{{ vault_digital_ocean_bucket_access_key }}"
+bucket_secret_key: "{{ vault_digital_ocean_bucket_secret_key }}"
+bucket_region: "{{ vault_digital_ocean_bucket_region }}"
+certs: custom
+dialer_caps: 1
+dialer_process_campaign_replicas: 1
+fqdn: "{{ vault_tenant_example_1_fqdn }}"
+itsp_nodes: "{{ vault_tenant_example_1_itsp_nodes }}"
+kamailio_webrtc_iface: "{{ vault_digital_ocean_lan_nic }}"            
+ssl_cert_file_name: "{{ vault_ssl_sephir_cert_file_name }}"        
+ssl_key_file_name: "{{ vault_ssl_sephir_key_file_name }}"
+swap_space: 4G
+postgres_password: "{{ vault_konecta_postgres_password }}"
+postgres_shm: 1g
+postgres_max_wal_size: 2GB
+postgres_max_connections: 200
+postgres_shared_buffers: 2GB
+postgres_idle_in_transaction_session_timeout: 300000
+postgres_statement_timeout: 120000
+postgres_effective_cache_size: 2GB
+uwsgi_processes: 4
+uwsgi_threads: 2
+uwsgi_evil_reload_on_rss: 10240
+tenant_id: tenant_example_1
+TZ: America/Argentina/Cordoba
+wazuh: false
