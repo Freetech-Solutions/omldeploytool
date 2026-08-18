@@ -773,17 +773,19 @@ services:
         condition: service_started
     environment:
       ACD_NODES: ${ACD_NODES}
+      DOMAIN: ${FQDN}
       FQDN: ${FQDN}
       IPADDR_PUBLIC: ${KAMAILIO_PSTN_HOSTNAME}
       IPADDR_PRIVATE: ${KAMAILIO_PSTN_HOSTNAME}
-      ITSP_NODES: ${PSTN_EMULATOR_IP}
+      ITSP_NODES: ${ITSP_NODES}
       RTPENGINE_SOCKET: udp:${RTPENGINE_HOSTNAME}:${RTPENGINE_BIND_UDP_PORT}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
+      KAMAILIO_PSTN_QA: true
       HOMER_ENABLE: ${HOMER_ENABLE}
       HOMER_HOST: ${HOMER_HOSTNAME}
       HOMER_PORT: ${HOMER_PORT}
       HOMER_CAPTURE_ID: ${HOMER_KAMAILIO_PSTN_CAPTURE_ID:-2002}
-      HOMER_NODE_NAME: ${HOMER_PSTN_NODE_NAME:-}
+      HOMER_NODE_NAME: ${HOMER_PSTN_NODE_NAME:-}      
     dns: 8.8.8.8
     privileged: true
     restart: on-failure
@@ -856,8 +858,8 @@ services:
   acd-server:
     <<: *asterisk-server-common
     networks:
-      omnileads:
-        ipv4_address: ${ACD_SERVER_IP}
+      - omnileads
+        # ipv4_address: ${ACD_SERVER_IP}
     environment:
       <<: *asterisk-server-env
     #volumes:
@@ -1084,8 +1086,8 @@ services:
     stdin_open: true
     tty: true
     networks:
-      omnileads:
-        ipv4_address: ${PSTN_EMULATOR_IP}
+      - omnileads
+      #  ipv4_address: ${PSTN_EMULATOR_IP}
 
     #volumes:
     #  - ../.custom_conf/pstn_extensions.conf:/etc/asterisk/extensions.conf

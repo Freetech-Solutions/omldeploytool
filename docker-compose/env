@@ -8,7 +8,7 @@ OML_HOSTNAME=127.0.0.1
 # If you want to use a public IP, set it here
 PUBLIC_IP=${OML_HOSTNAME}
 # If you want to use a FQDN, set it here
-FQDN=omnileads.local
+FQDN=omnileads.sephir.tech
 # --- Timezone for the environment
 TZ=America/Argentina/Cordoba
 # --- If you want to use the docker-compose scale option, set this variable to true
@@ -17,27 +17,28 @@ SCALE=false
 SUBNET=10.22.72.0/24
 GATEWAY=10.22.72.254
 
+DOMAIN=omnileads.local
 #############7#####################################################################################
 #                                  Components image version                                       #
 #                              versions of each image to deploy                                   #
 ###################################################################################################
 
 # --- OMniLeads images WEB
-APP_IMG=docker.io/freetechsolutions/omlapp:20260512-bef97fc2
-NGINX_IMG=docker.io/freetechsolutions/nginx:20260403-72e1ff68
-WS_IMG=docker.io/freetechsolutions/websockets:20260306-13838d19
+# APP_IMG=omlapp:latest
+APP_IMG=omlenterprise:local-enterprise
+NGINX_IMG=nginx:latest
+WS_IMG=websockets:latest
 
 # --- OMniLeads images TEL
-ACD_IMG=docker.io/freetechsolutions/acd:20260417-5fb61b47
-KAMAILIO_IMG=docker.io/freetechsolutions/kamailio:20260408-0292f718
-RTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20260218-4e51bf30
-CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
-CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3
-FASTAGI_IMG=docker.io/freetechsolutions/fastagi:20260211-0d7a1c9b
-
+ACD_IMG=acd:latest
+KAMAILIO_IMG=kamailio:latest
+RTPENGINE_IMG=rtpengine:latest
+CALLREC_COMPRESSOR_IMG=callrec_compressor:latest
+CALLREC_TRANSCRIBER_IMG=callrec_transcriber:latest
+FASTAGI_IMG=fastagi:latest
 # --- OMniLeads images DIALER
-DIALER_API_IMG=docker.io/freetechsolutions/dialer_api:20260302-6c129b12
-DIALER_WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20260302-6c129b12
+DIALER_API_IMG=dialer_api:latest
+DIALER_WORKER_IMG=dialer_worker:latest
 
 # --- Backend services common images
 REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
@@ -46,10 +47,11 @@ MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 
 # --- Images for testing and development
-PSTNEMULATOR_IMG=pstn_emulator:241209.01
 KAMAILIO_ITSP_IMG=omnileads/kamailio_itsp:dev
-OML_VUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
-NGINX_QA_IMG=docker.io/freetechsolutions/nginxqa:20260521-e4d691d4
+PSTNEMULATOR_IMG=pstn_emulator:241209.01
+VUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
+NGINX_QA_IMG=nginxqa:latest
+
 
 ###################################################################################################
 #                                       DJANGO APP                                                #
@@ -62,18 +64,17 @@ DAPHNE_HOSTNAME=daphne
 # is detected in the session (by default is 1 hour)
 SESSION_COOKIE_AGE=3600
 
-# Ephemeral Credentials TTL (ECTTL) is the time in seconds that will last the SIP credentials used
-#to authenticate a SIP user in the telephony system (by default 8 hours)
-EPHEMERAL_USER_TTL=28800
-
-# Presence log/heartbeat (optional; defaults apply if unset)
+# Session 
 PRESENCE_LOG_RECONNECT_COOLDOWN_MS=1500
-PRESENCE_HEARTBEAT_INTERVAL_SEC=15
-PRESENCE_HEARTBEAT_TIMEOUT_SEC=60
+PRESENCE_HEARTBEAT_INTERVAL_SEC=10
+PRESENCE_HEARTBEAT_TIMEOUT_SEC=90
 PRESENCE_HEARTBEAT_SWEEP_SEC=15
 PRESENCE_HEARTBEAT_LOGOUT_RECENT_SEC=90
 PRESENCE_HEARTBEAT_GUARD_TTL_SEC=90
 
+# Ephemeral Credentials TTL (ECTTL) is the time in seconds that will last the SIP credentials used
+#to authenticate a SIP user in the telephony system (by default 8 hours)
+EPHEMERAL_USER_TTL=28800
 # Secret Key for creating auth ephemeral credentials
 AUTHEPH_SK=SUp3rS3cr3tK3y
 SIP_SECRET_KEY=${AUTHEPH_SK}
@@ -82,7 +83,8 @@ SIP_SECRET_KEY=${AUTHEPH_SK}
 DJANGO_SECRET_KEY=s1+*bfrvb@=k@c&9=pm!0sijjewneu5p5rojil#q+!a2y&as-4
 
 # Django ALLOWED_HOSTS (fqdn + host IP + localhost; optional extra hosts comma-separated)
-DJANGO_ALLOWED_HOSTS=${FQDN},${OML_HOSTNAME},127.0.0.1
+DJANGO_ALLOWED_HOSTS=${FQDN},${OML_HOSTNAME},127.0.0.1,omlapp,nginx
+# Django CSRF TRUSTED ORIGINS (comma-separated list of allowed origins)
 DJANGO_CSRF_TRUSTED_ORIGINS=https://${FQDN}
 
 # Django logs (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -114,12 +116,13 @@ PYTHONPATH=/opt/omnileads/ominicontacto
 #####################################################################################################
 
 # Set the Speech to Text engine: openai, gemini, gcp or local (faster-whisper)
-STT_ENGINE=openai
+STT_ENGINE=gemini
 # --- In case o Clooud based STT put here the STT API key or JSON credentials (GCP)
 # for Gemini or OpenAI STT use the API key
-STT_API_KEY=fslajkhfjklsdhlfkhsdjklfhdsjkhfjkdshfjkshjkh432423jh4jk23h4k23jh4k23
+STT_API_KEY=hjdgsjadgajgjagsagsdjasghjasgdjahsgdjasgdjags
 # for Google GCP-STT use the JSON credentials
 STT_GCP_JSON_PATH=/app/google_credentials.json
+
 
 #####################################################################################################
 #                                       ACD                                                        #
@@ -129,22 +132,14 @@ ACD_APP=oml_acd
 ACD_HOSTNAME=acd-server
 ACD_REPLICAS=1
 
-# ACD_NODES is a comma-separated list of ACD nodes. Each node is a hostname:port pair.
-# You can adjusto the number of nodes to scale the ACD cluster.
-ACD_NODES=test-env-acd-server-1:5060
-
 ACD_RTP_PORT_MIN=30001
 ACD_RTP_PORT_MAX=40000
 ACD_AMI_USER=omnileadsami
 ACD_AMI_PASSWORD=5_MeO_DMT
-
 ACD_ARI_PORT=7088
-# --- OMniLeads ACD SIP Peer when dialer send calls
-# --- On test-env or dev-env you must set the ACD_DIALER_PJSIP_TRANSPORT variable with "acd-dev:5260" string
-ACD_DIALER_PJSIP_TRANSPORT=acd-server:5260
 
 # --- error, warning, notice, debug
-ACD_LOG_LEVEL=debug
+ACD_LOG_LEVEL=notice
 
 # --- Only if VOIP_ENV=custom, you can set custom SIP PJSIP transport ip  & port
 ACD_PJSIP_TRANSPORT_DIALER=127.0.0.1
@@ -153,8 +148,6 @@ ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
 ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
 ACD_WEBHOOK_TRANSFER_TTL=5
-ACD_PENDING_DIAL_TTL_SEC=7200
-
 ACD_REC_PATH=/var/spool/asterisk/recording
 # --- Asterisk scale parameters
 # Scale var "True" or "False"
@@ -172,8 +165,10 @@ ACD_SCALE=False
 # ACD_TIMER_T1=
 # ACD_TIMER_B=
 
-ACD_SERVER_IP=10.22.72.98
-
+#####################################################################################################
+#                                       FASTAGI                                                     #
+#####################################################################################################
+# --- On test-env or dev-env you must set the OMLACD_HOST variable with "fastagi" string
 FASTAGI_HOSTNAME=fastagi
 FASTAGI_PORT=4573
 
@@ -218,11 +213,19 @@ WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 # string for prod-env "127.0.0.1" is the default value
 KAMAILIO_WEBRTC_HOSTNAME=kamailio-webrtc
 KAMAILIO_WEBRTC_SIP_PORT=10060
+KAMAILIO_WEBRTC_IFACE=eth0
 KAMAILIO_HTTPS_PORT=10060
-KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
+
+# ACD_SERVER_IP is the IP address of the ACD server
+ACD_SERVER_IP=10.22.72.0/24
 
 KAMAILIO_PSTN_HOSTNAME=kamailio-pstn
 KAMAILIO_PSTN_UDP_PORT=5060
+
+# ACD_NODES is a comma-separated list of ACD nodes. Each node is a hostname:port pair.
+# You can adjusto the number of nodes to scale the ACD cluster.
+ACD_NODES=acd-server:5070 #test-env-acd-server-1:5070 # ,test-env-acd-server-2:5070
+
 # Variables for Kamailio memory. SHM is the maximum memory ammount.
 # PKG is the minimum memory ammount
 SHM_SIZE=2048
@@ -231,10 +234,12 @@ PKG_SIZE=1024
 KAMAILIO_DEBUG_ENABLED=true
 KAMAILIO_DEBUG_LEVEL=2
 
+KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
 # kamailio-webrtc container interface name
 KAMAILIO_WEBRTC_IFACE=eth0
 
-ITSP_NODES=${KAMAILIO_ITSP_IP},${PSTN_EMULATOR_IP}
+ITSP_NODES=pbxemulator:5070
+
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
 #########################################################################################################
@@ -281,33 +286,27 @@ GEARMAN_PORT=4730
 GEARMAN_JOB_SERVERS=${GEARMAN_HOSTNAME}:${GEARMAN_PORT}
 
 GEARMAN_CALLLOG_TASK=acd-log-processor
-
 #########################################################################################################
 #                                Object Storage BUCKET config                                           #
 #########################################################################################################
-# --- BUCKET_DEVICE=s3, is the default option and use an S3 TLS connection                                            
-# --- BUCKET_DEVICE=s3-no-check-cert, if you object storage service use self-signed TLS certs
+#   CALLREC_DEVICE=s3                                                                             
+#   is the default option and use an S3 TLS connection                                            
+#   CALLREC_DEVICE=s3-no-check-cert                                                               
+#   if you object storage service use self-signed TLS certs                                       
 BUCKET_DEVICE=s3
 
-# --- name for invoke bucket actions
+# BUCKET_NAME=devops-qa
+# BUCKET_ACCESS_KEY_ID=DO00CDTJAKWH7HEE4PVX
+# BUCKET_SECRET_ACCESS_KEY=DKB1L1cqq+jPI/R3NB3gzHKkbu8uCGDYXHE86R53mRs
+# BUCKET_ENDPOINT=https://sfo3.digitaloceanspaces.com
+# BUCKET_ENDPOINT_INTERNAL=${BUCKET_ENDPOINT}
+
 BUCKET_NAME=omnileads
-# --- Bucket credentials 
 BUCKET_ACCESS_KEY_ID=omlminio
 BUCKET_SECRET_ACCESS_KEY=s3omnileads123
-
-# --- In case of using external MinIO or other S3 compatible service, set the https s3 endpoint
-# DigitalOcean Spaces example: https://nyc3.digitaloceanspaces.com or AWS S3 example: https://s3.amazonaws.com
-# For example:
-# BUCKET_ENDPOINT=https://nyc3.digitaloceanspaces.com
-# BUCKET_ENDPOINT_INTERNAL=${BUCKET_ENDPOINT}
-# Optional region name, default is us-east-1
 BUCKET_DEFAULT_REGION=us-east-1
-
-# --- In case of using local MinIO, set:
-# the "BUCKET_ENDPOINT=https://${OML_HOSTNAME}/minio" & "BUCKET_ENDPOINT_INTERNAL=http://minio:9000"
-BUCKET_ENDPOINT=https://${OML_HOSTNAME}/minio
+BUCKET_ENDPOINT=https://${FQDN}/minio
 BUCKET_ENDPOINT_INTERNAL=http://minio:9000
-# --- MinIO web credentials
 MINIO_HTTP_ADMIN_USER=minio
 MINIO_HTTP_ADMIN_PASS=s3minio123
 
@@ -344,104 +343,91 @@ DIALER_GEARMAN_JOBS=start-campaign|stop-campaign|resume-campaign|process-contact
 DIALER_PYTHON_LOGLEVEL=debug
 
 # --- Call attempts per second
-DIALER_CAPS=3
+DIALER_CAPS=5
 # --- Time between the iterations when there are no contacts to call (in seconds)
-DIALER_TIME_BETWEEN_CALLS=1
+DIALER_TIME_BETWEEN_CALLS=4
 
 # --- Workers replicas
-DIALER_PROCESS_CAMPAIGN_REPLICAS=5
+DIALER_PROCESS_CAMPAIGN_REPLICAS=2
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
 
-# --- Periodic dialer channel audit (Redis OML:CALLS vs active Asterisk channels)
-# Interval in seconds between audit jobs. Set to 0 or a negative value to disable the scheduler job.
-DIALER_CHANNEL_AUDIT_INTERVAL_SEC=60
-# Distributed Redis lock TTL in seconds. It prevents overlapping audits across worker replicas.
-# Keep it longer than the expected audit duration and normally shorter than the audit interval.
-DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC=55
-# Grace period in seconds after reserving a channel (INCR). During this window, an audit does not
-# lower OML:CALLS because the newly originated PSTN channel may not be visible in Asterisk yet.
+DIALER_CHANNEL_AUDIT_INTERVAL_SEC=65
+DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC=50
 DIALER_RESERVE_GRACE_SEC=30
 
-# --- Predictive pacing (global; campaign uses initial_predictive_model in Postgres)
-# Maximum abandon rate D_max (EXIT_ABANDON+EXIT_TIMEOUT / connects). Used for gamma later.
+# --- Predictive pacing (globals; campaign gate = initial_predictive_model)
 DIALER_MAX_ABANDON_RATE=0.03
-# Progressive strict until ATT_COUNT reaches this sample (warm-up before overdial).
-DIALER_WARM_UP_SAMPLE_SIZE=50
-# Idle cadence for predictive campaigns when there are no contacts to dial (milliseconds).
+DIALER_WARM_UP_SAMPLE_SIZE=15
 DIALER_PREDICTIVE_TICK_MS=1000
-
+DIALER_HIT_RATE_FLOOR=0.05
+DIALER_DROP_RATE_ALPHA=0.1
+DIALER_DEFAULT_ART_SEC=15
+DIALER_P_LIB_REMAINING_EPS=1.0
+DIALER_PREDICTIVE_ENABLED=true
+DIALER_GAMMA_THROTTLE_FLOOR=0.2
 
 #########################################################################################################
-#                                          VoIP WebRTC Monitoring                                       #
+#                                          Monitoring                                                   #
 #########################################################################################################
-HOMER_ENABLE=True
+
+HOMER_ENABLE=False
 # --- IP or hostname that each instance will invoke when locating the other    
-HOMER_HOSTNAME=observability.example.com
+HOMER_HOSTNAME=homer.domain
 HOMER_PORT=9060
-# hep_capture_id must be numeric; use HOMER_*_NODE_NAME for Homer correlation/labels
-HOMER_KAMAILIO_PSTN_CAPTURE_ID=2002
-HOMER_KAMAILIO_WEBRTC_CAPTURE_ID=2003
-HOMER_PSTN_NODE_NAME=devenv.01-pstn
-HOMER_WEBRTC_NODE_NAME=devenv.01-webrtc
 
 #########################################################################################################
-#                                        Google Maps integrations                                       #
+#                                        Google integrations                                            #
 #########################################################################################################
 GOOGLE_MAPS_API_KEY=NULL
 GOOGLE_MAPS_CENTER='{ "lat": -31.416668, "lng": -64.183334 }'
 GOOGLE_API_KEY=jkjghjkgjk65467GHFGHF5646ghghfghFHGFghf
 GOOGLE_CLOUD_PROJECTID=your_project_id
 
+
 #########################################################################################################
 #                                       QA & Testing                                                    #
 #########################################################################################################
-# --- PSTN EMULATOR / Kamailio ITSP (QA)
-# Flujo outbound: ACD -> kamailio-pstn -> kamailio-itsp -> pbxemulator
+# --- PSTN EMULATOR
 KAMAILIO_ITSP_IP=10.22.72.97
 PSTN_EMULATOR_IP=10.22.72.99
 
 # Forced SIP responses by R-URI user-part prefix
-# (applies only to traffic reaching kamailio-itsp; numbers that do not match
 # the prefixes listed below are relayed to the PSTN Emulator (PBX))
+# When KAMAILIO_PSTN_QA is true, the prefixes listed below are relayed to the PSTN Emulator (PBX).
 
-# ---       092* -> 404 Not Found
-# ---       093* -> 503 Service Unavailable
-# ---       094* -> 486 Busy Here
-# ---       095* -> 603 Decline
-# ---       096* -> 403 Forbidden
-# ---       097* -> 405 Method Not Allowed
-# ---       098* -> 406 Not Acceptable
-# ---       099* -> 408 Request Timeout
-# ---       081* -> 480 Temporarily Unavailable
-# ---       082* -> 487 Request Terminated
-# ---       083* -> 488 Not Acceptable Here
-# ---       084* -> 500 Internal Server Error
-# ---       085* -> 502 Bad Gateway
-# ---       086* -> 608 Rejected
-# ---       087* -> 180 Ringing 45s, luego 408 Request Timeout
-# ---       otro -> relay hacia pstn emulator (PBX)
+#    081*  -> 480 Temporarily Unavailable
+#    082*  -> 487 Request Terminated
+#    083*  -> 488 Not Acceptable Here
+#    084*  -> 500 Internal Server Error
+#    085*  -> 502 Bad Gateway
+#    086*  -> 608 Rejected
+#    087*  -> 180 Ringing 45 seconds
+#    092*  -> 404 Not Found
+#    093*  -> 503 Service Unavailable
+#    094*  -> 486 Busy Here
+#    095*  -> 603 Decline
+#    096*  -> 403 Forbidden
+#    097*  -> 405 Method Not Allowed
+#    098*  -> 406 Not Acceptable
+#    099*  -> 408 Request Timeout
+#    otro  -> relay hacia ITSP (comportamiento normal del SBC)
 
 # For numbers relayed to the PSTN Emulator (PBX), the response mode is defined by
 # the "mode" set as an env var on the PSTN Emulator (PBX).
 
-PSTN_EMULATOR_MODE=advanced
+# ---default: 100% of the calls are answered.
+# ---dial2softphone: 100% of the calls are sent to the testing softphone.
+# ---test_dialer: 
 
-# ---Mode "default": 100% of the calls are answered.
-# ---Mode "dial2softphone": 100% of the calls are sent to the testing softphone.
-# ---Mode "advanced": calls are processed according to the last digit:
-#           2: ANSWER a call lasting 15 seconds.
-#           3: Waits 35 seconds, then ANSWER a call lasting 100 seconds.
-#           5: NO ANSWER.
-#           7: ANSWER a call lasting 27 seconds.
+PSTN_EMULATOR_MODE=test_dialer
 
-# --- dial2softphone
-# ---SIP_REFER: 100% of the calls are sent to the SIP REFER.
-# ---OML_API: 100% of the calls are sent to the OML API.
-# ---SIP_REFER_OML_API: 100% of the calls are sent to the SIP REFER and the OML API.
-# ---SIP_REFER_OML_API_DIALED: 100% of the calls are sent to the SIP REFER and the OML API and the dialed number is the OML API.
-# ---SIP_REFER_OML_API_DIALED: 100% of the calls are sent to the SIP REFER and the OML API and the dialed number is the OML API.
+# --- dial2softphone: 100% of the calls are sent to the softphone.
+# ---mode_1: 100% answered, play music and transfer with SIP REFER.
+# ---mode_2: 100% answered, play music and OML API (80% GESTION_BOT / 20% MUDA_BOT).
+# ---mode_3: 25% SIP REFER + GESTION_BOT / 50% 80-20 GESTION_BOT-MUDA_BOT / 25% agenda.
+# ---mode_4: 10% SIP REFER + GESTION_BOT / 25% MUDA_BOT / 40% ABANDON_BOT / 25% agenda.
+VOICEBOT_CALL_MODE=mode_4
 
-VOICEBOT_CALL_MODE=SIP_REFER
 VOICEBOT_USERNAME=voicebot
 VOICEBOT_PASSWORD=098098ZZZ
