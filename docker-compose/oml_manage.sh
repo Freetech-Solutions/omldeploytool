@@ -459,7 +459,7 @@ run_sngrep() {
         exit 1
     fi
     log "Opening sngrep in 'acd-server'..."
-    docker_compose exec -it acd-server sngrep
+    docker_compose exec -it acd-server sngrep -c
 }
 
 # -----------------------------------------------------------------------------

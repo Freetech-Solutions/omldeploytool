@@ -67,6 +67,7 @@
           - "'whatsapp' in _smoke_job_names"
           - "'dialer_api' in _smoke_job_names"
           - "'dialer_scheduler' in _smoke_job_names"
+          - "'dialer_channel_audit' in _smoke_job_names"
           - "'acd-config' in _smoke_job_names"
           - "'haproxy' in _smoke_job_names"
         fail_msg: "Faltan jobs esperados en AIO: {{ _smoke_job_names }}"

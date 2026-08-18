@@ -1,0 +1,74 @@
+#cloud-config
+# OMniLeads — bootstrap Ansible admin en instancias Vultr (Debian/Ubuntu/Alma/Rocky)
+# Pegar en: Deploy → Cloud-Init User Data
+# Recomendado: adjuntar SSH Key en el panel y user_scheme=root (no Limited User Login)
+
+ssh_pwauth: false
+disable_root: true
+
+# Override del vendor-data de Vultr (suele forzar upgrades y retrasa SSH)
+package_update: true
+package_upgrade: false
+
+packages:
+  - python3
+  - sudo
+
+users:
+  - default
+  - name: omladmin
+    gecos: OMniLeads Ansible admin
+    shell: /bin/bash
+    lock_passwd: true
+    groups: [sudo, wheel]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+runcmd:
+  - visudo -c
+  - |
+    set -euo pipefail
+    USER_NAME="omladmin"
+    HOME_DIR="/home/${USER_NAME}"
+    SSH_DIR="${HOME_DIR}/.ssh"
+    AUTH_KEYS="${SSH_DIR}/authorized_keys"
+
+    mkdir -p "${SSH_DIR}"
+
+    # Vultr: la llave del panel puede estar en root (scheme root)
+    # o en linuxuser (Limited User Login). Unimos ambas fuentes.
+    : > "${AUTH_KEYS}.tmp"
+    for SRC in \
+      /root/.ssh/authorized_keys \
+      /home/linuxuser/.ssh/authorized_keys
+    do
+      if [ -s "${SRC}" ]; then
+        awk '/ssh-rsa|ssh-ed25519|ecdsa-sha2|sk-ssh-ed25519|sk-ecdsa-sha2/{print}' "${SRC}" \
+          | sed -E 's/^.*(ssh-rsa|ssh-ed25519|ecdsa-sha2[^ ]*|sk-ssh-ed25519[^ ]*|sk-ecdsa-sha2[^ ]*)/\1/' \
+          >> "${AUTH_KEYS}.tmp"
+      fi
+    done
+
+    # Deduplicar y fallar si no hay ninguna llave (evita lockout con disable_root)
+    if [ ! -s "${AUTH_KEYS}.tmp" ]; then
+      echo "ERROR: no se encontraron SSH keys en root/linuxuser; no se deshabilita root de forma segura" >&2
+      exit 1
+    fi
+    sort -u "${AUTH_KEYS}.tmp" > "${AUTH_KEYS}"
+    rm -f "${AUTH_KEYS}.tmp"
+
+    chown -R "${USER_NAME}:${USER_NAME}" "${SSH_DIR}"
+    chmod 700 "${SSH_DIR}"
+    chmod 600 "${AUTH_KEYS}"
+
+    # Refuerzo SSH (idempotente)
+    mkdir -p /etc/ssh/sshd_config.d
+    cat > /etc/ssh/sshd_config.d/99-oml-hardening.conf <<'EOF'
+    PasswordAuthentication no
+    PermitRootLogin no
+    PubkeyAuthentication yes
+    EOF
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || true
+    fi
+
+final_message: "OMniLeads Vultr cloud-init finalizado. Conectar: ssh omladmin@<IP>"

@@ -127,11 +127,11 @@
         - postgres
         - restore
 
-    # omnileads siempre se restaura. omnidialer es opcional.
-    - name: RESTORE Definir lista base de bases a restaurar (omnileads)
+    # postgres_database (default omnileads) siempre se restaura. omnidialer es opcional.
+    - name: RESTORE Definir lista base de bases a restaurar ({{ postgres_database }})
       ansible.builtin.set_fact:
         oml_restore_db_list:
-          - name: omnileads
+          - name: "{{ postgres_database }}"
             backup_file: "{{ backup_filename }}"
       tags:
         - install

@@ -28,7 +28,6 @@ x-base-service-common: &base-service-common
     - omnileads
   restart: on-failure
   logging: *default-logging
-  dns: 8.8.8.8
   stop_grace_period: 10s
 
 # Optional service common template
@@ -63,7 +62,6 @@ x-depends-on-postgres-redis-minio: &depends-on-postgres-redis-minio
 # Django common template
 x-django-common: &django-common
   image: ${APP_IMG}
-  dns: 8.8.8.8
   networks:
     - omnileads
   restart: on-failure
@@ -174,6 +172,18 @@ x-dialer-worker-common: &dialer-worker-common
     REDIS_DIALER_PORT: ${REDIS_PORT}
     PYTHON_LOGLEVEL: ${DIALER_PYTHON_LOGLEVEL}
     TIME_BETWEEN_CALLS: ${DIALER_TIME_BETWEEN_CALLS}
+    DIALER_CHANNEL_AUDIT_INTERVAL_SEC: ${DIALER_CHANNEL_AUDIT_INTERVAL_SEC:-60}
+    DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC: ${DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC:-55}
+    DIALER_RESERVE_GRACE_SEC: ${DIALER_RESERVE_GRACE_SEC:-30}
+    DIALER_MAX_ABANDON_RATE: ${DIALER_MAX_ABANDON_RATE:-0.03}
+    DIALER_WARM_UP_SAMPLE_SIZE: ${DIALER_WARM_UP_SAMPLE_SIZE:-50}
+    DIALER_PREDICTIVE_TICK_MS: ${DIALER_PREDICTIVE_TICK_MS:-1000}
+    DIALER_HIT_RATE_FLOOR: ${DIALER_HIT_RATE_FLOOR:-0.05}
+    DIALER_DROP_RATE_ALPHA: ${DIALER_DROP_RATE_ALPHA:-0.1}
+    DIALER_DEFAULT_ART_SEC: ${DIALER_DEFAULT_ART_SEC:-15}
+    DIALER_P_LIB_REMAINING_EPS: ${DIALER_P_LIB_REMAINING_EPS:-1.0}
+    DIALER_PREDICTIVE_ENABLED: ${DIALER_PREDICTIVE_ENABLED:-true}
+    DIALER_GAMMA_THROTTLE_FLOOR: ${DIALER_GAMMA_THROTTLE_FLOOR:-0.2}
     TZ: ${TZ}
 
 # ACD common template
@@ -189,7 +199,6 @@ x-acd-common: &acd-common
 x-acd-ari-common: &acd-ari-common
   <<: *acd-common
   working_dir: /opt/asterisk/ari-app/
-  dns: 8.8.8.8
   stop_grace_period: 10s
 
 # ACD ARI environment variables
@@ -273,7 +282,6 @@ x-asterisk-conf-generator-common: &asterisk-conf-generator-common
   <<: *acd-common
   working_dir: /opt/asterisk/workers/
   entrypoint: [ "python", "astconf.py" ]
-  dns: 8.8.8.8
   stop_grace_period: 10s
   volumes:
     - asterisk_conf:/home/omnileads/astconf
@@ -320,7 +328,6 @@ x-acd-worker-common: &acd-worker-common
     - omnileads
   restart: on-failure
   logging: *default-logging
-  dns: 8.8.8.8
   stop_grace_period: 10s
   depends_on:
     gearman:
@@ -376,7 +383,6 @@ services:
   # ----------------------------------------------------------------------------
   postgresql:
     image: ${POSTGRES_IMG}
-    dns: 8.8.8.8
     environment:
       TZ: ${TZ}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -397,8 +403,7 @@ services:
       - postgresql:/var/lib/postgresql
 
   redis:
-    image: ${REDIS_IMG}
-    dns: 8.8.8.8
+    image: ${REDIS_IMG}    
     environment:
       TZ: ${TZ}
       BIND_IP: 0.0.0.0
@@ -467,7 +472,6 @@ services:
 
   dialer-postgresql:
     image: ${POSTGRES_IMG}
-    dns: 8.8.8.8
     environment:
       TZ: ${TZ}
       POSTGRES_USER: ${DIALER_POSTGRES_USER}
@@ -520,8 +524,7 @@ services:
       WEBUI_MODE: ${NGINX_WEBUI_MODE}
       WALLBOARD_WEBUI_PATH: ${NGINX_WALLBOARD_WEBUI_PATH}
       PREMIUMREPORTS_WEBUI_PATH: ${NGINX_PREMIUMREPORTS_WEBUI_PATH}
-      WSGI_PORT: ${UWSGI_PORT}
-    dns: 8.8.8.8
+      WSGI_PORT: ${UWSGI_PORT}    
     networks:
       - omnileads
     ports:
@@ -646,7 +649,6 @@ services:
       HOMER_PORT: ${HOMER_PORT}
       HOMER_CAPTURE_ID: ${HOMER_KAMAILIO_WEBRTC_CAPTURE_ID:-2003}
       HOMER_NODE_NAME: ${HOMER_WEBRTC_NODE_NAME:-}
-    dns: 8.8.8.8
     privileged: true
     restart: on-failure
     logging: *default-logging
@@ -725,18 +727,19 @@ services:
         condition: service_started
     environment:
       ACD_NODES: ${ACD_NODES}
+      DOMAIN: ${FQDN}
       FQDN: ${FQDN}
       IPADDR_PUBLIC: ${KAMAILIO_PSTN_HOSTNAME}
       IPADDR_PRIVATE: ${KAMAILIO_PSTN_HOSTNAME}
-      ITSP_NODES: ${PSTN_EMULATOR_IP}
+      ITSP_NODES: ${ITSP_NODES}
       RTPENGINE_SOCKET: udp:${RTPENGINE_HOSTNAME}:${RTPENGINE_BIND_UDP_PORT}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
+      KAMAILIO_PSTN_QA: true
       HOMER_ENABLE: ${HOMER_ENABLE}
       HOMER_HOST: ${HOMER_HOSTNAME}
       HOMER_PORT: ${HOMER_PORT}
       HOMER_CAPTURE_ID: ${HOMER_KAMAILIO_PSTN_CAPTURE_ID:-2002}
-      HOMER_NODE_NAME: ${HOMER_PSTN_NODE_NAME:-}
-    dns: 8.8.8.8
+      HOMER_NODE_NAME: ${HOMER_PSTN_NODE_NAME:-}      
     privileged: true
     restart: on-failure
     logging: *default-logging
@@ -807,9 +810,6 @@ services:
 
   acd-server:
     <<: *asterisk-server-common
-    networks:
-      omnileads:
-        ipv4_address: ${ACD_SERVER_IP}
     environment:
       <<: *asterisk-server-env
     #volumes:
@@ -919,6 +919,12 @@ services:
       <<: *dialer-worker-env
       GEARMAN_JOBS: "schedule-agenda"
 
+  dialer-channel-audit:
+    <<: *dialer-worker-common
+    environment:
+      <<: *dialer-worker-env
+      GEARMAN_JOBS: "audit-active-channels"
+
   dialer-start-camp:
     <<: *dialer-worker-common
     environment:
@@ -1012,6 +1018,7 @@ services:
   # ----------------------------------------------------------------------------
   # TEST & QA SERVICES
   # ----------------------------------------------------------------------------
+
   pbxemulator:
     image: ${PSTNEMULATOR_IMG}
     build:
@@ -1095,7 +1102,7 @@ services:
       - redis_redisinsight:/data
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.17 
     <<: *optional-service-common
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@omnileads.com}

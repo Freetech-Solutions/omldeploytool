@@ -258,8 +258,23 @@ dialer_caps: 3
 # --- Number of dialer container replicas
 dialer_process_campaign_replicas: 5
 dialer_process_event_replicas: 1
+
+# --- Periodic dialer channel audit (Redis OML:CALLS vs active Asterisk channels)
+# Interval in seconds between audit jobs. Set to 0 or a negative value to disable the scheduler job.
+dialer_channel_audit_interval_sec: 60
+# Distributed Redis lock TTL in seconds. It prevents overlapping audits across worker replicas.
+# Keep it longer than the expected audit duration and normally shorter than the audit interval.
+dialer_channel_audit_lock_ttl_sec: 55
+# Grace period in seconds after reserving a channel (INCR). During this window, an audit does not
+# lower OML:CALLS because the newly originated PSTN channel may not be visible in Asterisk yet.
+dialer_reserve_grace_sec: 30
+# Predictive pacing globals (override via env on dialer workers)
+dialer_max_abandon_rate: 0.03
+dialer_warm_up_sample_size: 50
+dialer_predictive_tick_ms: 1000
+
 # --- Log level for Dialer, 0: Error, 1: Warning, 2: Debug
-dialer_log_level: 1
+dialer_log_level: 2
 # --- Dialer API user & password
 dialer_password: "{{ vault_dialer_password }}"
 

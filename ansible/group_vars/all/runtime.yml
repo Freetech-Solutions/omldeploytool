@@ -78,6 +78,7 @@ dialer_process_campaign_container_name: dialer-process-campaign
 dialer_process_container_name: dialer-process
 dialer_render_template_container_name: dialer-render-template
 dialer_scheduler_container_name: dialer-scheduler
+dialer_channel_audit_container_name: dialer-channel-audit
 dialer_send_reports_container_name: dialer-send-reports
 # Plantillas Quadlet @. de process_* fuera de /etc/containers/systemd (solo symlinks @N ahí).
 dialer_process_worker_quadlet_dir: /etc/omnileads/dialer/quadlet

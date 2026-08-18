@@ -883,6 +883,8 @@ Then:
 ./deploy.sh --action=install --tenant=algarrobo
 ```
 
+On **AIO** inventories (`omnileads_aio` only), `site.yml` runs `site_aio_data.yml` before `site_restore.yml` so PostgreSQL/pods exist before the dump is applied. The restore target database is `postgres_database` (default `omnileads`).
+
 For a **productive** instance, use `oml_manage` on the target host for restore operations (the `restore` action was removed from `deploy.sh` in 3.X).
 
 # Upgrades :arrows_counterclockwise: <a name="upgrades"></a>

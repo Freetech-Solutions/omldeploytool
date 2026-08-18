@@ -267,11 +267,14 @@ run_playbook() {
   local inventory_path
   inventory_path="$(resolve_inventory)"
 
-  mkdir -p /tmp/ansible-local /tmp/ansible-remote "${ANSIBLE_LOG_DIR:-/tmp/oml_install_logs}"
+  # Controllers: local tmp under /tmp. Remotes: per-user ~/.ansible/tmp (default).
+  # Do NOT use a shared /tmp/ansible-remote on targets: with become, root creates it
+  # mode 0700 and later tasks as ansible_user fail with UNREACHABLE (mkdir tmp).
+  mkdir -p /tmp/ansible-local "${ANSIBLE_LOG_DIR:-/tmp/oml_install_logs}"
 
   ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" \
   ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}" \
-  ANSIBLE_REMOTE_TEMP="/tmp/ansible-remote" \
+  ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}" \
   ansible-playbook "$playbook" -i "$inventory_path" "${vault_args[@]}" "$@"
 }
 

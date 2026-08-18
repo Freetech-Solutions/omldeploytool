@@ -160,6 +160,7 @@
           'dialer_incidence_rules.service',
           'dialer_manage_campaign.service',
           'dialer_scheduler.service',
+          'dialer_channel_audit.service',
           'dialer_send_reports.service',
           'dialer_render_template.service',
         ]

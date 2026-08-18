@@ -1,0 +1,61 @@
+---
+# Capa data para hosts AIO antes de site_restore.yml.
+# En inventario solo-omnileads_aio el play data_statefull:data_stateless no matchea
+# hosts; sin este play el restore falla (data_statefull-pod.service inexistente).
+# Solo corre cuando backup_filename está definido (si no, end_host).
+- name: "OMniLeads AIO data layer before restore ({{ oml_play_hosts | default('omnileads_aio') }})"
+  hosts: "{{ oml_play_hosts | default('omnileads_aio') }}"
+  gather_facts: true
+  gather_subset:
+    - "!hardware"
+    - "!virtual"
+    - "!facter"
+    - "!ohai"
+  vars_files:
+    - ../group_vars/all/runtime.yml
+    - ../group_vars/all/vault.yml
+    - ../group_vars/all/images.yml
+    - ../group_vars/all/tenants_global.yml
+  pre_tasks:
+    - name: Normalize topology and component switches
+      ansible.builtin.include_role:
+        name: topology_normalize
+      tags:
+        - always
+
+    - name: Skip AIO data pre-restore when no backup_filename
+      ansible.builtin.meta: end_host
+      when: >
+        (backup_filename is not defined)
+        or ((backup_filename | default('') | length) == 0)
+      tags:
+        - always
+  roles:
+    - role: upgrade_from_2X
+      vars:
+        upgrade_from_2X_phase: cleanup_systemd
+      tags: [upgrade_from_2X, upgrade, prerequisitos]
+    - role: upgrade_from_2X
+      vars:
+        upgrade_from_2X_phase: prepare_apt
+      tags: [upgrade_from_2X, upgrade, prerequisitos]
+    - role: upgrade_from_2X
+      vars:
+        upgrade_from_2X_phase: upgrade_to_debian13
+      tags: [upgrade_from_2X, upgrade, upgrade_debian13, prerequisitos]
+    - role: prerequisitos
+      tags: [install, upgrade, update, prerequisitos]
+    # Tags del rol pods van en cada tarea (pods_role_tags); no anidar lista Jinja acá.
+    - role: pods
+    - role: minio
+      when: component_minio_enabled | bool
+      tags: [install, upgrade, update, minio, data]
+    - role: postgresql
+      when: component_postgresql_enabled | bool
+      tags: [install, upgrade, update, postgres, data]
+    - role: gearman
+      when: component_gearman_enabled | bool
+      tags: [install, upgrade, update, gearman, data]
+    - role: redis
+      when: component_redis_enabled | bool
+      tags: [install, upgrade, update, redis, data]

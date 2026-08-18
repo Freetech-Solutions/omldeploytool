@@ -93,7 +93,8 @@ Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y e
 | **dialer-process-contact** | Worker Gearman: procesamiento de contactos (marcado, resultado, reagenda). Escala con `DIALER_PROCESS_CONTACT_REPLICAS`. |
 | **dialer-process-camp** | Worker Gearman: procesamiento de campañas (estado, progreso). Escala con `DIALER_PROCESS_CAMPAIGN_REPLICAS`. |
 | **dialer-process-event** | Worker Gearman: procesamiento de eventos del dialer. Escala con `PROCESS_EVENT_REPLICAS`. |
-| **dialer-scheduler** | Worker Gearman: programación de la agenda de contactos (`schedule-agenda`). |
+| **dialer-scheduler** | Worker Gearman: programación de la agenda de contactos (`schedule-agenda`) y productor periódico de `audit-active-channels`. |
+| **dialer-channel-audit** | Worker Gearman: reconciliación `OML:CALLS` ↔ Asterisk (`audit-active-channels`). |
 | **dialer-start-camp** | Worker Gearman: inicio de campañas. |
 | **dialer-create-camp** | Worker Gearman: creación de campañas. |
 | **dialer-resume-camp** | Worker Gearman: reanudación de campañas pausadas. |

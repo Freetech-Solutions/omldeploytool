@@ -28,6 +28,9 @@
       - sngrep
       - python3-boto3
       - python3-psycopg2
+      # Debian 13 (trixie) ya no instala cron por defecto y el módulo
+      # ansible.builtin.cron (backup job) requiere el binario crontab.
+      - cron
     update_cache: yes
     cache_valid_time: 3600
     state: present
@@ -57,10 +60,23 @@
       - python3-boto3
       - jq
       - postgresql
+      - cronie
     state: present
   when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
   tags:
     - install
+
+# Instalar cron/cronie no garantiza el daemon corriendo (en RedHat el preset lo habilita
+# pero no lo inicia) y el job de backup de OS_CONF depende de él.
+- name: MAIN Ensure cron service is enabled and running
+  ansible.builtin.service:
+    name: "{{ 'cron' if ansible_os_family == 'Debian' else 'crond' }}"
+    enabled: true
+    state: started
+  when: >-
+    ansible_os_family == "Debian" or
+    ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
 
 - name: MAIN Install sngrep on Rocky or Alma Linux (EPEL, best-effort)
   dnf:

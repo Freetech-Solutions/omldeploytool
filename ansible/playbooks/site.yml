@@ -1,9 +1,15 @@
 ---
-# Por capas: datos (statefull/stateless) → edge → cómputo (pods) → AIO.
+# Por capas: datos (statefull/stateless) → data AIO (si backup_filename) →
+# restore → edge → cómputo (pods) → AIO.
 # Los grupos vacíos se omiten al resolver el patrón de hosts.
 - import_playbook: site_core.yml
   vars:
     oml_play_hosts: "data_statefull:data_stateless"
+
+# AIO: el play anterior no matchea hosts; levantar data antes del restore.
+- import_playbook: site_aio_data.yml
+  vars:
+    oml_play_hosts: "omnileads_aio"
 
 - import_playbook: site_restore.yml
   vars:

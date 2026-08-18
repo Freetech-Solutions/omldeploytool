@@ -39,3 +39,5 @@ components-git-repo/whisper-vm-finetune/
 CLAUDE.md
 docker-compose/CLAUDE.md
 ansible/CLAUDE.md
+
+.cursor

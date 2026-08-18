@@ -47,6 +47,7 @@ GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 
 # --- Images for testing and development
 PSTNEMULATOR_IMG=pstn_emulator:241209.01
+KAMAILIO_ITSP_IMG=omnileads/kamailio_itsp:dev
 OML_VUEJS_IMG=docker.io/freetechsolutions/vue-cli:develop
 NGINX_QA_IMG=docker.io/freetechsolutions/nginxqa:20260521-e4d691d4
 
@@ -233,6 +234,7 @@ KAMAILIO_DEBUG_LEVEL=2
 # kamailio-webrtc container interface name
 KAMAILIO_WEBRTC_IFACE=eth0
 
+ITSP_NODES=${KAMAILIO_ITSP_IP},${PSTN_EMULATOR_IP}
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
 #########################################################################################################
@@ -351,8 +353,23 @@ DIALER_PROCESS_CAMPAIGN_REPLICAS=5
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
 
+# --- Periodic dialer channel audit (Redis OML:CALLS vs active Asterisk channels)
+# Interval in seconds between audit jobs. Set to 0 or a negative value to disable the scheduler job.
 DIALER_CHANNEL_AUDIT_INTERVAL_SEC=60
+# Distributed Redis lock TTL in seconds. It prevents overlapping audits across worker replicas.
+# Keep it longer than the expected audit duration and normally shorter than the audit interval.
+DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC=55
+# Grace period in seconds after reserving a channel (INCR). During this window, an audit does not
+# lower OML:CALLS because the newly originated PSTN channel may not be visible in Asterisk yet.
 DIALER_RESERVE_GRACE_SEC=30
+
+# --- Predictive pacing (global; campaign uses initial_predictive_model in Postgres)
+# Maximum abandon rate D_max (EXIT_ABANDON+EXIT_TIMEOUT / connects). Used for gamma later.
+DIALER_MAX_ABANDON_RATE=0.03
+# Progressive strict until ATT_COUNT reaches this sample (warm-up before overdial).
+DIALER_WARM_UP_SAMPLE_SIZE=50
+# Idle cadence for predictive campaigns when there are no contacts to dial (milliseconds).
+DIALER_PREDICTIVE_TICK_MS=1000
 
 
 #########################################################################################################
@@ -379,22 +396,44 @@ GOOGLE_CLOUD_PROJECTID=your_project_id
 #########################################################################################################
 #                                       QA & Testing                                                    #
 #########################################################################################################
-# --- PSTN EMULATOR
+# --- PSTN EMULATOR / Kamailio ITSP (QA)
+# Flujo outbound: ACD -> kamailio-pstn -> kamailio-itsp -> pbxemulator
+KAMAILIO_ITSP_IP=10.22.72.97
 PSTN_EMULATOR_IP=10.22.72.99
 
-# ---default: 100% of the calls are answered.
-# ---dial2softphone: 100% of the calls are sent to the testing softphone.
-# ---ans_busy: 50% of the calls are answered, while the other 50% return BUSY.
-# ---ans_busy_congestion_noans: 25% of the calls are answered, while another 25% return BUSY, 25% return CONGESTION, and 25% return NO ANSWER.
-# ---advanced: in this mode, calls are processed according to the last digit:
-# ---       0: BUSY
-# ---       2: ANSWER a call lasting 15 seconds.
-# ---       3: Waits 35 seconds, then ANSWER a call lasting 100 seconds.
-# ---       5: NO ANSWER
-# ---       7: ANSWER a call lasting 27 seconds.
-# ---       9: CONGESTION
+# Forced SIP responses by R-URI user-part prefix
+# (applies only to traffic reaching kamailio-itsp; numbers that do not match
+# the prefixes listed below are relayed to the PSTN Emulator (PBX))
 
-PSTN_EMULATOR_MODE=default
+# ---       092* -> 404 Not Found
+# ---       093* -> 503 Service Unavailable
+# ---       094* -> 486 Busy Here
+# ---       095* -> 603 Decline
+# ---       096* -> 403 Forbidden
+# ---       097* -> 405 Method Not Allowed
+# ---       098* -> 406 Not Acceptable
+# ---       099* -> 408 Request Timeout
+# ---       081* -> 480 Temporarily Unavailable
+# ---       082* -> 487 Request Terminated
+# ---       083* -> 488 Not Acceptable Here
+# ---       084* -> 500 Internal Server Error
+# ---       085* -> 502 Bad Gateway
+# ---       086* -> 608 Rejected
+# ---       087* -> 180 Ringing 45s, luego 408 Request Timeout
+# ---       otro -> relay hacia pstn emulator (PBX)
+
+# For numbers relayed to the PSTN Emulator (PBX), the response mode is defined by
+# the "mode" set as an env var on the PSTN Emulator (PBX).
+
+PSTN_EMULATOR_MODE=advanced
+
+# ---Mode "default": 100% of the calls are answered.
+# ---Mode "dial2softphone": 100% of the calls are sent to the testing softphone.
+# ---Mode "advanced": calls are processed according to the last digit:
+#           2: ANSWER a call lasting 15 seconds.
+#           3: Waits 35 seconds, then ANSWER a call lasting 100 seconds.
+#           5: NO ANSWER.
+#           7: ANSWER a call lasting 27 seconds.
 
 # --- dial2softphone
 # ---SIP_REFER: 100% of the calls are sent to the SIP REFER.

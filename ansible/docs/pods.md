@@ -292,7 +292,8 @@ Todos usan `EnvironmentFile=/etc/default/django.env` salvo casos específicos de
 | `dialer_manage_campaign.service` | `dialer-manage-campaign` | `DIALER_WORKER_IMG` | Gestión de campañas salientes. |
 | `dialer_incidence_rules.service` | `dialer-incidence-rules` | `DIALER_WORKER_IMG` | Reglas de incidencias del dialer. |
 | `dialer_render_template.service` | `dialer-render-template` | `DIALER_WORKER_IMG` | Renderizado de plantillas de campaña. |
-| `dialer_scheduler.service` | `dialer-scheduler` | `DIALER_WORKER_IMG` | Job Gearman `schedule-agenda`. |
+| `dialer_scheduler.service` | `dialer-scheduler` | `DIALER_WORKER_IMG` | Job Gearman `schedule-agenda` + encola auditoría periódica. |
+| `dialer_channel_audit.service` | `dialer-channel-audit` | `DIALER_WORKER_IMG` | Job Gearman `audit-active-channels` (reconcilia `OML:CALLS`). |
 | `dialer_send_reports.service` | `dialer-send-reports` | `DIALER_WORKER_IMG` | Envío de reportes de campaña. |
 | `dialer_process_campaign@N.service` | `dialer-process-campaign-N` | `DIALER_WORKER_IMG` | Workers de procesamiento de campaña (réplicas). |
 | `dialer_process_contact@N.service` | `dialer-process-contact-N` | `DIALER_WORKER_IMG` | Workers de contactos (plantilla `@`, réplicas vía inventario). |

@@ -11,6 +11,7 @@
               'dialer_incidence_rules.service',
               'dialer_manage_campaign.service',
               'dialer_scheduler.service',
+              'dialer_channel_audit.service',
               'dialer_send_reports.service',
               'dialer_render_template.service',
             ]
@@ -135,6 +136,7 @@
     - { src: manage_campaign.container, dest: /etc/containers/systemd/dialer_manage_campaign.container, mode: "0644" }
     - { src: render_template.container, dest: /etc/containers/systemd/dialer_render_template.container, mode: "0644" }
     - { src: schedule_agenda.container, dest: /etc/containers/systemd/dialer_scheduler.container, mode: "0644" }
+    - { src: channel_audit.container, dest: /etc/containers/systemd/dialer_channel_audit.container, mode: "0644" }
     - { src: send_reports.container, dest: /etc/containers/systemd/dialer_send_reports.container, mode: "0644" }
   when: oml_has_dialer_workers | default(false) | bool
   tags: [install, upgrade, update]

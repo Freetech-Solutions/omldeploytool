@@ -174,6 +174,9 @@ x-dialer-worker-common: &dialer-worker-common
     REDIS_DIALER_PORT: ${REDIS_PORT}
     PYTHON_LOGLEVEL: ${DIALER_PYTHON_LOGLEVEL}
     TIME_BETWEEN_CALLS: ${DIALER_TIME_BETWEEN_CALLS}
+    DIALER_CHANNEL_AUDIT_INTERVAL_SEC: ${DIALER_CHANNEL_AUDIT_INTERVAL_SEC:-60}
+    DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC: ${DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC:-55}
+    DIALER_RESERVE_GRACE_SEC: ${DIALER_RESERVE_GRACE_SEC:-30}
     TZ: ${TZ}
 
 # ACD common template
@@ -963,6 +966,12 @@ services:
     environment:
       <<: *dialer-worker-env
       GEARMAN_JOBS: "schedule-agenda"
+
+  dialer-channel-audit:
+    <<: *dialer-worker-common
+    environment:
+      <<: *dialer-worker-env
+      GEARMAN_JOBS: "audit-active-channels"
 
   dialer-start-camp:
     <<: *dialer-worker-common

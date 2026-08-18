@@ -2,6 +2,12 @@
 
 Comparacion analizada: `main...develop-3.0` sobre `ansible/` (HEAD actual de la rama).
 
+## AIO restore con `backup_filename`
+
+- Nuevo playbook `site_aio_data.yml` importado por `site.yml` **antes** de `site_restore.yml`: en inventarios solo-`omnileads_aio` despliega la capa data (prerequisitos/pods/postgres/…) cuando hay `backup_filename`, evitando el fallo `data_statefull-pod.service` inexistente.
+- Restore usa `postgres_database` (no hardcode `omnileads`) como nombre de base a recrear/cargar.
+- `deploy.sh`: `ANSIBLE_REMOTE_TEMP` pasa a `~/.ansible/tmp` (antes `/tmp/ansible-remote` compartido rompía templates tras `become` como root).
+
 ## Wazuh Agent
 
 - Rol `wazuh-agent`: instalación y enrollment del agente oficial (Debian/RedHat) hacia un Manager externo.

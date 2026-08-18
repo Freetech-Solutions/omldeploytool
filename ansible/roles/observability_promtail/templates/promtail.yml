@@ -116,6 +116,7 @@ clients:
   'dialer_incidence_rules',
   'dialer_manage_campaign',
   'dialer_scheduler',
+  'dialer_channel_audit',
   'dialer_render_template',
   'dialer_send_reports',
 ] %}

@@ -53,7 +53,8 @@ KNOWN_CONTAINERS=(
   omlapp-daily-redis-cleanup omlapp-presence-heartbeat-scheduler oml-call-logger
   omlapp-dashboard-agent-scheduler omlapp-supervision-events-listener
   dialer-manage-campaign dialer-incidence-rules dialer-render-template
-  dialer-scheduler dialer-send-reports callrec-compressor callrec-transcriptor
+  dialer-scheduler dialer-channel-audit dialer-send-reports
+  callrec-compressor callrec-transcriptor
 )
 
 # Pods Quadlet (membresía en grupos pod del inventario; ver roles/pods/tasks/main.yml).
@@ -84,7 +85,8 @@ STACK_UNITS_ORDER=(
   acd-config.service acd-server.service acd-app.service acd-fastagi.service
   kamailio_webrtc.service kamailio_pstn.service rtpengine.service
   dialer_api.service dialer_incidence_rules.service dialer_manage_campaign.service
-  dialer_render_template.service dialer_scheduler.service dialer_send_reports.service
+  dialer_render_template.service dialer_scheduler.service
+  dialer_channel_audit.service dialer_send_reports.service
   callrec_compressor.service callrec_transcriber.service
 )
 
