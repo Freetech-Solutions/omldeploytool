@@ -725,6 +725,8 @@ services:
         condition: service_healthy
       rtpengine:
         condition: service_started
+      pbxemulator:
+        condition: service_started
     environment:
       ACD_NODES: ${ACD_NODES}
       DOMAIN: ${FQDN}

@@ -18,6 +18,10 @@ SUBNET=10.22.72.0/24
 GATEWAY=10.22.72.254
 
 DOMAIN=omnileads.local
+
+# --- PSTN EMULATOR
+PSTN_EMULATOR_IP=10.22.72.99
+
 #############7#####################################################################################
 #                                  Components image version                                       #
 #                              versions of each image to deploy                                   #
@@ -119,10 +123,9 @@ PYTHONPATH=/opt/omnileads/ominicontacto
 STT_ENGINE=gemini
 # --- In case o Clooud based STT put here the STT API key or JSON credentials (GCP)
 # for Gemini or OpenAI STT use the API key
-STT_API_KEY=hjdgsjadgajgjagsagsdjasghjasgdjahsgdjasgdjags
+STT_API_KEY=dajsdjahjkdahsjkh4-dasdhasjdhaskj5-dadasdasda
 # for Google GCP-STT use the JSON credentials
 STT_GCP_JSON_PATH=/app/google_credentials.json
-
 
 #####################################################################################################
 #                                       ACD                                                        #
@@ -165,6 +168,7 @@ ACD_SCALE=False
 # ACD_TIMER_T1=
 # ACD_TIMER_B=
 
+ACD_SERVER_IP=10.22.72.0/24
 #####################################################################################################
 #                                       FASTAGI                                                     #
 #####################################################################################################
@@ -216,9 +220,6 @@ KAMAILIO_WEBRTC_SIP_PORT=10060
 KAMAILIO_WEBRTC_IFACE=eth0
 KAMAILIO_HTTPS_PORT=10060
 
-# ACD_SERVER_IP is the IP address of the ACD server
-ACD_SERVER_IP=10.22.72.0/24
-
 KAMAILIO_PSTN_HOSTNAME=kamailio-pstn
 KAMAILIO_PSTN_UDP_PORT=5060
 
@@ -238,7 +239,7 @@ KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
 # kamailio-webrtc container interface name
 KAMAILIO_WEBRTC_IFACE=eth0
 
-ITSP_NODES=pbxemulator:5070
+ITSP_NODES=${PSTN_EMULATOR_IP}:5070
 
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
@@ -286,6 +287,7 @@ GEARMAN_PORT=4730
 GEARMAN_JOB_SERVERS=${GEARMAN_HOSTNAME}:${GEARMAN_PORT}
 
 GEARMAN_CALLLOG_TASK=acd-log-processor
+
 #########################################################################################################
 #                                Object Storage BUCKET config                                           #
 #########################################################################################################
@@ -373,24 +375,21 @@ DIALER_GAMMA_THROTTLE_FLOOR=0.2
 
 HOMER_ENABLE=False
 # --- IP or hostname that each instance will invoke when locating the other    
-HOMER_HOSTNAME=homer.domain
+HOMER_HOSTNAME=homer.sephir.tech
 HOMER_PORT=9060
 
 #########################################################################################################
 #                                        Google integrations                                            #
 #########################################################################################################
+
 GOOGLE_MAPS_API_KEY=NULL
 GOOGLE_MAPS_CENTER='{ "lat": -31.416668, "lng": -64.183334 }'
 GOOGLE_API_KEY=jkjghjkgjk65467GHFGHF5646ghghfghFHGFghf
 GOOGLE_CLOUD_PROJECTID=your_project_id
 
-
 #########################################################################################################
 #                                       QA & Testing                                                    #
 #########################################################################################################
-# --- PSTN EMULATOR
-KAMAILIO_ITSP_IP=10.22.72.97
-PSTN_EMULATOR_IP=10.22.72.99
 
 # Forced SIP responses by R-URI user-part prefix
 # the prefixes listed below are relayed to the PSTN Emulator (PBX))
