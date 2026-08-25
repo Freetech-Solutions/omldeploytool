@@ -1,7 +1,7 @@
 ---
 
 # --- OMniLeads images WEB
-APP_IMG: docker.io/freetechsolutions/omlapp:20260818-d104b363
+APP_IMG: docker.io/freetechsolutions/omlapp:20260825-c1a1eaed
 NGINX_IMG: docker.io/freetechsolutions/nginx:20260716-bf4395be
 WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
 
