@@ -7,7 +7,7 @@ WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
 
 # --- OMniLeads images TEL
 ACD_IMG: docker.io/freetechsolutions/acd:20260819-28dc14ba
-KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260716-142f8e28
+KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260824-805399ea
 RTPENGINE_IMG: docker.io/freetechsolutions/rtpengine:20260713-c32419a6
 CALLREC_COMPRESSOR_IMG: docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
 CALLREC_TRANSCRIBER_IMG: docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3
@@ -24,6 +24,10 @@ MINIO_IMG: docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 MINIO_MC_IMG: docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG: docker.io/artefactual/gearmand:1.1.21.2-alpine
 
+# QA images
+PSTN_EMULATOR_IMG: docker.io/omnileads/pstn_emulator:20260317-4a8510d1
+NGINX_QA_IMG: docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
+
 # --- Edge HTTP(S) load balancer (Quadlet en hosts del grupo edge)
 HAPROXY_IMG: docker.io/library/haproxy:3.3
 
@@ -38,8 +42,3 @@ PROMETHEUS_PODMAN_EXPORTER_IMG: quay.io/navidys/prometheus-podman-exporter:v1.21
 PROMETHEUS_PODMAN_IMG: quay.io/navidys/prometheus-podman-exporter:latest
 PROMTAIL_IMG: docker.io/grafana/promtail:main-9f5f159
 BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260422-16161cf0
-
-# QA images
-PSTN_EMULATOR_IMG: docker.io/omnileads/pstn_emulator:20260317-4a8510d1
-NGINX_QA_IMG: docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
-

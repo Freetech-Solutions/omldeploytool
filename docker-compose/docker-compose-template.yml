@@ -500,7 +500,7 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
-      - .custom_conf/certs/:/etc/omnileads/certs:ro
+      # - .custom_conf/certs/:/etc/omnileads/certs:ro
 
   omlapp:
     build:
@@ -529,7 +529,7 @@ services:
     volumes:
       - django_static:/opt/omnileads/static
       - django_media:/opt/omnileads/media_root
-      - ${REPO_PATH}/django/:/opt/omnileads/ominicontacto/
+      # - ${REPO_PATH}/django/:/opt/omnileads/ominicontacto/
 
   django-commands:
     <<: *django-common
@@ -880,47 +880,57 @@ services:
   # QA & Dev Env Tools
   # ----------------------------------------------------------------------------
 
-  vue-cli:
-    <<: *vue-common
-    tty: true
-    ports:
-      - 8081:8080
-    #build:
-    #  context: ./$REPO_PATH/django/omnileads_ui/
-    #  dockerfile: Dockerfile
+  # vue-cli:
+  #   <<: *vue-common
+  #   tty: true
+  #   ports:
+  #     - 8081:8080
+  #   #build:
+  #   #  context: ./$REPO_PATH/django/omnileads_ui/
+  #   #  dockerfile: Dockerfile
 
-  vue-build:
-    <<: *vue-common
-    logging: *default-logging
-    restart: "no"
-    entrypoint:
-      - /bin/sh
-      - -lc
-      - |
-        set -e
-        if [ ! -x node_modules/.bin/vue-cli-service ]; then
-          echo "==> [vue-build] installing npm dependencies (npm ci)"
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
-        else
-          echo "==> [vue-build] node_modules ok, skipping install"
-        fi
-        if [ ! -f dist/index.html ]; then
-          echo "==> [vue-build] running npm run build"
-          npm run build
-        else
-          echo "==> [vue-build] dist/ already built, skipping (run: docker compose run --rm vue-build npm run build to force)"
-        fi
+  # vue-build:
+  #   <<: *vue-common
+  #   logging: *default-logging
+  #   restart: "no"
+  #   entrypoint:
+  #     - /bin/sh
+  #     - -lc
+  #     - |
+  #       set -e
+  #       if [ ! -x node_modules/.bin/vue-cli-service ]; then
+  #         echo "==> [vue-build] installing npm dependencies (npm ci)"
+  #         if [ -f package-lock.json ]; then npm ci; else npm install; fi
+  #       else
+  #         echo "==> [vue-build] node_modules ok, skipping install"
+  #       fi
+  #       if [ ! -f dist/index.html ]; then
+  #         echo "==> [vue-build] running npm run build"
+  #         npm run build
+  #       else
+  #         echo "==> [vue-build] dist/ already built, skipping (run: docker compose run --rm vue-build npm run build to force)"
+  #       fi
+
+  # nginxcgi:
+  #   image: ${NGINX_QA_IMG}
+  #   build:
+  #     context: ./$REPO_PATH/omlqa/nginx/
+  #   <<: *optional-service-common
+  #   environment:
+  #     PGHOST: ${POSTGRES_HOSTNAME}
+  #     PGPORT: ${POSTGRES_PORT}
+  #     PGUSER: ${POSTGRES_USER}
+  #     PGPASSWORD: ${POSTGRES_PASSWORD}
+  #     PGDATABASE: ${POSTGRES_DB}
+  #     PSTN_HOSTNAME: pbxemulator
+  #   ports:
+  #     - 127.0.0.1:8888:8808/tcp
 
   pbxemulator:
     image: ${PSTNEMULATOR_IMG}
     build:
       context: ./$REPO_PATH/omlqa/pstn_emulator/
     hostname: pbxemulator
-    # kamailio-pstn debe estar creado antes: el wizard PJSIP resuelve
-    # remote_hosts al cargar Asterisk (identify del trunk OML).
-    depends_on:
-      kamailio-pstn:
-        condition: service_started
     environment:
       INBOUND_CALL_MODE: ${PSTN_EMULATOR_MODE}
       VOICEBOT_CALL_MODE: ${VOICEBOT_CALL_MODE}
@@ -939,21 +949,6 @@ services:
         ipv4_address: ${PSTN_EMULATOR_IP}
     #volumes:
     #  - ../.custom_conf/pstn_extensions.conf:/etc/asterisk/extensions.conf
-
-  nginxcgi:
-    image: ${NGINX_QA_IMG}
-    build:
-      context: ./$REPO_PATH/omlqa/nginx/
-    <<: *optional-service-common
-    environment:
-      PGHOST: ${POSTGRES_HOSTNAME}
-      PGPORT: ${POSTGRES_PORT}
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB}
-      PSTN_HOSTNAME: pbxemulator
-    ports:
-      - 127.0.0.1:8888:8808/tcp
 
   redisinsight:
     image: redis/redisinsight:latest

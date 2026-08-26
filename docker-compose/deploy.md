@@ -8,8 +8,11 @@ El modelo es de **stack único**: la plantilla `docker-compose-template.yml` def
 
 No hace falta clonar el repositorio a mano: `deploy.sh` se descarga directamente y se encarga de todo — clona/actualiza `omldeploytool` en la rama indicada, inicializa los submódulos, genera `docker-compose.yml` y `.env` desde las plantillas y construye las imágenes.
 
+
 ```bash
-curl -fsSL "https://gitlab.com/omnileads/omldeploytool/-/raw/${RAMA}/docker-compose/docker_install_linux.sh" -o deploy.sh
+# Elegir la rama a desplegar
+RAMA=develop-3.0
+curl -fsSL "https://gitlab.com/omnileads/omldeploytool/-/raw/${RAMA}/docker-compose/docker_install_linux.sh" -o docker_install_linux.sh
 bash docker_install_linux.sh
 ```
 
