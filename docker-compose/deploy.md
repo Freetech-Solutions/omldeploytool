@@ -4,6 +4,40 @@ Este documento describe la función de cada servicio del stack de OMniLeads desp
 
 El modelo es de **stack único**: la plantilla `docker-compose-template.yml` define **todos** los componentes — **OMniLeads** (contact center) + **OMniDialer** + telefonía (SIP, WebRTC, ACD) + herramientas de QA/desarrollo. Ya no existen los entornos `test-env` / `dev-env` / `prod-env`: el mismo stack funciona para **desarrollo**, **producción**, con **edge server externo** o con **data server externo**, según los valores que se configuren en el `.env`.
 
+## Descarga y despliegue con curl
+
+No hace falta clonar el repositorio a mano: `deploy.sh` se descarga directamente y se encarga de todo — clona/actualiza `omldeploytool` en la rama indicada, inicializa los submódulos, genera `docker-compose.yml` y `.env` desde las plantillas y construye las imágenes.
+
+```bash
+curl -fsSL "https://gitlab.com/omnileads/omldeploytool/-/raw/${RAMA}/docker-compose/docker_install_linux.sh" -o deploy.sh
+bash docker_install_linux.sh
+```
+
+```bash
+# Elegir la rama a desplegar
+RAMA=develop-3.0
+curl -fsSL "https://gitlab.com/omnileads/omldeploytool/-/raw/${RAMA}/docker-compose/deploy.sh" -o deploy.sh
+bash deploy.sh "$RAMA"
+```
+
+Si GitLab no está disponible, se puede usar el mirror de GitHub:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/Freetech-Solutions/omldeploytool/${RAMA}/docker-compose/deploy.sh" -o deploy.sh
+chmod +x deploy.sh
+./deploy.sh --repo=github.com/Freetech-Solutions "$RAMA"
+```
+
+Al finalizar, el stack queda listo en `./omldeploytool/docker-compose/`:
+
+```bash
+cd omldeploytool/docker-compose
+./oml_manage.sh up -d
+./oml_manage.sh reset-pass      # admin / admin
+```
+
+> Requiere que `deploy.sh` esté pusheado en la rama elegida. Opciones útiles: `./deploy.sh --no-build` (sin build de imágenes), `--path=/srv/` (directorio destino del clone). Ver `./deploy.sh --help`.
+
 ## Archivos involucrados
 
 | Archivo | Rol |

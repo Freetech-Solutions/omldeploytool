@@ -225,12 +225,39 @@ init_submodules() {
 
   log_info "Inicializando submódulos"
   git -C "$repo_root" submodule sync --recursive
-  if ! git -C "$repo_root" submodule update --init --recursive; then
-    if [[ "$USE_GITHUB_MIRROR" -eq 0 ]]; then
-      gitlab_down_message
-    fi
-    log_error "No se pudieron inicializar los submódulos desde $REPO_URL"
+
+  local update_log
+  update_log="$(mktemp)"
+  if git -C "$repo_root" submodule update --init --recursive 2>&1 | tee "$update_log"; then
+    rm -f "$update_log"
+    return 0
   fi
+
+  # "not our ref" / "did not contain": el monorepo pinea un commit de submódulo
+  # que no existe en el remoto del componente (rama del submódulo sin pushear,
+  # o mirror desactualizado). No es un problema de disponibilidad de GitLab.
+  if grep -qE 'not our ref|did not contain' "$update_log"; then
+    rm -f "$update_log"
+    cat >&2 <<EOF
+
+ERROR: la rama '$BRANCH' del monorepo referencia un commit de submódulo que no
+existe en el remoto de ese componente ("not our ref" / "did not contain").
+
+Causa típica: se commiteó el puntero del submódulo en el monorepo sin pushear
+antes la rama del submódulo en su propio repo. Solución:
+
+  git -C components-git-repo/<componente> push -u origin <rama-del-submodulo>
+
+y volver a correr $(basename "$0").
+EOF
+    exit 1
+  fi
+  rm -f "$update_log"
+
+  if [[ "$USE_GITHUB_MIRROR" -eq 0 ]]; then
+    gitlab_down_message
+  fi
+  log_error "No se pudieron inicializar los submódulos desde $REPO_URL"
 }
 
 clone_or_update_repo() {
