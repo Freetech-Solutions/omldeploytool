@@ -914,9 +914,13 @@ services:
   pbxemulator:
     image: ${PSTNEMULATOR_IMG}
     build:
-      context: ./$REPO_PATH/omlqa/pstn_emulator/    
-    # <<: *optional-service-common 
+      context: ./$REPO_PATH/omlqa/pstn_emulator/
     hostname: pbxemulator
+    # kamailio-pstn debe estar creado antes: el wizard PJSIP resuelve
+    # remote_hosts al cargar Asterisk (identify del trunk OML).
+    depends_on:
+      kamailio-pstn:
+        condition: service_started
     environment:
       INBOUND_CALL_MODE: ${PSTN_EMULATOR_MODE}
       VOICEBOT_CALL_MODE: ${VOICEBOT_CALL_MODE}
@@ -949,7 +953,7 @@ services:
       PGDATABASE: ${POSTGRES_DB}
       PSTN_HOSTNAME: pbxemulator
     ports:
-      - 8888:8808
+      - 127.0.0.1:8888:8808/tcp
 
   redisinsight:
     image: redis/redisinsight:latest
