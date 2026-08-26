@@ -286,6 +286,8 @@ prepare_dev_env() {
   log_info "Copiando oml_manage.sh y env a dev-env"
   cp "$repo_root/docker-compose/oml_manage.sh" "$dev_env_dir/oml_manage.sh"
   chmod +x "$dev_env_dir/oml_manage.sh"
+  # rm previo: no escribir a través de un symlink .env -> ../.env
+  rm -f "$dev_env_dir/.env"
   cp "$repo_root/docker-compose/env" "$dev_env_dir/.env"
 
   log_info "Ajustando variables para dev-env (set_dev_env.sh)"

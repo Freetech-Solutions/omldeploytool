@@ -1,3 +1,4 @@
+ansible/CLAUDE.md
 ansible/group_vars/all/vault.yml
 ansible/instances
 ansible/.inventory.yml
@@ -17,27 +18,15 @@ ansible/.ansible-lint
 .idea/
 
 docker-compose/.custom_conf/
-docker-compose/prod-env/oml_manage.sh
-docker-compose/test-env/oml_manage.sh
-docker-compose/dev-env/oml_manage.sh
-docker-compose/dev-env/.env
-docker-compose/dev-env/gitlab/
-docker-compose/dev-env/gitlab-runner/config/config.toml
-docker-compose/prod-env/.env
-docker-compose/test-env/.env
 docker-compose/observability/.env
-docker-compose/observability/.env
-docker-compose/backend/.env
+docker-compose/pstn-proxy/.env
+docker-compose/.env
+docker-compose/docker-compose.yml
+docker-compose/CLAUDE.md
 
 components-git-repo/custom_app/
-components-git-repo/voice_ai/
-components-git-repo/whisper-vm-finetune/
 
 .ci-omnileads/
 .cache/
-
-CLAUDE.md
-docker-compose/CLAUDE.md
-ansible/CLAUDE.md
-
 .cursor
+.CLAUDE.md

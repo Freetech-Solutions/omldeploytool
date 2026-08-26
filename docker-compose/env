@@ -2,7 +2,7 @@
 #                                   Environment                                                   #   
 ###################################################################################################
 # --- Path to the repositories where the OML git submodules are cloned
-REPO_PATH=../../components-git-repo
+REPO_PATH=../components-git-repo
 # IPV4 address of the docker engine host
 OML_HOSTNAME=127.0.0.1
 # If you want to use a public IP, set it here
@@ -16,10 +16,12 @@ SCALE=false
 # --- If you want to use a custom docker network bridge params:
 SUBNET=10.22.72.0/24
 GATEWAY=10.22.72.254
-
 DOMAIN=omnileads.local
-
-# --- PSTN EMULATOR
+# --- VoIP plane static IPs (Kamailio dispatcher/allowlist and PJSIP identify
+# match by source IP, not Docker DNS). High addresses avoid Docker DHCP
+# which allocates from .2 upward. Do not reuse GATEWAY (.254).
+ACD_HOST_IP=10.22.72.100
+KAMAILIO_PSTN_IP=10.22.72.101
 PSTN_EMULATOR_IP=10.22.72.99
 
 #############7#####################################################################################
@@ -112,8 +114,13 @@ UWSGI_LISTEN_QUEUE_SIZE=2048
 UWSGI_WORKER_RELOAD_MERCY=60
 UWSGI_EVIL_RELOAD_ON_RSS=10240
 
-DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
+# --- Django Python path
 PYTHONPATH=/opt/omnileads/ominicontacto
+
+# --- Django settings module: production or develop
+DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
+# --- Django entrypoint: init_uwsgi.sh or init_devenv.sh
+DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh
 
 #####################################################################################################
 #                                       STT & TTS                                                   #
@@ -123,9 +130,10 @@ PYTHONPATH=/opt/omnileads/ominicontacto
 STT_ENGINE=gemini
 # --- In case o Clooud based STT put here the STT API key or JSON credentials (GCP)
 # for Gemini or OpenAI STT use the API key
-STT_API_KEY=dajsdjahjkdahsjkh4-dasdhasjdhaskj5-dadasdasda
+STT_API_KEY=AIzaSyDkVNF5O7-4NDEwLMEZfxTh2g3PzET3sOY
 # for Google GCP-STT use the JSON credentials
 STT_GCP_JSON_PATH=/app/google_credentials.json
+
 
 #####################################################################################################
 #                                       ACD                                                        #
@@ -138,37 +146,19 @@ ACD_REPLICAS=1
 ACD_RTP_PORT_MIN=30001
 ACD_RTP_PORT_MAX=40000
 ACD_AMI_USER=omnileadsami
-ACD_AMI_PASSWORD=5_MeO_DMT
+ACD_AMI_PASSWORD=hjg@3jhadw@lkkj099jkllksaKJKJ33@dd27q3@
 ACD_ARI_PORT=7088
 
 # --- error, warning, notice, debug
 ACD_LOG_LEVEL=notice
 
-# --- Only if VOIP_ENV=custom, you can set custom SIP PJSIP transport ip  & port
-ACD_PJSIP_TRANSPORT_DIALER=127.0.0.1
 ACD_PJSIP_TRANSPORT_AGENT=${ACD_HOSTNAME}
 ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
 ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
-ACD_WEBHOOK_TRANSFER_TTL=5
+ACD_WEBHOOK_TRANSFER_TTL=10
 ACD_REC_PATH=/var/spool/asterisk/recording
-# --- Asterisk scale parameters
-# Scale var "True" or "False"
-ACD_SCALE=False
-# ACD_POD_CPU_LIMIT=100m
-# ACD_POD_MEM_LIMIT=512Mi
-# ACD_MEM_LIMIT=
-# ACD_THREADPOOL_IDLE_TIMEOUT=
-# ACD_THREADPOOL_MAX_SIZE=
-# ACD_THREADPOOL_INITIAL_SIZE=
-# ACD_THREADPOOL_AUTO_INCREMENT=
-# ACD_STASIS_INITIAL_SIZE=
-# ACD_STASIS_IDLE_TIMEOUT_SEC=
-# ACD_STASIS_MAX_SIZE=
-# ACD_TIMER_T1=
-# ACD_TIMER_B=
 
-ACD_SERVER_IP=10.22.72.0/24
 #####################################################################################################
 #                                       FASTAGI                                                     #
 #####################################################################################################
@@ -202,11 +192,6 @@ WEBSOCKET_PORT=8000
 # *** Activete verbose ---> DEBUG:fts.oml.services.websockets,websockets.server
 WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets ;INFO:websockets.server
 
-# ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
-# ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
-# *** For redis sentinel cluster ---> redis+sentinel://master/sentinel_01,sentinel_02,sentinel_03
-# *** For simple redis ---> redis://redis:6379
-
 # --- IP or hostname that each instance will invoke when locating the other    
 WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 
@@ -217,30 +202,33 @@ WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 # string for prod-env "127.0.0.1" is the default value
 KAMAILIO_WEBRTC_HOSTNAME=kamailio-webrtc
 KAMAILIO_WEBRTC_SIP_PORT=10060
-KAMAILIO_WEBRTC_IFACE=eth0
 KAMAILIO_HTTPS_PORT=10060
+# kamailio-webrtc container interface name
+KAMAILIO_WEBRTC_IFACE=eth0
+# CIDR of the compose network; kamailio-webrtc allows SIP from this range.
+# Not a container address — use ACD_HOST_IP for acd-server ipv4_address.
+KAMAILIO_ACD_SERVER_NET=10.22.72.0/24
+
 
 KAMAILIO_PSTN_HOSTNAME=kamailio-pstn
 KAMAILIO_PSTN_UDP_PORT=5060
 
-# ACD_NODES is a comma-separated list of ACD nodes. Each node is a hostname:port pair.
-# You can adjusto the number of nodes to scale the ACD cluster.
-ACD_NODES=acd-server:5070 #test-env-acd-server-1:5070 # ,test-env-acd-server-2:5070
-
 # Variables for Kamailio memory. SHM is the maximum memory ammount.
 # PKG is the minimum memory ammount
-SHM_SIZE=2048
-PKG_SIZE=1024
+KAMAILIO_SHM_SIZE=2048
+KAMAILIO_PKG_SIZE=1024
 
 KAMAILIO_DEBUG_ENABLED=true
 KAMAILIO_DEBUG_LEVEL=2
 
 KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
-# kamailio-webrtc container interface name
-KAMAILIO_WEBRTC_IFACE=eth0
 
-ITSP_NODES=${PSTN_EMULATOR_IP}:5070
+# ACD_NODES: comma-separated ACD trunk addresses (ip:port). Use the static
+KAMAILIO_ACD_NODES=${ACD_HOST_IP}:5070
+# ACD_HOST_IP so Kamailio dispatcher matches outbound INVITEs after recreate.
+KAMAILIO_ITSP_NODES=${PSTN_EMULATOR_IP}:5070
 
+KAMAILIO_PSTN_QA=true
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
 #########################################################################################################
@@ -287,7 +275,6 @@ GEARMAN_PORT=4730
 GEARMAN_JOB_SERVERS=${GEARMAN_HOSTNAME}:${GEARMAN_PORT}
 
 GEARMAN_CALLLOG_TASK=acd-log-processor
-
 #########################################################################################################
 #                                Object Storage BUCKET config                                           #
 #########################################################################################################
@@ -316,7 +303,7 @@ MINIO_HTTP_ADMIN_PASS=s3minio123
 #                                   OMniDialer                                                          #
 #########################################################################################################
 # --- Django and Dialer API connection params
-DIALER_PASSWORD=0mn1d14l3r765
+DIALER_PASSWORD=uhbe@k4@3h@@b987ds@@
 
 # --- IP or hostname that each instance will invoke when locating the other    
 # When omnidialer run in other host, you must set the OMNIDIALER_HOST variable with 
@@ -331,23 +318,23 @@ DIALER_REDIS_DB=3
 # --- OML Websocket channel path (adjust if OML is running in other host)
 DIALER_DCHANNELS_URL=wss://${NGINX_HOSTNAME}/channels/omnidialer/${DIALER_PASSWORD}
 
-# --- Postgres dialer conn params
-DIALER_POSTGRES_USER=omnidialer
+# --- Postgres dialer conn params (misma instancia que OML; DB dedicada omnidialer)
+DIALER_POSTGRES_USER=${POSTGRES_USER}
 DIALER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-DIALER_POSTGRES_SERVER=dialer-postgresql
-DIALER_POSTGRES_PORT=5433
+DIALER_POSTGRES_SERVER=${POSTGRES_HOSTNAME}
+DIALER_POSTGRES_PORT=${POSTGRES_PORT}
 DIALER_POSTGRES_DB=omnidialer
 
 # --- Gearman conn params
-DIALER_GEARMAN_JOBS=start-campaign|stop-campaign|resume-campaign|process-contact|schedule-contact|process-event|create-campaign|edit-campaign|pause-campaign|delete-campaign|send-reports|add-incidence-rule-disposition|create-incidence-rule|process-campaign|delete-incidence-rule|update-incidence-rule|schedule-agenda|change-database|render-template|manage-dialer|manual-call
-
+DIALER_GEARMAN_JOBS_MANAGE_CAMPAIGN=start-campaign|stop-campaign|resume-campaign|process-contact|create-campaign|edit-campaign|pause-campaign|delete-campaign|change-database
+DIALER_GEARMAN_JOBS_MANAGE_INCIDENCE_RULES=add-incidence-rule-disposition|create-incidence-rule|process-campaign|delete-incidence-rule|update-incidence-rule
 # --- Log level
 DIALER_PYTHON_LOGLEVEL=debug
 
 # --- Call attempts per second
-DIALER_CAPS=5
+DIALER_CAPS=1
 # --- Time between the iterations when there are no contacts to call (in seconds)
-DIALER_TIME_BETWEEN_CALLS=4
+DIALER_TIME_BETWEEN_CALLS=2
 
 # --- Workers replicas
 DIALER_PROCESS_CAMPAIGN_REPLICAS=2
@@ -381,10 +368,9 @@ HOMER_PORT=9060
 #########################################################################################################
 #                                        Google integrations                                            #
 #########################################################################################################
-
 GOOGLE_MAPS_API_KEY=NULL
 GOOGLE_MAPS_CENTER='{ "lat": -31.416668, "lng": -64.183334 }'
-GOOGLE_API_KEY=jkjghjkgjk65467GHFGHF5646ghghfghFHGFghf
+GOOGLE_API_KEY=jkj@ghjkgjk65467GHFGHF@5646ghghfghFHGF@ghf@jhgjhg
 GOOGLE_CLOUD_PROJECTID=your_project_id
 
 #########################################################################################################
@@ -417,7 +403,12 @@ GOOGLE_CLOUD_PROJECTID=your_project_id
 
 # ---default: 100% of the calls are answered.
 # ---dial2softphone: 100% of the calls are sent to the testing softphone.
-# ---test_dialer: 
+# ---test_dialer: dialer-oriented simulation; every call is answered and a random
+#    case is applied (see omlqa/pstn_emulator/conf/extensions.conf, exten _X.):
+#      25%  -> short call: answer + ~1s + hangup (SHORTCALL disposition)
+#      25%  -> music on hold, no greeting
+#      50%  -> "hola" greeting + music on hold (simulates a human answer, for AMD)
+#    Music length is random as well: 1/3 15s, 1/3 27s, 1/3 full track.
 
 PSTN_EMULATOR_MODE=test_dialer
 
@@ -430,3 +421,4 @@ VOICEBOT_CALL_MODE=mode_4
 
 VOICEBOT_USERNAME=voicebot
 VOICEBOT_PASSWORD=098098ZZZ
+

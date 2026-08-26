@@ -18,12 +18,11 @@ Servicios de datos e infraestructura compartida: bases de datos, caché, almacen
 
 | Servicio | Función |
 |----------|---------|
-| **postgresql** | Base de datos principal de OMniLeads. Almacena configuración, usuarios, campañas, reportes y datos de llamadas (puerto 5432). |
+| **postgresql** | Instancia única de PostgreSQL (puerto 5432). Contiene la DB `omnileads` (OML) y la DB `omnidialer` (dialer), creada al init con `omnidialer.sql` — el mismo patrón que el rol Ansible `postgresql`. |
 | **redis** | Cache, sesiones, pub/sub y colas en tiempo real (con RedisGears). Usado por la web, los workers, los websockets y el ACD. |
 | **minio** | Almacenamiento de objetos compatible con S3 para grabaciones y archivos media. API en `:9000` y consola en `:9001`. Con límites de recursos (`1G` / `0.5 CPU`). |
 | **createbuckets** | Tarea one-shot (`restart: "no"`) que, al levantar el stack, crea el bucket `omnileads`, el usuario `omlminio` y asigna la política `readwrite`. |
 | **gearman** | Cola de trabajos distribuidos. La usan el ACD (registro de llamadas), el dialer (campañas/contactos/eventos) y los procesos post-llamada. |
-| **dialer-postgresql** | Base de datos exclusiva del OMniDialer (puerto interno 5433). Se inicializa con `../omnidialer.sql`. |
 
 ---
 
@@ -85,7 +84,7 @@ Workers que ejecutan tareas en segundo plano, listeners de eventos y schedulers 
 
 ## Dialer-stack
 
-Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y eventos. La base de datos del dialer (`dialer-postgresql`) se documenta en la sección *Backend*.
+Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y eventos. La base `omnidialer` vive en el mismo servicio `postgresql` (no hay instancia aparte).
 
 | Servicio | Función |
 |----------|---------|
@@ -95,21 +94,10 @@ Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y e
 | **dialer-process-event** | Worker Gearman: procesamiento de eventos del dialer. Escala con `PROCESS_EVENT_REPLICAS`. |
 | **dialer-scheduler** | Worker Gearman: programación de la agenda de contactos (`schedule-agenda`) y productor periódico de `audit-active-channels`. |
 | **dialer-channel-audit** | Worker Gearman: reconciliación `OML:CALLS` ↔ Asterisk (`audit-active-channels`). |
-| **dialer-start-camp** | Worker Gearman: inicio de campañas. |
-| **dialer-create-camp** | Worker Gearman: creación de campañas. |
-| **dialer-resume-camp** | Worker Gearman: reanudación de campañas pausadas. |
-| **dialer-edit-camp** | Worker Gearman: edición de campañas. |
-| **dialer-stop-camp** | Worker Gearman: detención de campañas. |
-| **dialer-pause-camp** | Worker Gearman: pausa de campañas. |
-| **dialer-delete-camp** | Worker Gearman: eliminación de campañas. |
-| **dialer-change-database-camp** | Worker Gearman: cambio de la base de contactos de una campaña. |
+| **dialer-manage-campaign** | Worker Gearman: ciclo de vida de campañas (`create/start/pause/resume/stop/edit/delete-campaign`, `change-database`). |
 | **dialer-send-reports** | Worker Gearman: envío de reportes del dialer. |
-| **dialer-add-incidence-rule** | Worker Gearman: alta de reglas de incidencia por disposición. |
-| **dialer-create-incidence-rule** | Worker Gearman: creación de reglas de incidencia. |
-| **dialer-delete-incidence-rule** | Worker Gearman: eliminación de reglas de incidencia. |
-| **dialer-update-incidence-rule** | Worker Gearman: actualización de reglas de incidencia. |
+| **dialer-incidence-rules** | Worker Gearman: reglas de incidencia (`add/create/update/delete`). |
 | **dialer-render-template** | Worker Gearman: renderizado de plantillas (por ejemplo, reportes). |
-| **dialer-manage-dialer** | Worker Gearman: tareas de gestión general del dialer. |
 
 ---
 
@@ -134,7 +122,7 @@ Utilidades on-demand y servicios auxiliares para administración o QA. **Solo se
 | **pbxemulator** | test-env, dev-env | Emulador PSTN para QA. Simula respuestas de llamadas (atendida, ocupado, congestión, no contesta, …) según `PSTN_EMULATOR_MODE`. Expone `4569/udp` y recibe IP fija (`PSTN_EMULATOR_IP`). |
 | **nginxcgi** | test-env, dev-env | Nginx auxiliar de QA que expone scripts CGI internos. Puerto host `8888`. |
 | **redisinsight** | test-env, dev-env | Interfaz web para inspeccionar Redis. Publicado en `127.0.0.1:7963 → 5540`. |
-| **pgadmin** | test-env, dev-env | Interfaz web para administrar PostgreSQL (base principal y `dialer-postgresql`). Publicado en `127.0.0.1:5050 → 80`. Credenciales por defecto: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (`admin@omnileads.com` / `admin`). |
+| **pgadmin** | test-env, dev-env | Interfaz web para administrar PostgreSQL (bases `omnileads` y `omnidialer` en el mismo servidor). Publicado en `127.0.0.1:5050 → 80`. Credenciales por defecto: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (`admin@omnileads.com` / `admin`). |
 | **vue-cli** | dev-env | Front-end Vue (modo dev server) montado sobre `${REPO_PATH}/django/omnileads_ui/`. Publicado en `localhost:8081`. |
 | **vue-build** | dev-env | Job one-shot (`restart: "no"`) que ejecuta `npm ci` / `npm run build` para generar el `dist/` que consume `omlapp`. `omlapp` espera su finalización (`service_completed_successfully`). |
 
@@ -151,7 +139,6 @@ flowchart TB
     redis[redis]
     minio[minio]
     gearman[gearman]
-    dialer_pg[dialer-postgresql]
   end
 
   subgraph tel_acd [Tel-ACD]

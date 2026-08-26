@@ -5,6 +5,19 @@
 -- Dumped from database version 14.9 (Debian 14.9-1.pgdg110+1)
 -- Dumped by pg_dump version 14.9 (Debian 14.9-1.pgdg110+1)
 
+\set ON_ERROR_STOP on
+
+-- El rol POSTGRES_USER ya existe (lo crea la imagen oficial de postgres).
+-- Crea la DB omnidialer en el mismo servidor (mismo patrón que Ansible).
+SELECT format('CREATE DATABASE omnidialer WITH OWNER %I TEMPLATE template1 ENCODING ''UTF8'';', current_user)
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'omnidialer') \gexec
+
+\connect omnidialer
+
+-- (opcional) endurecer/grant schema public
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT ALL ON SCHEMA public TO CURRENT_USER;
+
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -22,9 +35,8 @@ SET default_table_access_method = heap;
 
 
 --
--- Name: jobs; Type: TABLE; Schema: public; Owner: omnidialer
+-- Name: jobs; Type: TABLE; Schema: public; Owner: current_user
 --
-
 
 CREATE TABLE public.jobs (
     id SERIAL PRIMARY KEY,
@@ -41,9 +53,10 @@ CREATE INDEX idx_jobs_datime ON public.jobs(datime);
 CREATE INDEX idx_jobs_status ON public.jobs(status);
 CREATE INDEX idx_jobs_name_status ON public.jobs(job_name, status);
 
+ALTER TABLE public.jobs OWNER TO CURRENT_USER;
 
 --
--- Name: system.control; Type: TABLE; Schema: public; Owner: omnidialer
+-- Name: system.control; Type: TABLE; Schema: public; Owner: current_user
 --
 
 CREATE TABLE public.system_control (
@@ -52,11 +65,12 @@ CREATE TABLE public.system_control (
     updated_at TIMESTAMP DEFAULT now()
 );
 
+ALTER TABLE public.system_control OWNER TO CURRENT_USER;
 
 INSERT INTO public.system_control (id, is_active) VALUES (true, true);
 
 --
--- Name: campaign; Type: TABLE; Schema: public; Owner: omnidialer
+-- Name: campaign; Type: TABLE; Schema: public; Owner: current_user
 --
 
 CREATE TABLE public.campaign (
@@ -89,11 +103,10 @@ CREATE TABLE public.campaign (
     prefix character varying(128)
 );
 
-
-
+ALTER TABLE public.campaign OWNER TO CURRENT_USER;
 
 --
--- Name: campaign_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
+-- Name: campaign_id_seq; Type: SEQUENCE; Schema: public; Owner: current_user
 --
 
 CREATE SEQUENCE public.campaign_id_seq
@@ -104,17 +117,16 @@ CREATE SEQUENCE public.campaign_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
+ALTER TABLE public.campaign_id_seq OWNER TO CURRENT_USER;
 
 --
--- Name: campaign_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
+-- Name: campaign_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: current_user
 --
 
 ALTER SEQUENCE public.campaign_id_seq OWNED BY public.campaign.id;
 
-
 --
--- Name: contact; Type: TABLE; Schema: public; Owner: omnidialer
+-- Name: contact; Type: TABLE; Schema: public; Owner: current_user
 --
 
 CREATE TABLE public.contact (
@@ -124,10 +136,10 @@ CREATE TABLE public.contact (
     is_original boolean NOT NULL
 );
 
-
+ALTER TABLE public.contact OWNER TO CURRENT_USER;
 
 --
--- Name: contact_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
+-- Name: contact_id_seq; Type: SEQUENCE; Schema: public; Owner: current_user
 --
 
 CREATE SEQUENCE public.contact_id_seq
@@ -138,17 +150,16 @@ CREATE SEQUENCE public.contact_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
+ALTER TABLE public.contact_id_seq OWNER TO CURRENT_USER;
 
 --
--- Name: contact_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
+-- Name: contact_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: current_user
 --
 
 ALTER SEQUENCE public.contact_id_seq OWNED BY public.contact.id;
 
-
 --
--- Name: contact_in_campaign; Type: TABLE; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign; Type: TABLE; Schema: public; Owner: current_user
 --
 
 CREATE TABLE public.contact_in_campaign (
@@ -165,10 +176,10 @@ CREATE TABLE public.contact_in_campaign (
     phone_number_index integer
 );
 
-
+ALTER TABLE public.contact_in_campaign OWNER TO CURRENT_USER;
 
 --
--- Name: contact_in_campaign_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign_id_seq; Type: SEQUENCE; Schema: public; Owner: current_user
 --
 
 CREATE SEQUENCE public.contact_in_campaign_id_seq
@@ -179,31 +190,32 @@ CREATE SEQUENCE public.contact_in_campaign_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
+ALTER TABLE public.contact_in_campaign_id_seq OWNER TO CURRENT_USER;
 
 --
--- Name: contact_in_campaign_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: current_user
 --
 
 ALTER SEQUENCE public.contact_in_campaign_id_seq
     OWNED BY public.contact_in_campaign.id;
 
+ALTER SEQUENCE public.contact_in_campaign_id_seq
+    OWNER TO CURRENT_USER;
 
 --
--- Name: COLUMN contact_in_campaign.id_campaign; Type: COMMENT; Schema: public; Owner: omnidialer
+-- Name: COLUMN contact_in_campaign.id_campaign; Type: COMMENT; Schema: public; Owner: current_user
 --
 
 COMMENT ON COLUMN public.contact_in_campaign.id_campaign IS 'foreign key to campaign table';
 
-
 --
--- Name: COLUMN contact_in_campaign.id_contact; Type: COMMENT; Schema: public; Owner: omnidialer
+-- Name: COLUMN contact_in_campaign.id_contact; Type: COMMENT; Schema: public; Owner: current_user
 --
 
 COMMENT ON COLUMN public.contact_in_campaign.id_contact IS 'link to contact table';
 
 --
--- Name: incidence_rules; Type: TABLE; Schema: public; Owner: omnidialer
+-- Name: incidence_rules; Type: TABLE; Schema: public; Owner: current_user
 --
 
 CREATE TABLE public.incidence_rules (
@@ -218,11 +230,10 @@ CREATE TABLE public.incidence_rules (
     CONSTRAINT incidence_rules_status_check CHECK ((status >= 0))
 );
 
-
-
+ALTER TABLE public.incidence_rules OWNER TO CURRENT_USER;
 
 --
--- Name: incidence_rules_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_id_seq; Type: SEQUENCE; Schema: public; Owner: current_user
 --
 
 CREATE SEQUENCE public.incidence_rules_id_seq
@@ -233,118 +244,108 @@ CREATE SEQUENCE public.incidence_rules_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
+ALTER TABLE public.incidence_rules_id_seq OWNER TO CURRENT_USER;
 
 --
--- Name: incidence_rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: current_user
 --
 
 ALTER SEQUENCE public.incidence_rules_id_seq OWNED BY public.incidence_rules.id;
 
-
 --
--- Name: campaign id; Type: DEFAULT; Schema: public; Owner: omnidialer
+-- Name: campaign id; Type: DEFAULT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.campaign ALTER COLUMN id SET DEFAULT nextval('public.campaign_id_seq'::regclass);
 
-
 --
--- Name: contact id; Type: DEFAULT; Schema: public; Owner: omnidialer
+-- Name: contact id; Type: DEFAULT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.contact ALTER COLUMN id SET DEFAULT nextval('public.contact_id_seq'::regclass);
 
-
 --
--- Name: incidence_rules id; Type: DEFAULT; Schema: public; Owner: omnidialer
+-- Name: incidence_rules id; Type: DEFAULT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.incidence_rules ALTER COLUMN id SET DEFAULT nextval('public.incidence_rules_id_seq'::regclass);
 
-
-
 --
--- Name: contact_in_campaign id; Type: DEFAULT; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign id; Type: DEFAULT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.contact_in_campaign ALTER COLUMN id SET DEFAULT nextval('public.contact_in_campaign_id_seq'::regclass);
 
-
-
 --
--- Name: campaign campaign_pkey; Type: CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: campaign campaign_pkey; Type: CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.campaign
     ADD CONSTRAINT campaign_pkey PRIMARY KEY (id);
 
-
 --
--- Name: contact contact_pkey; Type: CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: contact contact_pkey; Type: CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.contact
     ADD CONSTRAINT contact_pkey PRIMARY KEY (id);
 
-
 --
--- Name: incidence_rules incidence_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: incidence_rules incidence_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.incidence_rules
     ADD CONSTRAINT incidence_rules_pkey PRIMARY KEY (id);
 
-
 --
--- Name: contact_in_campaign primary_key_contact_in_campaign; Type: CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign primary_key_contact_in_campaign; Type: CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.contact_in_campaign
     ADD CONSTRAINT primary_key_contact_in_campaign PRIMARY KEY (id);
 
-
 --
--- Name: fki_foreign_key_contact; Type: INDEX; Schema: public; Owner: omnidialer
+-- Name: fki_foreign_key_contact; Type: INDEX; Schema: public; Owner: current_user
 --
 
 CREATE INDEX fki_foreign_key_contact ON public.contact_in_campaign USING btree (id_contact);
 
-
 --
--- Name: fki_foreign_key_campaign; Type: INDEX; Schema: public; Owner: omnidialer
+-- Name: fki_foreign_key_campaign; Type: INDEX; Schema: public; Owner: current_user
 --
 
 CREATE INDEX fki_foreign_key_campaign ON public.contact_in_campaign USING btree (id_campaign);
 
 --
--- Name: incidence_rules_campaign_id_707899e9; Type: INDEX; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_campaign_id_707899e9; Type: INDEX; Schema: public; Owner: current_user
 --
 
 CREATE INDEX incidence_rules_campaign_id_707899e9 ON public.incidence_rules USING btree (campaign_id);
 
 --
--- Name: contact_in_campaign foreign_key_campaign; Type: FK CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign foreign_key_campaign; Type: FK CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.contact_in_campaign
     ADD CONSTRAINT foreign_key_campaign FOREIGN KEY (id_campaign) REFERENCES public.campaign(id) ON DELETE CASCADE NOT VALID;
 
-
 --
--- Name: contact_in_campaign foreign_key_contact; Type: FK CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: contact_in_campaign foreign_key_contact; Type: FK CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.contact_in_campaign
     ADD CONSTRAINT foreign_key_contact FOREIGN KEY (id_contact) REFERENCES public.contact(id) ON DELETE CASCADE NOT VALID;
 
 --
--- Name: incidence_rules re_campaign_id_707899e9_fk_ominicont; Type: FK CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: incidence_rules re_campaign_id_707899e9_fk_ominicont; Type: FK CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.incidence_rules
     ADD CONSTRAINT re_campaign_id_707899e9_fk_ominicont FOREIGN KEY (campaign_id) REFERENCES public.campaign(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED ;
 
+--
+-- Name: incidence_rules_disposition; Type: TABLE; Schema: public; Owner: current_user
+--
 
 CREATE TABLE public.incidence_rules_disposition (
     id integer NOT NULL,
@@ -356,9 +357,10 @@ CREATE TABLE public.incidence_rules_disposition (
     CONSTRAINT incidence_rules_in_mode_check CHECK ((in_mode >= 0))
 );
 
+ALTER TABLE public.incidence_rules_disposition OWNER TO CURRENT_USER;
 
 --
--- Name: incidence_rules_disposition_id_seq; Type: SEQUENCE; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_disposition_id_seq; Type: SEQUENCE; Schema: public; Owner: current_user
 --
 
 CREATE SEQUENCE public.incidence_rules_disposition_id_seq
@@ -369,35 +371,35 @@ CREATE SEQUENCE public.incidence_rules_disposition_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
+ALTER TABLE public.incidence_rules_disposition_id_seq OWNER TO CURRENT_USER;
 
 --
--- Name: incidence_rules_disposition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_disposition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: current_user
 --
 
 ALTER SEQUENCE public.incidence_rules_disposition_id_seq OWNED BY public.incidence_rules_disposition.id;
 
 --
--- Name: incidence_rules_disposition id; Type: DEFAULT; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_disposition id; Type: DEFAULT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.incidence_rules_disposition ALTER COLUMN id SET DEFAULT nextval('public.incidence_rules_disposition_id_seq'::regclass);
 
 --
--- Name: incidence_rules_disposition incidence_rules_disposition_pkey; Type: CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_disposition incidence_rules_disposition_pkey; Type: CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.incidence_rules_disposition
     ADD CONSTRAINT incidence_rules_disposition_pkey PRIMARY KEY (id);
 
 --
--- Name: incidence_rules_disposition_campaign_disposition_id_707899e9; Type: INDEX; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_disposition_campaign_disposition_id_707899e9; Type: INDEX; Schema: public; Owner: current_user
 --
 
 CREATE INDEX incidence_rules_campaign_disposition_id_707899e9 ON public.incidence_rules_disposition USING btree (campaign_id);
 
 --
--- Name: incidence_rules_disposition re_campaign_id_707899ea_fk_ominicont; Type: FK CONSTRAINT; Schema: public; Owner: omnidialer
+-- Name: incidence_rules_disposition re_campaign_id_707899ea_fk_ominicont; Type: FK CONSTRAINT; Schema: public; Owner: current_user
 --
 
 ALTER TABLE ONLY public.incidence_rules_disposition

@@ -57,7 +57,7 @@ The reusable assets at `docker-compose/` are:
 
 - `env` — template with the full list of variables.
 - `oml_manage.sh` — administration helper script (already present inside each environment).
-- `omnidialer.sql` — bootstrap SQL for the dialer database.
+- `omnidialer.sql` — bootstrap SQL for the `omnidialer` database (created inside the shared `postgresql` instance).
 - `docker_install_linux.sh` — Docker installation helper for Linux.
 - `custom_conf_examples/`, `.custom_conf/`, `certs/`, `addons/`, `observability/`, `pstn-proxy/` — optional/extension assets.
 
@@ -170,7 +170,7 @@ DIALER_PROCESS_EVENT_REPLICAS=1
 - `DIALER_PROCESS_CAMPAIGN_REPLICAS`: number of `dialer-process-camp` workers; you typically need one replica per concurrent campaign.
 - `DIALER_PROCESS_CONTACT_REPLICAS`, `DIALER_PROCESS_EVENT_REPLICAS`: contact and event processors scale.
 
-The dialer stack uses its own PostgreSQL instance (`dialer-postgresql`, port `5433`) initialized from `omnidialer.sql`.
+The dialer uses the same PostgreSQL instance as OMniLeads (`postgresql`, port `5432`). The `omnidialer` database is created at first boot from `omnidialer.sql`, matching the Ansible `postgresql` role.
 
 ## Call Recording, STT & Summarization <a name="recording"></a>
 
