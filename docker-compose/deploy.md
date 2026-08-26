@@ -1,14 +1,29 @@
 # Documentación del stack de despliegue
 
-Este documento describe la función de cada servicio definido en los `docker-compose.yml` de OMniLeads. Los tres entornos disponibles comparten la misma arquitectura base — **OMniLeads** (contact center) + **OMniDialer** + componentes de telefonía (SIP, WebRTC, ACD) — y se diferencian por los servicios opcionales y por la red que usan los servicios de borde:
+Este documento describe la función de cada servicio del stack de OMniLeads desplegado con Docker Compose y cómo adaptar el despliegue a distintos escenarios mediante el archivo `.env`.
 
-| Entorno     | Ubicación                              | Servicios opcionales / extra                                                                 | Red de `kamailio-pstn` y `rtpengine` |
-|-------------|----------------------------------------|----------------------------------------------------------------------------------------------|----------------------------------------|
-| `test-env`  | `docker-compose/test-env/`             | `pbxemulator`, `nginxcgi`, `redisinsight`, `pgadmin`                                          | bridge `omnileads`                     |
-| `prod-env`  | `docker-compose/prod-env/`             | — (stack mínimo, sin QA ni herramientas administrativas)                                      | `network_mode: host`                   |
-| `dev-env`   | `docker-compose/dev-env/`              | Igual que `test-env` + `vue-cli` y `vue-build` (front-end Vue.js montado desde el repo)       | bridge `omnileads`                     |
+El modelo es de **stack único**: la plantilla `docker-compose-template.yml` define **todos** los componentes — **OMniLeads** (contact center) + **OMniDialer** + telefonía (SIP, WebRTC, ACD) + herramientas de QA/desarrollo. Ya no existen los entornos `test-env` / `dev-env` / `prod-env`: el mismo stack funciona para **desarrollo**, **producción**, con **edge server externo** o con **data server externo**, según los valores que se configuren en el `.env`.
 
-Las variables de entorno, hostnames y puertos se configuran en el `.env` ubicado dentro de cada uno de esos directorios.
+## Archivos involucrados
+
+| Archivo | Rol |
+|---------|-----|
+| `docker-compose-template.yml` | Plantilla versionada con todos los componentes. |
+| `docker-compose.yml` | Copia de trabajo que usa Compose (gitignored). |
+| `env` | Plantilla de variables con todos los valores y comentarios. |
+| `.env` | Copia de trabajo de variables (gitignored). |
+
+## Inicio rápido
+
+```bash
+cd docker-compose
+cp docker-compose-template.yml docker-compose.yml
+cp env .env
+# editar .env según el escenario (ver "Modos de despliegue")
+./oml_manage.sh up -d
+./oml_manage.sh reset-pass      # admin / admin
+./oml_manage.sh data-generate   # datos de demo (opcional)
+```
 
 ---
 
@@ -34,18 +49,18 @@ Componentes del *Automatic Call Distribution*: Asterisk como PBX/ACD, generació
 |----------|---------|
 | **fastagi** | Servicio FastAGI consultado por Asterisk para lógica de llamadas (AMD, enrutamiento, etc.). Conecta con PostgreSQL, Redis y Gearman. |
 | **acd-conf-generator** | Genera la configuración de Asterisk (`astconf.py`) a partir de los datos de OMniLeads y la escribe en el volumen compartido `asterisk_conf`. |
-| **acd-server** | Asterisk como PBX/ACD. Gestiona llamadas, colas y grabaciones (volúmenes `asterisk_callrec`, `asterisk_conf`, `asterisk_sounds`). Recibe una IP fija (`ACD_SERVER_IP`) dentro de la red `omnileads`. |
+| **acd-server** | Asterisk como PBX/ACD. Gestiona llamadas, colas y grabaciones (volúmenes `asterisk_callrec`, `asterisk_conf`, `asterisk_sounds`). Recibe una IP fija (`ACD_HOST_IP`) dentro de la red `omnileads`. |
 | **acd-app** | Aplicación ARI (Asterisk REST Interface) que orquesta llamadas en Asterisk vía Stasis: transferencias, grabación, integración con el dialer y con la API REST de OMniLeads. |
 
 ---
 
 ## Tel-bridges (puentes SIP/RTP)
 
-Proxy SIP para PSTN y media proxy RTP. En `test-env` y `dev-env` usan la red bridge `omnileads`; en `prod-env` se ejecutan en `network_mode: host` para publicar puertos directamente sobre las interfaces del host.
+Proxy SIP para PSTN y media proxy RTP. Usan la red bridge `omnileads` con IPs estáticas (Kamailio dispatcher/allowlist y PJSIP identify matchean por IP origen, no por DNS). Si se usa un **edge server externo**, estos contenedores locales dejan de ser necesarios (ver *Modos de despliegue*).
 
 | Servicio | Función |
 |----------|---------|
-| **kamailio-pstn** | Proxy SIP para tráfico PSTN. Enruta llamadas entrantes/salientes hacia el ACD y se apoya en `rtpengine` para el media. Usa la trunk hacia los ITSPs definidos en `ITSP_NODES`. |
+| **kamailio-pstn** | Proxy SIP para tráfico PSTN. Enruta llamadas entrantes/salientes hacia el ACD y se apoya en `rtpengine` para el media. Usa la trunk hacia los ITSPs definidos en `KAMAILIO_ITSP_NODES`. IP fija `KAMAILIO_PSTN_IP`. |
 | **rtpengine** | Media proxy RTP/SRTP. Intermedia el tráfico de audio/video entre WebRTC (SRTP) y RTP clásico (Asterisk, troncales). Rango de puertos `RTPENGINE_RTP_PORT_MIN` – `RTPENGINE_RTP_PORT_MAX`. |
 
 ---
@@ -56,10 +71,10 @@ Servidor web, aplicación Django (uWSGI/ASGI), WebSockets y proxy SIP WebRTC. Pu
 
 | Servicio | Función |
 |----------|---------|
-| **omlapp** | Aplicación web principal (uWSGI). Expone la UI y las APIs REST de OMniLeads. Healthcheck contra `:8099/`. En `dev-env` monta el código fuente desde `${REPO_PATH}/django/` y arranca con `init_devenv.sh`; en `test-env`/`prod-env` corre `init_uwsgi.sh`. |
+| **omlapp** | Aplicación web principal (uWSGI). Expone la UI y las APIs REST de OMniLeads. Healthcheck contra `:8099/`. El entrypoint lo define `DJANGO_ENTRYPOINT` (`init_devenv.sh` para desarrollo, `init_uwsgi.sh` para producción) y monta el código fuente desde `${REPO_PATH}/django/`. |
 | **daphne** | Servidor ASGI para peticiones asíncronas y WebSockets de Django Channels. Atiende canales y conexiones en tiempo real. |
 | **websockets** | Servidor WebSocket dedicado (puerto interno 8000) para presencia, notificaciones y actualizaciones en vivo. |
-| **nginx** | Reverse proxy HTTPS (puerto 443). Sirve estáticos, reparte tráfico a `omlapp` (WSGI), `daphne` (ASGI), `websockets` y `kamailio-webrtc`. Punto de entrada único desde el exterior. En `dev-env` monta los certificados desde `../.custom_conf/certs/`. |
+| **nginx** | Reverse proxy HTTPS (puerto 443). Sirve estáticos, reparte tráfico a `omlapp` (WSGI), `daphne` (ASGI), `websockets` y `kamailio-webrtc`. Punto de entrada único desde el exterior. Monta los certificados TLS desde `.custom_conf/certs/`. |
 | **kamailio-webrtc** | Proxy SIP para clientes WebRTC: registro de extensiones, autenticación efímera (`AUTHEPH_SK`) y enrutamiento hacia Asterisk. |
 
 ---
@@ -84,14 +99,14 @@ Workers que ejecutan tareas en segundo plano, listeners de eventos y schedulers 
 
 ## Dialer-stack
 
-Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y eventos. La base `omnidialer` vive en el mismo servicio `postgresql` (no hay instancia aparte).
+Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y eventos. La base `omnidialer` vive en el mismo servicio `postgresql` (no hay instancia aparte). Los nombres y agrupación de workers son simétricos a los Quadlets de Ansible (`ansible/roles/dialer/templates/`).
 
 | Servicio | Función |
 |----------|---------|
 | **dialer-api** | API HTTP del dialer (puerto interno 1440). Recibe órdenes desde Django para crear, pausar, reanudar o detener campañas y gestionar contactos. |
 | **dialer-process-contact** | Worker Gearman: procesamiento de contactos (marcado, resultado, reagenda). Escala con `DIALER_PROCESS_CONTACT_REPLICAS`. |
 | **dialer-process-camp** | Worker Gearman: procesamiento de campañas (estado, progreso). Escala con `DIALER_PROCESS_CAMPAIGN_REPLICAS`. |
-| **dialer-process-event** | Worker Gearman: procesamiento de eventos del dialer. Escala con `PROCESS_EVENT_REPLICAS`. |
+| **dialer-process-event** | Worker Gearman: procesamiento de eventos del dialer. Escala con `DIALER_PROCESS_EVENT_REPLICAS`. |
 | **dialer-scheduler** | Worker Gearman: programación de la agenda de contactos (`schedule-agenda`) y productor periódico de `audit-active-channels`. |
 | **dialer-channel-audit** | Worker Gearman: reconciliación `OML:CALLS` ↔ Asterisk (`audit-active-channels`). |
 | **dialer-manage-campaign** | Worker Gearman: ciclo de vida de campañas (`create/start/pause/resume/stop/edit/delete-campaign`, `change-database`). |
@@ -112,21 +127,85 @@ Procesamiento de las grabaciones generadas por Asterisk: compresión y subida a 
 
 ---
 
-## Servicios opcionales y utilidades
+## Herramientas QA y de desarrollo
 
-Utilidades on-demand y servicios auxiliares para administración o QA. **Solo se incluyen en `test-env` y `dev-env`** (excepto `django-commands`, que está en los tres).
+Utilidades auxiliares para administración, QA y desarrollo front-end. Forman parte de la plantilla; en un despliegue de producción pueden omitirse (comentándolas en la copia de trabajo o levantando la lista de servicios explícita con `docker compose up -d <servicios>`).
 
-| Servicio | Disponible en | Función |
-|----------|----------------|---------|
-| **django-commands** | test-env, prod-env, dev-env | Contenedor one-shot que ejecuta `django_commands.sh` (migraciones, `collectstatic`, etc.) al levantar el stack o bajo demanda con `./oml_manage.sh django-commands`. |
-| **pbxemulator** | test-env, dev-env | Emulador PSTN para QA. Simula respuestas de llamadas (atendida, ocupado, congestión, no contesta, …) según `PSTN_EMULATOR_MODE`. Expone `4569/udp` y recibe IP fija (`PSTN_EMULATOR_IP`). |
-| **nginxcgi** | test-env, dev-env | Nginx auxiliar de QA que expone scripts CGI internos. Puerto host `8888`. |
-| **redisinsight** | test-env, dev-env | Interfaz web para inspeccionar Redis. Publicado en `127.0.0.1:7963 → 5540`. |
-| **pgadmin** | test-env, dev-env | Interfaz web para administrar PostgreSQL (bases `omnileads` y `omnidialer` en el mismo servidor). Publicado en `127.0.0.1:5050 → 80`. Credenciales por defecto: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (`admin@omnileads.com` / `admin`). |
-| **vue-cli** | dev-env | Front-end Vue (modo dev server) montado sobre `${REPO_PATH}/django/omnileads_ui/`. Publicado en `localhost:8081`. |
-| **vue-build** | dev-env | Job one-shot (`restart: "no"`) que ejecuta `npm ci` / `npm run build` para generar el `dist/` que consume `omlapp`. `omlapp` espera su finalización (`service_completed_successfully`). |
+| Servicio | Función |
+|----------|---------|
+| **django-commands** | Contenedor one-shot que ejecuta `django_commands.sh` (migraciones, `collectstatic`, etc.) al levantar el stack o bajo demanda con `./oml_manage.sh django-commands`. |
+| **pbxemulator** | Emulador PSTN para QA. Simula escenarios de llamadas salientes/entrantes según `PSTN_EMULATOR_MODE` (ver comentarios en `.env`). Expone `4569/udp` y recibe IP fija (`PSTN_EMULATOR_IP`). |
+| **nginxcgi** | Nginx auxiliar de QA que expone scripts CGI internos. Puerto host `8888`. |
+| **redisinsight** | Interfaz web para inspeccionar Redis. Publicado en `127.0.0.1:7963 → 5540`. |
+| **pgadmin** | Interfaz web para administrar PostgreSQL (bases `omnileads` y `omnidialer` en el mismo servidor). Publicado en `127.0.0.1:5050 → 80`. Credenciales por defecto: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (`admin@omnileads.com` / `admin`). |
+| **vue-cli** | Front-end Vue (modo dev server con hot reload) montado sobre `${REPO_PATH}/django/omnileads_ui/`. Publicado en `localhost:8081`. |
+| **vue-build** | Job one-shot (`restart: "no"`) que ejecuta `npm ci` / `npm run build` para generar el `dist/` que consume `omlapp`. |
 
-> En `prod-env` ninguna de estas herramientas administrativas/QA está incluida; sólo se mantiene `django-commands`.
+---
+
+## Modos de despliegue (vía `.env`)
+
+El mismo `docker-compose.yml` cubre todos los escenarios; lo único que cambia es el `.env`.
+
+### Desarrollo
+
+```bash
+DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
+DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh
+NGINX_WEBUI_MODE=rproxy
+```
+
+- `omlapp` monta el código desde `${REPO_PATH}/django/`: los cambios se reflejan sin rebuild.
+- `vue-cli` expone el dev server de Vue en `http://localhost:8081` (hot reload); con `NGINX_WEBUI_MODE=rproxy` nginx proxya la SPA hacia él.
+- Herramientas QA (`pbxemulator`, `nginxcgi`, `redisinsight`, `pgadmin`) disponibles.
+
+### Producción
+
+```bash
+DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
+DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_uwsgi.sh
+NGINX_WEBUI_MODE=static
+OML_HOSTNAME=<IP o FQDN del host>
+PUBLIC_IP=${OML_HOSTNAME}
+FQDN=midominio.com
+DJANGO_ALLOWED_HOSTS=${FQDN},${OML_HOSTNAME}
+DJANGO_CSRF_TRUSTED_ORIGINS=https://${FQDN}
+```
+
+- Certificados TLS en `.custom_conf/certs/` (se montan en nginx).
+- Revisar y cambiar todos los secretos del `.env` (passwords de Postgres, AMI, dialer, `DJANGO_SECRET_KEY`, etc.).
+- Detrás de NAT: `RTPENGINE_NAT=true` y `PUBLIC_IP` con la IP pública.
+- Las herramientas QA/dev pueden omitirse del despliegue.
+
+### Edge server externo
+
+Cuando el plano de borde (SIP WebRTC/PSTN + media) corre en otro host:
+
+```bash
+KAMAILIO_WEBRTC_HOSTNAME=<IP o FQDN del edge>
+KAMAILIO_PSTN_HOSTNAME=<IP o FQDN del edge>
+RTPENGINE_HOSTNAME=<IP o FQDN del edge>
+```
+
+El resto del stack resuelve la señalización y el media contra ese edge externo; los contenedores locales `kamailio-webrtc`, `kamailio-pstn` y `rtpengine` dejan de ser necesarios.
+
+### Data server externo
+
+Cuando las bases de datos, caché, cola y object storage corren en otro host:
+
+```bash
+POSTGRES_HOSTNAME=<IP o FQDN>     # + POSTGRES_HA / POSTGRES_NODE_RO / POSTGRES_SSL si aplica
+REDIS_HOSTNAME=<IP o FQDN>
+GEARMAN_HOSTNAME=<IP o FQDN>
+BUCKET_NAME=<bucket>
+BUCKET_ACCESS_KEY_ID=<access key>
+BUCKET_SECRET_ACCESS_KEY=<secret>
+BUCKET_ENDPOINT=https://<endpoint S3 público>
+BUCKET_ENDPOINT_INTERNAL=http://<endpoint S3 interno>
+```
+
+- `DIALER_POSTGRES_SERVER` sigue a `POSTGRES_HOSTNAME` (misma instancia): la DB `omnidialer` debe existir en el servidor externo — el script `omnidialer.sql` sólo corre automáticamente en el init del postgres embebido, así que en un Postgres externo hay que aplicarlo a mano.
+- Los contenedores locales `postgresql`, `redis`, `gearman`, `minio` y `createbuckets` dejan de ser necesarios.
 
 ---
 
@@ -190,28 +269,23 @@ flowchart TB
 
 ---
 
-## Configuración y despliegue
+## Operación
 
-Las variables de entorno, hostnames y puertos se definen en el `.env` ubicado dentro de cada uno de los entornos (`test-env/.env`, `prod-env/.env`, `dev-env/.env`). El flujo recomendado utiliza el helper `oml_manage.sh` que ya viene en cada carpeta:
-
-```bash
-# Ejemplo en test-env
-cp env test-env/.env
-cd test-env
-./set_test_env.sh
-./oml_manage.sh up -d
-./oml_manage.sh reset-pass
-./oml_manage.sh data-generate
-```
-
-Comandos equivalentes con Docker Compose directo (sin el helper):
+El helper `oml_manage.sh` envuelve a `docker compose` sobre la copia de trabajo (`docker-compose.yml` + `.env`):
 
 ```bash
-docker compose -f docker-compose/test-env/docker-compose.yml \
-  --env-file docker-compose/test-env/.env \
-  up -d
+./oml_manage.sh up -d            # levantar todo
+./oml_manage.sh down             # bajar
+./oml_manage.sh logs -f <svc>    # logs de un servicio
+./oml_manage.sh status           # estado y salud de contenedores
+./oml_manage.sh reset-pass       # reset admin/admin
+./oml_manage.sh django-commands  # migraciones/comandos Django on-demand
 ```
 
-Todos los servicios definidos en el `docker-compose.yml` se levantan por defecto; los servicios listados como **opcionales** (RedisInsight, pgAdmin, nginxcgi, vue-cli, etc.) sólo aparecen en los `docker-compose.yml` de `test-env` y `dev-env`, por lo que para no levantarlos basta con usar `prod-env` o con eliminarlos del compose.
+Equivalente directo sin el helper:
 
-Para más detalles operativos (firewall, build de imágenes propias, emulador PSTN, herramientas administrativas) ver [`README.md`](./README.md).
+```bash
+docker compose up -d
+```
+
+Para más detalles (build de imágenes propias, emulador PSTN, firewall) ver [`README.md`](./README.md).

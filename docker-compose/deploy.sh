@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 #
-# Despliegue del entorno de desarrollo (dev-env).
+# Despliegue de una instancia por defecto del stack OMniLeads (Docker Compose).
+#
+# El modelo es de stack único: docker-compose/docker-compose-template.yml define
+# todos los componentes y docker-compose/env las variables. Este script deja
+# docker-compose/ listo para `./oml_manage.sh up -d`.
 #
 # Uso:
 #   ./deploy.sh [rama]
@@ -39,7 +43,9 @@ usage() {
   cat <<EOF
 Uso: $(basename "$0") [opciones] [rama]
 
-Despliega el entorno de desarrollo OMniLeads (dev-env).
+Despliega una instancia por defecto del stack OMniLeads (stack único en
+docker-compose/). Luego se ajusta docker-compose/.env según el escenario
+(desarrollo, producción, edge o data externos — ver deploy.md).
 
 Opciones:
   --repo=HOST/ORG   Usa mirror GitHub (ej: github.com/Freetech-Solutions)
@@ -66,7 +72,7 @@ Pasos:
   2. Checkout de la rama indicada (+ reescritura de .gitmodules si --repo)
   3. Inicializa submódulos
   4. Ejecuta git_sanity.sh --list-submodules
-  5. Copia oml_manage.sh y env -> dev-env/.env
+  5. Genera docker-compose/docker-compose.yml y .env desde las plantillas
   6. Ejecuta docker compose build (omitido con --no-build)
 EOF
 }
@@ -279,26 +285,23 @@ list_submodules() {
   (cd "$repo_root" && ./git_sanity.sh --list-submodules)
 }
 
-prepare_dev_env() {
+prepare_instance() {
   local repo_root="$1"
-  local dev_env_dir="$2"
+  local compose_dir="$2"
 
-  log_info "Copiando oml_manage.sh y env a dev-env"
-  cp "$repo_root/docker-compose/oml_manage.sh" "$dev_env_dir/oml_manage.sh"
-  chmod +x "$dev_env_dir/oml_manage.sh"
-  # rm previo: no escribir a través de un symlink .env -> ../.env
-  rm -f "$dev_env_dir/.env"
-  cp "$repo_root/docker-compose/env" "$dev_env_dir/.env"
-
-  log_info "Ajustando variables para dev-env (set_dev_env.sh)"
-  (cd "$dev_env_dir" && ./set_dev_env.sh)
+  log_info "Generando docker-compose.yml y .env desde las plantillas"
+  # rm previo: no escribir a través de symlinks preexistentes
+  rm -f "$compose_dir/docker-compose.yml" "$compose_dir/.env"
+  cp "$repo_root/docker-compose/docker-compose-template.yml" "$compose_dir/docker-compose.yml"
+  cp "$repo_root/docker-compose/env" "$compose_dir/.env"
+  chmod +x "$compose_dir/oml_manage.sh"
 }
 
 build_stack() {
-  local dev_env_dir="$1"
+  local compose_dir="$1"
 
   log_info "Construyendo imágenes (docker compose build)"
-  (cd "$dev_env_dir" && "${compose_cmd[@]}" build)
+  (cd "$compose_dir" && "${compose_cmd[@]}" build)
 }
 
 main() {
@@ -307,30 +310,32 @@ main() {
   configure_repo_url
   check_dependencies
 
-  local repo_root dev_env_dir
+  local repo_root compose_dir
   repo_root="$(resolve_repo_root)"
   log_info "Directorio destino: $repo_root"
   clone_or_update_repo "$repo_root"
   repo_root="$(cd "$repo_root" && pwd)"
-  dev_env_dir="$repo_root/docker-compose/dev-env"
+  compose_dir="$repo_root/docker-compose"
 
-  [[ -f "$dev_env_dir/docker-compose.yml" ]] \
-    || log_error "No se encontró docker-compose.yml en $dev_env_dir"
+  [[ -f "$compose_dir/docker-compose-template.yml" ]] \
+    || log_error "No se encontró docker-compose-template.yml en $compose_dir"
+  [[ -f "$compose_dir/env" ]] \
+    || log_error "No se encontró env en $compose_dir"
 
   list_submodules "$repo_root"
-  prepare_dev_env "$repo_root" "$dev_env_dir"
+  prepare_instance "$repo_root" "$compose_dir"
 
   if [[ "$NO_BUILD" -eq 0 ]]; then
-    build_stack "$dev_env_dir"
+    build_stack "$compose_dir"
   else
     log_info "Omitiendo docker compose build (--no-build)"
   fi
 
-  log_info "Despliegue de dev-env completado."
-  if [[ "$NO_BUILD" -eq 0 ]]; then
-    log_info "Para levantar el stack: cd $dev_env_dir && ./oml_manage.sh up -d"
-  else
-    log_info "Para construir y levantar: cd $dev_env_dir && docker compose build && ./oml_manage.sh up -d"
+  log_info "Despliegue preparado en $compose_dir"
+  log_info "Para levantar el stack: cd $compose_dir && ./oml_manage.sh up -d"
+  log_info "Luego: ./oml_manage.sh reset-pass (admin/admin)"
+  if [[ "$NO_BUILD" -ne 0 ]]; then
+    log_info "Recordá construir antes: docker compose build"
   fi
 }
 
