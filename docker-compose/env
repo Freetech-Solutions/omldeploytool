@@ -30,7 +30,7 @@ PSTN_EMULATOR_IP=10.22.72.99
 ###################################################################################################
 
 # --- OMniLeads images WEB
-APP_IMG=docker.io/freetechsolutions/omlapp:20260825-c1a1eaed
+APP_IMG=docker.io/freetechsolutions/omlapp:20260826-138a7353
 NGINX_IMG=docker.io/freetechsolutions/nginx:20260716-bf4395be
 WS_IMG=docker.io/freetechsolutions/websockets:20260306-13838d19
 
