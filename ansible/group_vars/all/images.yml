@@ -41,4 +41,4 @@ UWSGI_EXPORTER_IMG: docker.io/timonwong/uwsgi-exporter:v1.3.0
 PROMETHEUS_PODMAN_EXPORTER_IMG: quay.io/navidys/prometheus-podman-exporter:v1.21.0
 PROMETHEUS_PODMAN_IMG: quay.io/navidys/prometheus-podman-exporter:latest
 PROMTAIL_IMG: docker.io/grafana/promtail:main-9f5f159
-BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260422-16161cf0
+BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb

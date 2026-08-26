@@ -927,7 +927,7 @@ services:
   #     - 127.0.0.1:8888:8808/tcp
 
   pbxemulator:
-    image: ${PSTNEMULATOR_IMG}
+    image: ${PSTN_EMULATOR_IMG}
     build:
       context: ./$REPO_PATH/omlqa/pstn_emulator/
     hostname: pbxemulator

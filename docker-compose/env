@@ -56,7 +56,7 @@ GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260422-16161cf0
 
 # QA images
-PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260317-4a8510d1
+PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260818-6f6fbf74
 NGINX_QA_IMG=docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
 
 ###################################################################################################
