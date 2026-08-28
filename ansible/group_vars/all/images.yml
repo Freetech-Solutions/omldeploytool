@@ -24,8 +24,10 @@ MINIO_IMG: docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 MINIO_MC_IMG: docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG: docker.io/artefactual/gearmand:1.1.21.2-alpine
 
+BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb
+
 # QA images
-PSTN_EMULATOR_IMG: docker.io/omnileads/pstn_emulator:20260317-4a8510d1
+PSTN_EMULATOR_IMG: docker.io/omnileads/pstn_emulator:20260827-8f8a14b9
 NGINX_QA_IMG: docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
 
 # --- Edge HTTP(S) load balancer (Quadlet en hosts del grupo edge)

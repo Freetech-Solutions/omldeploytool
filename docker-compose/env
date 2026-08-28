@@ -53,10 +53,10 @@ MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 MINIO_MC_IMG=docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 
-BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260422-16161cf0
+BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb
 
 # QA images
-PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260818-6f6fbf74
+PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260827-8f8a14b9
 NGINX_QA_IMG=docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
 
 ###################################################################################################
@@ -118,9 +118,9 @@ UWSGI_EVIL_RELOAD_ON_RSS=10240
 PYTHONPATH=/opt/omnileads/ominicontacto
 
 # --- Django settings module: production or develop
-DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
+DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
 # --- Django entrypoint: init_uwsgi.sh or init_devenv.sh
-DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh
+DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_uwsgi.sh
 
 #####################################################################################################
 #                                       STT & TTS                                                   #
