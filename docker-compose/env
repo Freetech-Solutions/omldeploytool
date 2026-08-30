@@ -149,7 +149,7 @@ ACD_AMI_USER=omnileadsami
 ACD_AMI_PASSWORD=hjg@3jhadw@lkkj099jkllksaKJKJ33@dd27q3@
 ACD_ARI_PORT=7088
 
-# --- error, warning, notice, debug
+# --- 0 ERROR, 1 WARNING, 2 INFO, 3 DEBUG
 ACD_LOG_LEVEL=notice
 
 ACD_PJSIP_TRANSPORT_AGENT=${ACD_HOSTNAME}

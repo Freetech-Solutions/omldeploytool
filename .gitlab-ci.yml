@@ -29,8 +29,13 @@ stages:
 
 # GitLab no expande ${GITLEAKS_STAGE} del template incluido en el campo stage.
 # Escaneo Anti-Leaks limitado a ansible/ (pathspec en git log).
+# rules explícitas: sobrescriben las heredadas del template para correr también en cada push.
 gitleaks_scan:
   stage: security
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   variables:
     GITLEAKS_SCAN_PATH: "ansible"
   script:
