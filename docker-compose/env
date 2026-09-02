@@ -28,14 +28,13 @@ PSTN_EMULATOR_IP=10.22.72.99
 #                                  Components image version                                       #
 #                              versions of each image to deploy                                   #
 ###################################################################################################
-
 # --- OMniLeads images WEB
-APP_IMG=docker.io/freetechsolutions/omlapp:20260826-138a7353
+APP_IMG=docker.io/freetechsolutions/omlapp:20260901-f462915c
 NGINX_IMG=docker.io/freetechsolutions/nginx:20260716-bf4395be
 WS_IMG=docker.io/freetechsolutions/websockets:20260306-13838d19
 
 # --- OMniLeads images TEL
-ACD_IMG=docker.io/freetechsolutions/acd:20260819-28dc14ba
+ACD_IMG=docker.io/freetechsolutions/acd:20260901-47c8189d
 KAMAILIO_IMG=docker.io/freetechsolutions/kamailio:20260824-805399ea
 RTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20260713-c32419a6
 CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
@@ -53,11 +52,12 @@ MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
 MINIO_MC_IMG=docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 
-BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb
+BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260422-16161cf0
 
 # QA images
-PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260827-8f8a14b9
+PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260317-4a8510d1
 NGINX_QA_IMG=docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
+
 
 ###################################################################################################
 #                                       DJANGO APP                                                #
@@ -130,7 +130,7 @@ DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_uwsgi.sh
 STT_ENGINE=gemini
 # --- In case o Clooud based STT put here the STT API key or JSON credentials (GCP)
 # for Gemini or OpenAI STT use the API key
-STT_API_KEY=AIzaSyDkVNF5O7-4NDEwLMEZfxTh2g3PzET3sOY
+STT_API_KEY=sajkh423kh9d8cds56sa643fxw5@hjg@3jhadw@lkkj099jsd34gksaKJKJ33@dd27q3@
 # for Google GCP-STT use the JSON credentials
 STT_GCP_JSON_PATH=/app/google_credentials.json
 
@@ -149,8 +149,8 @@ ACD_AMI_USER=omnileadsami
 ACD_AMI_PASSWORD=hjg@3jhadw@lkkj099jkllksaKJKJ33@dd27q3@
 ACD_ARI_PORT=7088
 
-# --- error, warning, notice, debug
-ACD_LOG_LEVEL=notice
+# --- error, warning, info, debug
+ACD_LOG_LEVEL=debug
 
 ACD_PJSIP_TRANSPORT_AGENT=${ACD_HOSTNAME}
 ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
@@ -170,6 +170,8 @@ FASTAGI_PORT=4573
 #                                       POSTGRESQL                                                  #
 #####################################################################################################
 # --- IP or hostname that each instance will invoke when locating the other    
+# On production environment, you must set the POSTGRES_HOSTNAME variable with "IP_ADDRESS" or "FQDN"
+# of the external hostname of the OMniLeads Database Server.
 POSTGRES_HOSTNAME=postgresql
 POSTGRES_DB=omnileads
 POSTGRES_PORT=5432
@@ -198,8 +200,9 @@ WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
 #########################################################################################################
 #                                           KAMAILIO                                                    #
 #########################################################################################################
-# --- On test-env or dev-env you must set the KAMAILIO_WEBRTC_HOSTNAME variable with "kamailio-webrtc-dev"
-# string for prod-env "127.0.0.1" is the default value
+# --- On test-env or dev-env you must set the KAMAILIO_WEBRTC_HOSTNAME variable with "kamailio-webrtc"
+# On production environment, you must set the KAMAILIO_WEBRTC_HOSTNAME variable with "IP_ADDRESS" or "FQDN"
+# of the external hostname of the OMniLeads Edge Server.
 KAMAILIO_WEBRTC_HOSTNAME=kamailio-webrtc
 KAMAILIO_WEBRTC_SIP_PORT=10060
 KAMAILIO_HTTPS_PORT=10060
@@ -209,7 +212,9 @@ KAMAILIO_WEBRTC_IFACE=eth0
 # Not a container address — use ACD_HOST_IP for acd-server ipv4_address.
 KAMAILIO_ACD_SERVER_NET=10.22.72.0/24
 
-
+# --- On test-env or dev-env you must set the KAMAILIO_PSTN_HOSTNAME variable with "kamailio-pstn"
+# On production environment, you must set the KAMAILIO_PSTN_HOSTNAME variable with "IP_ADDRESS" or "FQDN"
+# of the external hostname of the OMniLeads Edge Server.
 KAMAILIO_PSTN_HOSTNAME=kamailio-pstn
 KAMAILIO_PSTN_UDP_PORT=5060
 
@@ -243,12 +248,15 @@ NGINX_WALLBOARD_WEBUI_PATH=/opt/omnileads/static/webui-wallboard
 NGINX_PREMIUMREPORTS_WEBUI_PATH=/opt/omnileads/static/webui-premiumreports
 # -----------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other    
-# "${OML_HOSTNAME}" is the prod profile or "redis" is the dev profile
+# On production environment, you must set the REDIS_HOSTNAME variable with "IP_ADDRESS" or "FQDN"
+# of the external hostname of the OMniLeads Data Stateless Server.
 REDIS_HOSTNAME=redis
 REDIS_PORT=6379
 
 # ------------------------------------------------------------------------------
 # --- On test-env or dev-env you must set the RTPENGINE_HOSTNAME variable with "rtpengine" string
+# On production environment, you must set the RTPENGINE_HOSTNAME variable with "IP_ADDRESS" or "FQDN"
+# of the external hostname of the OMniLeads Edge Server.
 RTPENGINE_HOSTNAME=rtpengine
 RTPENGINE_BIND_UDP_PORT=22222
 RTPENGINE_RTP_PORT_MIN=20001
@@ -270,6 +278,8 @@ RTPENGINE_RTP_ADDR="internal/${RTPENGINE_HOSTNAME};external/${PUBLIC_IP}"
 # ------------------------------------------------------------------------------
 # --- IP or hostname that each instance will invoke when locating the other
 # "${OML_HOSTNAME}" is the prod profile or "gearman" is the dev profile   
+# On production environment, you must set the GEARMAN_HOSTNAME variable with "IP_ADDRESS" or "FQDN"
+# of the external hostname of the OMniLeads Data Stateless Server.
 GEARMAN_HOSTNAME=gearman
 GEARMAN_PORT=4730
 GEARMAN_JOB_SERVERS=${GEARMAN_HOSTNAME}:${GEARMAN_PORT}
@@ -284,6 +294,7 @@ GEARMAN_CALLLOG_TASK=acd-log-processor
 #   if you object storage service use self-signed TLS certs                                       
 BUCKET_DEVICE=s3
 
+# On production environment, you must set the BUCKET_NAME variable with the name of the bucket
 # BUCKET_NAME=devops-qa
 # BUCKET_ACCESS_KEY_ID=DO00CDTJAKWH7HEE4PVX
 # BUCKET_SECRET_ACCESS_KEY=DKB1L1cqq+jPI/R3NB3gzHKkbu8uCGDYXHE86R53mRs
@@ -303,7 +314,7 @@ MINIO_HTTP_ADMIN_PASS=s3minio123
 #                                   OMniDialer                                                          #
 #########################################################################################################
 # --- Django and Dialer API connection params
-DIALER_PASSWORD=uhbe@k4@3h@@b987ds@@
+DIALER_PASSWORD=uhbe@k4@3h@@b987ds@@ss
 
 # --- IP or hostname that each instance will invoke when locating the other    
 # When omnidialer run in other host, you must set the OMNIDIALER_HOST variable with 
@@ -334,7 +345,7 @@ DIALER_PYTHON_LOGLEVEL=debug
 # --- Call attempts per second
 DIALER_CAPS=1
 # --- Time between the iterations when there are no contacts to call (in seconds)
-DIALER_TIME_BETWEEN_CALLS=2
+DIALER_TIME_BETWEEN_CALLS=1
 
 # --- Workers replicas
 DIALER_PROCESS_CAMPAIGN_REPLICAS=2
@@ -360,7 +371,7 @@ DIALER_GAMMA_THROTTLE_FLOOR=0.2
 #                                          Monitoring                                                   #
 #########################################################################################################
 
-HOMER_ENABLE=False
+HOMER_ENABLE=True
 # --- IP or hostname that each instance will invoke when locating the other    
 HOMER_HOSTNAME=homer.sephir.tech
 HOMER_PORT=9060
@@ -388,7 +399,7 @@ GOOGLE_CLOUD_PROJECTID=your_project_id
 #    085*  -> 502 Bad Gateway
 #    086*  -> 608 Rejected
 #    087*  -> 180 Ringing 45 seconds
-#    092*  -> 404 Not Found
+#    092*  -> 404 Not Found|
 #    093*  -> 503 Service Unavailable
 #    094*  -> 486 Busy Here
 #    095*  -> 603 Decline
