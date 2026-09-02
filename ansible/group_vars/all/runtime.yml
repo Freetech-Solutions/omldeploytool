@@ -52,6 +52,7 @@ dialer_engine: omnidialer
 # ACD vars
 acd_app: oml_acd
 acd_ag_handoff_ttl: 15
+acd_shortcall_duration_threshold_sec: 5
 
 # Pods names
 data_stateless_pod: data-stateless-server

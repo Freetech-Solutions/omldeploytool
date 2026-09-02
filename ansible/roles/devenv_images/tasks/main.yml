@@ -1,0 +1,80 @@
+---
+- name: DEVENV Assert source root exists
+  ansible.builtin.stat:
+    path: "{{ oml_src_root }}"
+  register: devenv_src_root_stat
+  tags:
+    - install
+    - upgrade
+    - update
+    - devenv
+
+- name: DEVENV Fail when components-git-repo is missing
+  ansible.builtin.assert:
+    that:
+      - devenv_src_root_stat.stat.exists
+      - devenv_src_root_stat.stat.isdir
+    fail_msg: >-
+      oml_src_root='{{ oml_src_root }}' no existe. Inicializá submódulos
+      (git submodule update --init --recursive) o ajustá oml_src_root en vars.yml.
+  tags:
+    - install
+    - upgrade
+    - update
+    - devenv
+
+- name: DEVENV Decide whether to rebuild images
+  ansible.builtin.set_fact:
+    devenv_do_build: >-
+      {{
+        ('install' in ansible_run_tags)
+        or ('upgrade' in ansible_run_tags)
+        or (devenv_rebuild_images | default(false) | bool)
+        or ('devenv' in ansible_run_tags)
+      }}
+  tags:
+    - install
+    - upgrade
+    - update
+    - devenv
+
+- name: DEVENV Build component images with podman
+  ansible.builtin.shell: >-
+    podman build -t {{ item.image | quote }}
+    -f {{ item.dockerfile | quote }}
+    {% if (item.target | default('') | length) > 0 %}--target {{ item.target | quote }}{% endif %}
+    .
+  args:
+    chdir: "{{ oml_src_root }}/{{ item.context }}"
+  loop: "{{ devenv_build_images }}"
+  loop_control:
+    label: "{{ item.image }}"
+  when: devenv_do_build | bool
+  tags:
+    - install
+    - upgrade
+    - update
+    - devenv
+
+- name: DEVENV Pull Vue CLI tool image
+  ansible.builtin.command:
+    cmd: podman pull --quiet {{ VUE_CLI_IMG }}
+  changed_when: true
+  when: devenv_do_build | bool
+  tags:
+    - install
+    - upgrade
+    - update
+    - devenv
+
+- name: DEVENV Skip rebuild notice on update
+  ansible.builtin.debug:
+    msg: >-
+      Saltando podman build (action update sin devenv_rebuild_images).
+      Para forzar rebuild: devenv_rebuild_images=true o --action=upgrade.
+  when: not (devenv_do_build | bool)
+  tags:
+    - install
+    - upgrade
+    - update
+    - devenv

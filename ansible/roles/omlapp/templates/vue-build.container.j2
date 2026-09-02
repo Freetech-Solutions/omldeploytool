@@ -1,0 +1,27 @@
+[Unit]
+Description=OMniLeads Vue production build (oneshot)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+Requires=omlapp_web-pod.service
+
+[Container]
+ContainerName=vue-build
+Image={{ VUE_CLI_IMG }}
+Pod=omlapp_web.pod
+WorkingDir=/home/oml_frontend
+Label=tier=omlapp
+LogDriver=journald
+Volume={{ vue_src_host_path }}:/home/oml_frontend:z
+Volume=/etc/omnileads/vue-build.sh:/usr/local/bin/vue-build.sh:ro,Z
+PodmanArgs=--cgroups=no-conmon
+Exec=/bin/sh /usr/local/bin/vue-build.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Restart=no
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

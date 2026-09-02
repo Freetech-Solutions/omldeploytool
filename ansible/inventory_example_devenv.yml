@@ -1,0 +1,46 @@
+---
+# Local AIO devenv (Podman Quadlet on the Ansible controller host).
+# Requires Linux + Podman (>= 4.4) + systemd already installed: with oml_devenv,
+# prerequisitos does NOT apt/dnf-install packages (not even podman).
+# Not Darwin. Copy to:
+#   mkdir -p instances/devenv
+#   cp inventory_example_devenv.yml instances/devenv/inventory.yml
+#   cp inventory_example_devenv_vars.yml instances/devenv/vars.yml
+# Place custom TLS certs in instances/devenv/ (cert.pem, key.pem).
+# Set omni_ip_lan to a real host IPv4 (never 127.0.0.1).
+#
+# Deploy:
+#   ./deploy.sh --action=install --tenant=devenv --yes
+#   ./deploy.sh --action=devenv --tenant=devenv --yes   # alias: install + oml_devenv=true
+#
+# Docs: docs/devenv.md
+
+all:
+  children:
+    aio_instances:
+      hosts:
+        devenv:
+          ansible_connection: local
+          ansible_host: 127.0.0.1
+          ansible_become: true
+          ansible_become_method: sudo
+          # Admin user with sudo NOPASSWD (not root, not omnileads).
+          ansible_user: omladmin
+          ansible_python_interpreter: /usr/bin/python3
+          # REPLACE with the host LAN IPv4 used for PublishPort / SIP advertise.
+          omni_ip_lan: 192.168.1.10
+          tenant_id: devenv
+          fqdn: localhost
+          bucket_name: omnileads
+          itsp_nodes: "oml-pstn-server"
+          kamailio_webrtc_iface: eth0
+          certs: custom
+          ssl_cert_file_name: cert.pem
+          ssl_key_file_name: key.pem
+
+##########################################################
+### All in One "AIO" (no dedicated edge group → no HAProxy)
+##########################################################
+omnileads_aio:
+  hosts:
+    devenv:

@@ -1,0 +1,39 @@
+---
+# Copy to instances/devenv/vars.yml (loaded by deploy.sh as --extra-vars).
+# See docs/devenv.md
+
+oml_devenv: true
+qa_env: true
+django_settings_module: ominicontacto.settings.develop
+force_image_pull: false
+
+# Rebuild images on --action=update when set true
+devenv_rebuild_images: false
+
+# Source trees on the host (bind-mounted into omlapp / workers / vue)
+oml_src_root: "{{ playbook_dir }}/../../components-git-repo"
+django_src_host_path: "{{ oml_src_root }}/django"
+vue_src_host_path: "{{ oml_src_root }}/django/omnileads_ui"
+
+# Local image tags produced by roles/devenv_images
+APP_IMG: localhost/omlapp:devenv
+NGINX_IMG: localhost/nginx:devenv
+WS_IMG: localhost/websockets:devenv
+ACD_IMG: localhost/acd:devenv
+KAMAILIO_IMG: localhost/kamailio:devenv
+RTPENGINE_IMG: localhost/rtpengine:devenv
+FASTAGI_IMG: localhost/fastagi:devenv
+CALLREC_COMPRESSOR_IMG: localhost/callrec_compressor:devenv
+CALLREC_TRANSCRIBER_IMG: localhost/callrec_transcriber:devenv
+DIALER_API_IMG: localhost/dialer_api:devenv
+DIALER_WORKER_IMG: localhost/dialer_worker:devenv
+PSTN_EMULATOR_IMG: localhost/pstn_emulator:devenv
+NGINX_QA_IMG: localhost/omlqa_nginx:devenv
+
+# Vue CLI tool image (pulled, not built)
+VUE_CLI_IMG: docker.io/freetechsolutions/vue-cli:develop
+
+# Dialer replicas (aligned with docker-compose/dev-env/set_dev_env.sh)
+dialer_process_campaign_replicas: 2
+dialer_process_contact_replicas: 1
+dialer_process_event_replicas: 1

@@ -157,6 +157,7 @@ ACD_PJSIP_TRANSPORT_TRUNK=${ACD_HOSTNAME}
 ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
 ACD_WEBHOOK_TRANSFER_TTL=10
+SHORTCALL_DURATION_THRESHOLD_SEC=5
 ACD_REC_PATH=/var/spool/asterisk/recording
 
 #####################################################################################################

@@ -1,0 +1,60 @@
+---
+# Build OMniLeads images from components-git-repo for local Quadlet devenv.
+devenv_rebuild_images: false
+oml_src_root: "{{ playbook_dir }}/../../components-git-repo"
+VUE_CLI_IMG: docker.io/freetechsolutions/vue-cli:develop
+
+# List of images to podman build (context relative to oml_src_root).
+devenv_build_images:
+  - image: "{{ APP_IMG }}"
+    context: django
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ NGINX_IMG }}"
+    context: nginx
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ WS_IMG }}"
+    context: websocket-server
+    dockerfile: etc/fts/oml/services/websockets/dockerfile
+    target: run
+  - image: "{{ ACD_IMG }}"
+    context: acd
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ KAMAILIO_IMG }}"
+    context: kamailio
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ RTPENGINE_IMG }}"
+    context: rtpengine
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ FASTAGI_IMG }}"
+    context: fastagi
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ CALLREC_COMPRESSOR_IMG }}"
+    context: postcall_actions/callrec_compressor
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ CALLREC_TRANSCRIBER_IMG }}"
+    context: postcall_actions/callrec_transcriber
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ DIALER_API_IMG }}"
+    context: dialer/interface/src
+    dockerfile: Dockerfile
+    target: run
+  - image: "{{ DIALER_WORKER_IMG }}"
+    context: dialer/workers/handle-campaign/src
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ PSTN_EMULATOR_IMG }}"
+    context: omlqa/pstn_emulator
+    dockerfile: Dockerfile
+    target: ""
+  - image: "{{ NGINX_QA_IMG }}"
+    context: omlqa/nginx
+    dockerfile: Dockerfile
+    target: ""

@@ -1,0 +1,25 @@
+[Unit]
+Description=OMniLeads Vue CLI (dev hot-reload)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+Requires=omlapp_web-pod.service
+
+[Container]
+ContainerName=vue-cli
+Image={{ VUE_CLI_IMG }}
+Pod=omlapp_web.pod
+WorkingDir=/home/oml_frontend
+Label=tier=omlapp
+LogDriver=journald
+Volume={{ vue_src_host_path }}:/home/oml_frontend:z
+PodmanArgs=--cgroups=no-conmon
+# Default entrypoint of vue-cli image serves the SPA; keep TTY for interactive npm.
+PodmanArgs=--tty
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+
+[Install]
+WantedBy=multi-user.target
