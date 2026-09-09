@@ -1,12 +1,12 @@
 ---
 
 # --- OMniLeads images WEB
-APP_IMG: docker.io/freetechsolutions/omlapp:20260901-f462915c
+APP_IMG: docker.io/freetechsolutions/omlapp:20260903-4c9f4cbc
 NGINX_IMG: docker.io/freetechsolutions/nginx:20260716-bf4395be
 WS_IMG: docker.io/freetechsolutions/websockets:20260306-13838d19
 
 # --- OMniLeads images TEL
-ACD_IMG: docker.io/freetechsolutions/acd:20260901-47c8189d
+ACD_IMG: docker.io/freetechsolutions/acd:20260903-4dd0d196
 KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20260824-805399ea
 RTPENGINE_IMG: docker.io/freetechsolutions/rtpengine:20260713-c32419a6
 CALLREC_COMPRESSOR_IMG: docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
@@ -43,4 +43,3 @@ UWSGI_EXPORTER_IMG: docker.io/timonwong/uwsgi-exporter:v1.3.0
 PROMETHEUS_PODMAN_EXPORTER_IMG: quay.io/navidys/prometheus-podman-exporter:v1.21.0
 PROMETHEUS_PODMAN_IMG: quay.io/navidys/prometheus-podman-exporter:latest
 PROMTAIL_IMG: docker.io/grafana/promtail:main-9f5f159
-BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb
