@@ -69,6 +69,8 @@ DAPHNE_HOSTNAME=daphne
 # Session Cookie Age (SCA) is the time in seconds that will last the https session when inactivity
 # is detected in the session (by default is 1 hour)
 SESSION_COOKIE_AGE=3600
+# Presigned S3/MinIO recording URL TTL (seconds). Independent of SESSION_COOKIE_AGE.
+STORAGE_PRESIGNED_URL_TTL=120
 
 # Session 
 PRESENCE_LOG_RECONNECT_COOLDOWN_MS=1500

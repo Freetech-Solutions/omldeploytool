@@ -41,6 +41,9 @@ django_secret_key: "{{ vault_django_secret_key }}"
 # --- Session Cookie Age, is the time in seconds that will last 
 # --- the https session when inactivity
 SCA: 3600
+# --- TTL of S3/MinIO presigned recording URLs (seconds). Keep shorter than SCA
+# --- so a leaked link dies even if the Django session is still valid.
+storage_presigned_url_ttl: 120
 # --- Session API token (seconds)
 api_token_expired_after: 3600
 # --- Ephemeral Credentials TTL (ECTTL) is the time in seconds 
