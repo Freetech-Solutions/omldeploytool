@@ -296,6 +296,18 @@ google_maps_center: '{ "lat": -31.416668, "lng": -64.183334 }'
 google_api_key: "{{ vault_google_api_key }}"
 google_cloud_projectid: "{{ vault_google_cloud_projectid }}"
 
+#------------------------------------- Fail2ban (SSH) ----------------------------------
+# --- Jail sshd en cada host de pods (nftables; ufw/firewalld están desactivados).
+# --- Override por tenant: instances/<tenant>/vars.yml
+# --- Disable por host/tenant: fail2ban: false en inventory.yml o vars.yml
+#
+fail2ban: true
+fail2ban_bantime: 1h
+fail2ban_findtime: 10m
+fail2ban_maxretry: 5
+# --- CIDRs de bastion / red de admin (además de localhost y omni_ip_lan del inventario).
+fail2ban_ignoreip_extra: []
+
 #------------------------------------- Wazuh Agent ----------------------------------
 # --- OS agent (FIM / logs) enrolled to a central Wazuh Manager.
 # --- El rol se ejecuta cuando wazuh_manager está definido (y wazuh != false).

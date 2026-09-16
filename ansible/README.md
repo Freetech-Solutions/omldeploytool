@@ -185,6 +185,7 @@ Typical parameters:
 | `omlapp-workers` | `playbooks/site.yml` (tags `omlapp-workers,gather_facts`) | Workers of the omlapp pod. |
 | `observability` | `playbooks/site.yml` (tags `observability,gather_facts`, `oml_observability_deploy=true`) | Prometheus + exporters + Promtail. |
 | `wazuh-agent` | `playbooks/site.yml` (tags `wazuh-agent,gather_facts`) | Wazuh Agent OS (repo oficial + enrollment). Requiere `wazuh_manager`. Desactivar con `wazuh: false` en el inventario. |
+| `fail2ban` | `playbooks/site.yml` (tags `fail2ban,gather_facts`) | fail2ban jail SSH (`nftables`). On by default; disable with `fail2ban: false`. Whitelist bastion/admin in `fail2ban_ignoreip_extra`. |
 | `postgres` / `redis` / `minio` / `gearman` | `playbooks/site.yml` | Single data role re-run. |
 | `data` | `playbooks/site.yml` | All data roles (postgres, redis, minio, gearman). |
 | `telephony-edge` | `playbooks/site.yml` | Edge telephony role (`rtpengine`, Kamailio WebRTC/PSTN). |
@@ -652,43 +653,86 @@ aio_instances:
 
 # Security 🛡️ <a name="security"></a>
 
-OMniLeads combines Web (HTTPS), WebRTC (WSS + SRTP) and VoIP (SIP + RTP) technologies. Production deployments exposed to the Internet should sit behind:
+OMniLeads 3.X combines Web (HTTPS), WebRTC (WSS + SRTP) and VoIP (SIP + RTP). The Internet-facing perimeter is the **Edge** host (inventory group `edge`): **HAProxy** terminates TLS on TCP/443 and **`telephony_edge`** (`Network=host`) runs RTPengine, Kamailio WebRTC and Kamailio PSTN. Compute, data and ACD stay on `omni_ip_lan` and must not be published to the Internet.
 
-* A **Reverse Proxy / Load Balancer** in front of Nginx on TCP/443.
-* A **Session Border Controller (SBC)** terminating PSTN SIP toward your trunks.
+How that maps to layouts (see [Cluster deployments](#ait-deploy)):
 
-A well-configured **Cloud Firewall** keeps the attack surface small.
+| Layout | Who faces the Internet | TLS terminator | Telephony edge |
+|--------|------------------------|----------------|----------------|
+| **AIO** (`omnileads_aio` only) | The single host | **Nginx** on `:443` (HAProxy is **not** installed unless the host is also in `edge`) | Same host (`telephony_edge-pod.service`) |
+| **AIO + Edge** / **AIT** / **fully split** | The host in group `edge` | **HAProxy** on `:80` / `:443` (re-encrypts to Nginx `:443` on `omlapp_web`) | Dedicated Edge host |
+
+Production tenants exposed to the Internet should keep:
+
+* A **Cloud Firewall / Security Group** that publishes only the Edge (or AIO) ports below.
+* Optionally a **Reverse Proxy / Load Balancer** in front of HAProxy on TCP/443.
+* Optionally a **Session Border Controller (SBC)** terminating PSTN SIP toward your trunks (Kamailio PSTN still listens on UDP/5060 on the Edge).
+
+HAProxy TLS baseline (TLS 1.2+, modern ciphers, HSTS, backend re-encrypt): [`docs/haproxy_tls_iso27001.md`](docs/haproxy_tls_iso27001.md).
 
 ![Diagrama security](./png/security.png)
 
-### Firewall rules for an AIO host
+The diagram is the AIO + Edge posture: the **Tenant Edge Server** holds the public IP (users, WebRTC media, ITSP SIP). The **Tenant OML Server** (data / `omlapp_web` / ACD / workers) only needs a private IP plus SSH from your admin network. Prometheus is **not** a public port — scrape on LAN or via `https://<fqdn>/prom` on the Edge.
 
-| Port              | Protocol | Component                       | Scope                                |
-|-------------------|----------|---------------------------------|--------------------------------------|
-| 443               | TCP      | Nginx (Web + WebRTC TLS)        | Open to Internet                     |
-| `rtpengine_rtp_port_min`–`rtpengine_rtp_port_max` (default 20000–30000) | UDP | RTPengine / WebRTC SRTP | Open to Internet |
-| `acd_rtp_port_min`–`acd_rtp_port_max` (default 40000–50000) | UDP | Asterisk PSTN RTP | Open to Internet |
-| 5060              | UDP      | Kamailio PSTN SIP               | Restrict to ITSP IP(s)               |
-| `acd_trunk_sip_port` (default 6070) | UDP | Asterisk trunk SIP (desde Kamailio) | LAN / inter-nodo según topología |
-| 9090              | TCP      | Prometheus (`omlapp_web` / AIO) | LAN-only **or** front by HAProxy at `https://<fqdn>/prom` |
-| 8404              | TCP      | HAProxy metrics (`/metrics`, edge) | LAN-only (RFC1918 scrape)            |
-| 9273              | TCP      | Kamailio PSTN metrics (`/metrics`, edge) | LAN-only                         |
-| 9274              | TCP      | Kamailio WebRTC metrics (`/metrics`, edge) | LAN-only                       |
-| 22223             | TCP      | RTPengine metrics (edge)        | LAN-only                             |
-| 9100              | TCP      | Node exporter (todos los hosts con `observability.pod`) | LAN-only inter-nodo      |
-| 9882              | TCP      | Podman exporter (todos los hosts con `observability.pod`) | LAN-only inter-nodo    |
-| 9187              | TCP      | Postgres exporter (`data_statefull`) | LAN-only inter-nodo           |
-| 9121              | TCP      | Redis exporter (`data_stateless`) | LAN-only inter-nodo              |
-| 9418              | TCP      | Gearman exporter (`data_stateless`) | LAN-only inter-nodo            |
-| 9117              | TCP      | uWSGI exporter (`omlapp_web`)   | LAN-only inter-nodo                  |
+Ansible disables OS firewalls (`ufw` / `firewalld`). Enforce the tables below on the **cloud / VPC firewall**. Ports come from [`runtime.yml`](group_vars/all/runtime.yml) and [`tenants_global.yml`](group_vars/all/tenants_global.yml).
 
-Prometheus is published on `omni_ip_lan:9090` by the Podman `PublishPort` of the observability pod. External access is recommended through HAProxy on the edge host, gated by `haproxy_prom_allowed_src` (uncomment in [`tenants_global.yml`](group_vars/all/tenants_global.yml) with `vault_haproxy_prom_allowed_src` — list of CIDRs allowed at `/prom`). If `haproxy_prom_allowed_src` is empty or undefined, HAProxy **denies `/prom` by default**.
+**SSH brute-force protection:** each pod host runs **fail2ban** (jail `sshd` only, `banaction=nftables`, `backend=systemd`) when `fail2ban: true` (default). It **complements** — does not replace — restricting TCP/22 to admin/bastion at the cloud firewall. Whitelist your deployer/bastion CIDRs in `fail2ban_ignoreip_extra` (localhost and every host `omni_ip_lan` are already ignored). Disable per tenant/host with `fail2ban: false`. Dedicated re-run: `./deploy.sh --action=fail2ban --tenant=<tenant>`.
 
-**Cluster inter-node scrape:** the tenant Prometheus runs on `omlapp_web` / AIO and scrapes every peer via `omni_ip_lan`. The `observability.pod` publishes exporter ports on the LAN IP of each host (see [`observability.pod.j2`](roles/pods/templates/observability.pod.j2)). OS firewalls (`ufw`/`firewalld`) are disabled by Ansible; if your cloud provider filters the **private VPC**, allow the ports above **between tenant nodes only** (not from the Internet). After deploy, Ansible runs a TCP reachability check from the Prometheus host (tag `validate`).
+### Edge host (group `edge`) — public perimeter
+
+HAProxy (`Network=host`, outside the pod) + `telephony_edge.pod` (Kamailio WebRTC / PSTN + RTPengine) + `observability.pod` exporters.
+
+| Port | Protocol | Component | Scope |
+|------|----------|-----------|-------|
+| 80 | TCP | HAProxy (HTTP → HTTPS) and certbot HTTP-01 when `certs: certbot` | Open to Internet |
+| 443 | TCP | HAProxy: Web UI, APIs, `wss://<fqdn>/ws` → Kamailio WebRTC `:10060` | Open to Internet |
+| `rtpengine_rtp_port_min`–`rtpengine_rtp_port_max` (default 20000–30000) | UDP | RTPengine (WebRTC SRTP and PSTN RTP toward the ITSP) | Open to Internet |
+| `kamailio_pstn_port` (default 5060) | UDP | Kamailio PSTN SIP | **Restrict to ITSP IP(s)** |
+| 22 | TCP | SSH (`ansible_user`) | Restrict to admin / bastion |
+| `kamailio_wss_port` (default 10060) | TCP | Kamailio WebRTC (HAProxy backend `/ws`) | Localhost / `omni_ip_lan` only |
+| 8404 | TCP | HAProxy metrics (`/metrics`) | LAN-only (RFC1918 scrape) |
+| 9273 | TCP | Kamailio PSTN metrics | LAN-only |
+| 9274 | TCP | Kamailio WebRTC metrics | LAN-only |
+| 22223 | TCP | RTPengine metrics | LAN-only |
+| 9100 / 9882 | TCP | Node / Podman exporters | LAN-only inter-node |
+
+Do **not** publish `:9090` on the Edge. Prometheus lives on `omlapp_web` / AIO; HAProxy fronts it at `/prom` (see below).
+
+### Compute, data and ACD hosts — private VPC only
+
+In AIO + Edge, AIT and fully split layouts these hosts should have **no** user/ITSP ports on the public IP (SSH only, preferably via bastion). Nginx still binds `:80`/`:443` on the `omlapp_web` host — block them from the Internet at the cloud firewall; HAProxy reaches the backend on `omni_ip_lan:443`.
+
+| Port | Protocol | Component | Scope |
+|------|----------|-----------|-------|
+| 22 | TCP | SSH | Admin / bastion only |
+| 443 | TCP | Nginx on `omlapp_web` (HAProxy backend, TLS re-encrypt) | **From Edge `omni_ip_lan` only** |
+| `acd_trunk_sip_port` (default **5070**) | UDP | Asterisk PJSIP trunk (Kamailio PSTN → ACD) | **From Edge → ACD** (`acd_nodes`). On co-located AIO/edge+ACD: `127.0.0.1:5070` |
+| `acd_rtp_port_min`–`acd_rtp_port_max` (default 40000–50000) | UDP | Asterisk RTP (internal leg toward RTPengine) | **Between Edge and ACD** — not from the Internet |
+| `acd_agent_sip_port` (default 5160) | UDP | Asterisk agent SIP | LAN / localhost |
+| 7088 / 7098 | TCP | Asterisk ARI / ACD app metrics | LAN-only |
+| 5432 / 9000 / 9001 | TCP | PostgreSQL / MinIO (`data_statefull`) | LAN-only inter-node |
+| 6379 / 4730 | TCP | Redis / Gearman (`data_stateless`) | LAN-only inter-node |
+| 9090 | TCP | Prometheus (`omlapp_web` / AIO) | LAN-only, or via Edge `/prom` |
+| 9100 / 9882 | TCP | Node / Podman exporters (every host with `observability.pod`) | LAN-only inter-node |
+| 9187 | TCP | Postgres exporter (`data_statefull`) | LAN-only inter-node |
+| 9121 / 9418 | TCP | Redis / Gearman exporters (`data_stateless`) | LAN-only inter-node |
+| 9117 | TCP | uWSGI exporter (`omlapp_web`) | LAN-only inter-node |
+
+Media path in 3.X: browsers and the ITSP send RTP/SRTP to **RTPengine on the Edge**. Asterisk RTP (`40000–50000`) is the private hairpin between Edge and ACD, not a second Internet range.
+
+### AIO (single host, no dedicated Edge)
+
+One public IP carries both the web front and `telephony_edge`. Nginx terminates TLS (no HAProxy). Open the Edge Internet ports (80/443, RTPengine UDP, SIP 5060 to the ITSP, SSH to admin) on that host. Trunk SIP (`5070`) and Asterisk RTP stay on loopback / the host namespace — no extra cloud rule. Observability ports remain LAN-only (or `/prom` if you also put the host in group `edge` to install HAProxy).
+
+### Prometheus on `/prom`
+
+Prometheus is published on `omni_ip_lan:9090` by the Podman `PublishPort` of the observability pod on `omlapp_web` / AIO. External access goes through HAProxy on the Edge at `https://<fqdn>/prom`, gated by `haproxy_prom_allowed_src` (uncomment in [`tenants_global.yml`](group_vars/all/tenants_global.yml) with `vault_haproxy_prom_allowed_src` — list of CIDRs). If `haproxy_prom_allowed_src` is empty or undefined, HAProxy **denies `/prom` by default**.
+
+**Cluster inter-node scrape:** the tenant Prometheus scrapes every peer via `omni_ip_lan`. The `observability.pod` publishes exporter ports on the LAN IP of each host (see [`observability.pod.j2`](roles/pods/templates/observability.pod.j2)). If the cloud provider filters the **private VPC**, allow the LAN ports above **between tenant nodes only**. After deploy, Ansible runs a TCP reachability check from the Prometheus host (tag `validate`).
 
 ```bash
-# From the omlapp_web / AIO host (example PortaVoice)
-for t in 10.10.0.14:9100 10.10.0.15:9187 10.10.0.14:8404; do
+# From the omlapp_web / AIO host — Edge exporters + a data host
+for t in 10.10.0.14:9100 10.10.0.14:8404 10.10.0.15:9187; do
   nc -zv "${t%:*}" "${t#*:}" || echo "FAIL $t"
 done
 ```

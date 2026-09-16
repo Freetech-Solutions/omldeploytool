@@ -2,6 +2,14 @@
 
 Comparacion analizada: `main...develop-3.0` sobre `ansible/` (HEAD actual de la rama).
 
+## Fail2ban (SSH)
+
+- Rol `fail2ban`: jail `sshd` con `banaction=nftables` y `backend=systemd` (ufw/firewalld quedan desactivados por `prerequisitos`).
+- Integrado en `site_core.yml` (tags `install` / `upgrade` / `update` / `fail2ban`) y acción `./deploy.sh --action=fail2ban`.
+- Habilitado por defecto (`fail2ban: true`); anular con `fail2ban: false`. Skip en `oml_devenv`.
+- `ignoreip`: localhost + `omni_ip_lan` del inventario + `fail2ban_ignoreip_extra` (bastion/admin).
+- Variables en `group_vars/all/tenants_global.yml` (`fail2ban_bantime`, `fail2ban_findtime`, `fail2ban_maxretry`, `fail2ban_ignoreip_extra`).
+
 ## AIO restore con `backup_filename`
 
 - Nuevo playbook `site_aio_data.yml` importado por `site.yml` **antes** de `site_restore.yml`: en inventarios solo-`omnileads_aio` despliega la capa data (prerequisitos/pods/postgres/…) cuando hay `backup_filename`, evitando el fallo `data_statefull-pod.service` inexistente.

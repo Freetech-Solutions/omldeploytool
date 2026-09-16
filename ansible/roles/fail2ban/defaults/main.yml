@@ -1,0 +1,33 @@
+# Copyright (C) 2026 Freetech Solutions
+#
+# This file is part of OMniLeads
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ISO/IEC 27001 — Control 8.9 (Gestión de la configuración):
+# Variables centralizadas para jail SSH reproducible en todos los nodos.
+#
+# ISO/IEC 27001 — Control 8.16 (Monitoreo de actividades):
+# Protección contra fuerza bruta SSH vía fail2ban + nftables.
+---
+# Fallbacks del rol. Config operativa en:
+#   - group_vars/all/tenants_global.yml (todos los tenants)
+#   - instances/<tenant>/vars.yml (override por tenant)
+#   - inventory.yml host/group vars (p. ej. fail2ban: false)
+
+fail2ban_bantime: 1h
+fail2ban_findtime: 10m
+fail2ban_maxretry: 5
+
+# CIDRs/IPs adicionales (bastion, red de admin). Se suman a localhost y omni_ip_lan.
+fail2ban_ignoreip_extra: []
+
+fail2ban_package_state: present
+fail2ban_service_enabled: true
+fail2ban_service_state: started
+
+# Destino del drop-in (no pisa jail.conf de la distro).
+fail2ban_jail_d_conf: /etc/fail2ban/jail.d/99-omnileads.conf

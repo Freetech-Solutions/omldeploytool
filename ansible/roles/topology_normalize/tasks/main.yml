@@ -314,6 +314,16 @@
           or ('wazuh-agent' in ansible_run_tags)
         )
       }}
+    # fail2ban (jail SSH): on by default; inventory can set fail2ban: false.
+    # Skip devenv hosts (no OS package installs). Dedicated --action=fail2ban forces the role.
+    component_fail2ban_enabled: >-
+      {{
+        (not (oml_devenv | default(false) | bool))
+        and (
+          (fail2ban | default(true) | bool)
+          or ('fail2ban' in ansible_run_tags)
+        )
+      }}
     # Addons (pod enterprise + rol addons) solo con imagen omlapp *-enterprise.
     component_addons_enabled: >-
       {{

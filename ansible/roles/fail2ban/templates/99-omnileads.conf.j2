@@ -1,0 +1,17 @@
+# Managed by Ansible — OMniLeads fail2ban (SSH only).
+# Drop-in: no modifica jail.conf de la distro.
+# banaction=nftables: prerequisitos desactiva ufw/firewalld.
+# backend=systemd: journald (Storage=volatile); no depender de /var/log/auth.log.
+
+[DEFAULT]
+ignoreip = {{ fail2ban_ignoreip_list | join(' ') }}
+bantime = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+banaction = nftables
+
+[sshd]
+enabled = true
+port = {{ ansible_ssh_port | default(22) }}
+backend = systemd
+filter = sshd

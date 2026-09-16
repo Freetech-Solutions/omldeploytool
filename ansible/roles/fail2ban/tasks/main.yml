@@ -1,0 +1,83 @@
+# Copyright (C) 2026 Freetech Solutions
+#
+# This file is part of OMniLeads
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ISO/IEC 27001 — Control 8.9 (Gestión de la configuración):
+# Instalación idempotente de fail2ban (jail SSH) vía Ansible.
+#
+# ISO/IEC 27001 — Control 8.16 (Monitoreo de actividades):
+# Ban automático de IPs con fuerza bruta SSH (nftables; ufw/firewalld off).
+---
+- name: FAIL2BAN Ensure EPEL on Rocky or Alma Linux
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+
+- name: FAIL2BAN Install packages (Debian)
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+      - nftables
+    state: "{{ fail2ban_package_state }}"
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 300
+  when: ansible_os_family == "Debian"
+
+- name: FAIL2BAN Install packages (Rocky/Alma)
+  ansible.builtin.dnf:
+    name:
+      - fail2ban
+      - nftables
+    state: "{{ fail2ban_package_state }}"
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+
+- name: FAIL2BAN Build ignoreip list
+  ansible.builtin.set_fact:
+    fail2ban_ignoreip_list: >-
+      {{
+        (['127.0.0.1/8', '::1']
+         + (
+             groups['all'] | default([])
+             | map('extract', hostvars)
+             | selectattr('omni_ip_lan', 'defined')
+             | map(attribute='omni_ip_lan')
+             | select('string')
+             | reject('equalto', '')
+             | list
+           )
+         + (fail2ban_ignoreip_extra | default([]))
+        )
+        | unique
+        | list
+      }}
+
+- name: FAIL2BAN Ensure jail.d directory exists
+  ansible.builtin.file:
+    path: /etc/fail2ban/jail.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: FAIL2BAN Deploy SSH jail drop-in
+  ansible.builtin.template:
+    src: 99-omnileads.conf.j2
+    dest: "{{ fail2ban_jail_d_conf }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart fail2ban
+
+- name: FAIL2BAN Ensure fail2ban service is enabled and started
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: "{{ fail2ban_service_enabled | bool }}"
+    state: "{{ fail2ban_service_state }}"
+  when: fail2ban_package_state != "absent"
