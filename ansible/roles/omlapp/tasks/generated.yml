@@ -108,7 +108,7 @@
     login_host: "{{ postgres_host  | trim }}"
     login_password: "{{ postgres_password }}"
     login_user: "{{ postgres_user }}"
-    port: "{{ postgres_port }}"
+    login_port: "{{ postgres_port }}"
     maintenance_db: "{{ postgres_maintenance_db }}"
     state: present
   tags:

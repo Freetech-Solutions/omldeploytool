@@ -177,7 +177,7 @@
         login_host: "{{ oml_restore_postgres_host }}"
         login_password: "{{ postgres_password }}"
         login_user: "{{ postgres_user }}"
-        port: "{{ postgres_port }}"
+        login_port: "{{ postgres_port }}"
         maintenance_db: "{{ postgres_maintenance_db }}"
         state: absent
         force: true
@@ -197,7 +197,7 @@
         login_host: "{{ oml_restore_postgres_host }}"
         login_password: "{{ postgres_password }}"
         login_user: "{{ postgres_user }}"
-        port: "{{ postgres_port }}"
+        login_port: "{{ postgres_port }}"
         maintenance_db: "{{ postgres_maintenance_db }}"
         state: present
       loop: "{{ oml_restore_db_list }}"

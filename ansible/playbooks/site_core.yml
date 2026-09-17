@@ -35,6 +35,9 @@
       tags: [upgrade_from_2X, upgrade, upgrade_debian13, prerequisitos]
     - role: prerequisitos
       tags: [install, upgrade, update, prerequisitos]
+    - role: fail2ban
+      when: component_fail2ban_enabled | bool
+      tags: [install, upgrade, update, fail2ban]
     - role: wazuh-agent
       when: component_wazuh_agent_enabled | bool
       tags: [install, upgrade, update, wazuh-agent]

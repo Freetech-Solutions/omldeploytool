@@ -54,6 +54,7 @@ Primary actions (playbooks/site.yml unless noted):
   omlapp, omlapp-workers, nginx, websockets, dialer, qa, addons
   observability
   wazuh-agent
+  fail2ban
   postgres, redis, minio, gearman
   haproxy, edge
   data
@@ -360,6 +361,11 @@ case "$oml_action" in
   wazuh-agent)
     run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
       --tags "wazuh-agent,gather_facts" \
+      "${common_extra_vars[@]}" || rc=$?
+    ;;
+  fail2ban)
+    run_playbook "$ANSIBLE_DIR/playbooks/site.yml" \
+      --tags "fail2ban,gather_facts" \
       "${common_extra_vars[@]}" || rc=$?
     ;;
   prerequisitos)

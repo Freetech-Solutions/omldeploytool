@@ -5,8 +5,15 @@ Description=OmniLeads Web Pod
 [Pod]
 Network={{ oml_network }}
 
+{# Con grupo edge, HAProxy es el borde público: nginx solo en LAN. #}
+{# Sin edge (AIO clásico), nginx termina TLS en todas las interfaces. #}
+{% if (groups['edge'] | default([]) | length) > 0 %}
+PublishPort={{ omni_ip_lan }}:80:80
+PublishPort={{ omni_ip_lan }}:443:443
+{% else %}
 PublishPort=80:80
 PublishPort=443:443
+{% endif %}
 PublishPort={{ omni_ip_lan }}:9191:9191
 
 [Install]

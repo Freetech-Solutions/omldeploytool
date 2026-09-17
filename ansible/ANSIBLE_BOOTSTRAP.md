@@ -74,13 +74,15 @@ ansible-lint --version
 
 ### Re-ejecuciones futuras
 
-Cuando se actualice `requirements.txt` o `requirements.yml`:
+Cuando se actualice `requirements.txt` o `requirements.yml` (pines exactos; no chase latest):
 
 ```bash
 source venv/bin/activate
-pip install -r requirements.txt --upgrade
-ansible-galaxy collection install -r requirements.yml --upgrade
+pip install -r requirements.txt
+ansible-galaxy collection install -r requirements.yml --force
 ```
+
+`--force` en Galaxy aplica un pin más bajo si el control node ya tenía un major más nuevo (p. ej. `community.general` 13.x). No uses `--upgrade` en el archivo de collections: un `>=` abierto + `--upgrade` instaló `community.postgresql` 5.x y rompió `postgresql_db` (`port` vs `login_port`).
 
 ---
 

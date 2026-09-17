@@ -1,0 +1,29 @@
+# Managed by Ansible — OMniLeads fail2ban (SSH + optional Kamailio PSTN).
+# Drop-in: no modifica jail.conf de la distro.
+# banaction=nftables: prerequisitos desactiva ufw/firewalld.
+# backend=systemd: journald (Storage=volatile); no depender de /var/log/auth.log.
+
+[DEFAULT]
+ignoreip = {{ fail2ban_ignoreip_list | join(' ') }}
+bantime = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+banaction = nftables
+
+[sshd]
+enabled = true
+port = {{ ansible_ssh_port | default(22) }}
+backend = systemd
+filter = sshd
+
+{% if (oml_runs_edge | default(false) | bool) and (fail2ban_kamailio_pike | default(true) | bool) %}
+# Kamailio PSTN PIKE / unauthorized origin bans (edge / AIO hosts).
+# nftables-allports: drop SIP (UDP/TCP) and all other traffic from banned IPs.
+[kamailio-pstn]
+enabled = true
+filter = kamailio-pike
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=kamailio_pstn.service
+banaction = nftables-allports
+protocol = all
+{% endif %}

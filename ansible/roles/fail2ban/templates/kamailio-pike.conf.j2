@@ -1,0 +1,7 @@
+# Managed by Ansible — OMniLeads fail2ban filter for Kamailio PSTN PIKE / unauthorized origins.
+# Matches journald lines from kamailio_pstn.service (LogDriver=journald, kamailio -E).
+
+[Definition]
+failregex = Pike block from <HOST>(?::\d+)?
+            RECHAZADO origen no autorizado <HOST>(?::\d+)?
+ignoreregex =

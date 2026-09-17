@@ -236,7 +236,7 @@ Dependencia: `postgresql.service` declara `Requires=data_statefull-pod.service`.
 | **Plantilla** | `roles/pods/templates/omlapp_web.pod.j2` |
 | **Unidad systemd** | `omlapp_web-pod.service` |
 | **Red** | `omnileads` |
-| **Puertos publicados** | `80`, `443` (todas las interfaces), `omni_ip_lan:9191` (stats uWSGI) |
+| **Puertos publicados** | `80`, `443` en todas las interfaces (AIO sin `edge`); `omni_ip_lan:80/443` si hay grupo `edge` (HAProxy); `omni_ip_lan:9191` (stats uWSGI) |
 | **Hosts** | `omlapp_web`, `omnileads_aio` |
 
 | Unidad systemd | Contenedor | Imagen | Función |
