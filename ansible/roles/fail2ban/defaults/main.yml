@@ -8,15 +8,18 @@
 # (at your option) any later version.
 #
 # ISO/IEC 27001 — Control 8.9 (Gestión de la configuración):
-# Variables centralizadas para jail SSH reproducible en todos los nodos.
+# Variables centralizadas para jails SSH / Kamailio PSTN reproducibles.
 #
 # ISO/IEC 27001 — Control 8.16 (Monitoreo de actividades):
-# Protección contra fuerza bruta SSH vía fail2ban + nftables.
+# Protección contra fuerza bruta SSH y flood SIP vía fail2ban + nftables.
 ---
 # Fallbacks del rol. Config operativa en:
 #   - group_vars/all/tenants_global.yml (todos los tenants)
 #   - instances/<tenant>/vars.yml (override por tenant)
 #   - inventory.yml host/group vars (p. ej. fail2ban: false)
+#
+# Protección contra fuerza bruta SSH vía fail2ban + nftables.
+# En hosts edge/AIO también jail kamailio-pstn (PIKE / orígenes no autorizados).
 
 fail2ban_bantime: 1h
 fail2ban_findtime: 10m
@@ -25,9 +28,13 @@ fail2ban_maxretry: 5
 # CIDRs/IPs adicionales (bastion, red de admin). Se suman a localhost y omni_ip_lan.
 fail2ban_ignoreip_extra: []
 
+# Jail kamailio-pstn + PIKE en Kamailio PSTN (solo hosts edge/AIO).
+fail2ban_kamailio_pike: true
+
 fail2ban_package_state: present
 fail2ban_service_enabled: true
 fail2ban_service_state: started
 
 # Destino del drop-in (no pisa jail.conf de la distro).
 fail2ban_jail_d_conf: /etc/fail2ban/jail.d/99-omnileads.conf
+fail2ban_filter_kamailio_pike: /etc/fail2ban/filter.d/kamailio-pike.conf

@@ -35,7 +35,7 @@ El Edge no es “otro pod más con otros puertos”: es el **punto donde el trá
 ---------------------------------------------------------------------------------------------
               |                                 │                               Privae
          ┌────▼───────┬───────────┬─────────┬───┴───────┬─────────────────────────┐
-         │ nginx      │ postgres  │ workers | asterisk  | callrec │ observability |
+         │ nginx (443)│ postgres  │ workers | asterisk  | callrec │ observability |
          │ uwsgi      │ redis     │ dialer  | acd-app   │ workers │ containers    |
          │ daphne     | gearman   │ django  | fastagi   |         │               │
          │ dialer-api |           │ others  | acd-conf  |         │               │
@@ -81,11 +81,12 @@ PublishPort={{ omni_ip_lan }}:5432:5432
 PublishPort={{ omni_ip_lan }}:9000:9000
 ```
 
-`omlapp_web` publica HTTPS en todas las interfaces y stats uWSGI en LAN:
+`omlapp_web` publica HTTPS según layout: en AIO sin grupo `edge` en todas las interfaces; si hay Edge (HAProxy), solo en LAN. Stats uWSGI siempre en LAN:
 
 ```ini
-PublishPort=80:80
-PublishPort=443:443
+{# Con edge: omni_ip_lan:80/443; sin edge: 80/443 en 0.0.0.0 #}
+PublishPort={{ omni_ip_lan }}:80:80
+PublishPort={{ omni_ip_lan }}:443:443
 PublishPort={{ omni_ip_lan }}:9191:9191
 ```
 

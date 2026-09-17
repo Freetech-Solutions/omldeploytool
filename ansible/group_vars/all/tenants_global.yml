@@ -44,7 +44,7 @@ SCA: 3600
 # --- TTL of S3/MinIO presigned recording URLs (seconds). Keep shorter than SCA
 # --- so a leaked link dies even if the Django session is still valid.
 storage_presigned_url_ttl: 120
-# --- Session API token (seconds)
+# --- API Bearer token TTL (seconds). Independent of SCA.
 api_token_expired_after: 3600
 # --- Ephemeral Credentials TTL (ECTTL) is the time in seconds 
 # --- that will last the SIP credentials used to authenticate a SIP user
@@ -206,8 +206,9 @@ acd_log_level: info
 # kamailio shm & pkg memory params 
 # https://www.kamailio.org/wiki/tutorials/troubleshooting/memory
 
-kamailio_shm_size: 512
-kamailio_pkg_size: 64
+kamailio_shm_size: 1024
+kamailio_pkg_size: 256
+
 kamailio_certs_location: /etc/kamailio/certs
 
 # --- Kamailio log level
@@ -296,10 +297,12 @@ google_maps_center: '{ "lat": -31.416668, "lng": -64.183334 }'
 google_api_key: "{{ vault_google_api_key }}"
 google_cloud_projectid: "{{ vault_google_cloud_projectid }}"
 
-#------------------------------------- Fail2ban (SSH) ----------------------------------
+#------------------------------------- Fail2ban (SSH + Kamailio PSTN) ----------------------------------
 # --- Jail sshd en cada host de pods (nftables; ufw/firewalld están desactivados).
+# --- Jail kamailio-pstn en hosts edge/AIO (journald de kamailio_pstn.service + PIKE).
 # --- Override por tenant: instances/<tenant>/vars.yml
 # --- Disable por host/tenant: fail2ban: false en inventory.yml o vars.yml
+# --- Disable solo PIKE/jail Kamailio: fail2ban_kamailio_pike: false
 #
 fail2ban: true
 fail2ban_bantime: 1h
@@ -307,6 +310,8 @@ fail2ban_findtime: 10m
 fail2ban_maxretry: 5
 # --- CIDRs de bastion / red de admin (además de localhost y omni_ip_lan del inventario).
 fail2ban_ignoreip_extra: []
+# --- PIKE antiflood en Kamailio PSTN + jail fail2ban kamailio-pstn (hosts edge).
+fail2ban_kamailio_pike: true
 
 #------------------------------------- Wazuh Agent ----------------------------------
 # --- OS agent (FIM / logs) enrolled to a central Wazuh Manager.

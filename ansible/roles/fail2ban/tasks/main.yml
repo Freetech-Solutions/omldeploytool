@@ -8,10 +8,10 @@
 # (at your option) any later version.
 #
 # ISO/IEC 27001 — Control 8.9 (Gestión de la configuración):
-# Instalación idempotente de fail2ban (jail SSH) vía Ansible.
+# Instalación idempotente de fail2ban (jail SSH + Kamailio PSTN) vía Ansible.
 #
 # ISO/IEC 27001 — Control 8.16 (Monitoreo de actividades):
-# Ban automático de IPs con fuerza bruta SSH (nftables; ufw/firewalld off).
+# Ban automático de IPs con fuerza bruta SSH / flood SIP (nftables; ufw/firewalld off).
 ---
 - name: FAIL2BAN Ensure EPEL on Rocky or Alma Linux
   ansible.builtin.dnf:
@@ -38,6 +38,24 @@
     state: "{{ fail2ban_package_state }}"
   when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
 
+- name: FAIL2BAN Parse ITSP IPv4s from itsp_nodes for ignoreip
+  ansible.builtin.set_fact:
+    fail2ban_itsp_ips: >-
+      {{
+        (
+          (itsp_nodes | default('') | string).split(',')
+          | map('trim')
+          | reject('equalto', '')
+          | map('regex_replace', '^label=', '')
+          | map('regex_replace', ':.*$', '')
+          | map('trim')
+          | select('match', '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$')
+          | list
+        )
+        if (oml_runs_edge | default(false) | bool)
+        else []
+      }}
+
 - name: FAIL2BAN Build ignoreip list
   ansible.builtin.set_fact:
     fail2ban_ignoreip_list: >-
@@ -52,6 +70,16 @@
              | reject('equalto', '')
              | list
            )
+         + (
+             [omni_ip_wan]
+             if (
+               (oml_runs_edge | default(false) | bool)
+               and (omni_ip_wan is defined)
+               and ((omni_ip_wan | string | length) > 0)
+             )
+             else []
+           )
+         + (fail2ban_itsp_ips | default([]))
          + (fail2ban_ignoreip_extra | default([]))
         )
         | unique
@@ -66,7 +94,30 @@
     group: root
     mode: '0755'
 
-- name: FAIL2BAN Deploy SSH jail drop-in
+- name: FAIL2BAN Ensure filter.d directory exists
+  ansible.builtin.file:
+    path: /etc/fail2ban/filter.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - oml_runs_edge | default(false) | bool
+    - fail2ban_kamailio_pike | default(true) | bool
+
+- name: FAIL2BAN Deploy Kamailio PIKE filter
+  ansible.builtin.template:
+    src: kamailio-pike.conf.j2
+    dest: "{{ fail2ban_filter_kamailio_pike }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart fail2ban
+  when:
+    - oml_runs_edge | default(false) | bool
+    - fail2ban_kamailio_pike | default(true) | bool
+
+- name: FAIL2BAN Deploy jail drop-in (SSH + optional Kamailio PSTN)
   ansible.builtin.template:
     src: 99-omnileads.conf.j2
     dest: "{{ fail2ban_jail_d_conf }}"

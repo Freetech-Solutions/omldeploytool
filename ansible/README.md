@@ -185,7 +185,7 @@ Typical parameters:
 | `omlapp-workers` | `playbooks/site.yml` (tags `omlapp-workers,gather_facts`) | Workers of the omlapp pod. |
 | `observability` | `playbooks/site.yml` (tags `observability,gather_facts`, `oml_observability_deploy=true`) | Prometheus + exporters + Promtail. |
 | `wazuh-agent` | `playbooks/site.yml` (tags `wazuh-agent,gather_facts`) | Wazuh Agent OS (repo oficial + enrollment). Requiere `wazuh_manager`. Desactivar con `wazuh: false` en el inventario. |
-| `fail2ban` | `playbooks/site.yml` (tags `fail2ban,gather_facts`) | fail2ban jail SSH (`nftables`). On by default; disable with `fail2ban: false`. Whitelist bastion/admin in `fail2ban_ignoreip_extra`. |
+| `fail2ban` | `playbooks/site.yml` (tags `fail2ban,gather_facts`) | fail2ban: jail SSH (`nftables`) en todos los hosts; jail `kamailio-pstn` (journald + PIKE, `nftables-allports`) en edge/AIO. On by default; disable with `fail2ban: false`. Whitelist bastion/admin in `fail2ban_ignoreip_extra`; disable solo Kamailio con `fail2ban_kamailio_pike: false`. |
 | `postgres` / `redis` / `minio` / `gearman` | `playbooks/site.yml` | Single data role re-run. |
 | `data` | `playbooks/site.yml` | All data roles (postgres, redis, minio, gearman). |
 | `telephony-edge` | `playbooks/site.yml` | Edge telephony role (`rtpengine`, Kamailio WebRTC/PSTN). |
@@ -676,7 +676,12 @@ The diagram is the AIO + Edge posture: the **Tenant Edge Server** holds the publ
 
 Ansible disables OS firewalls (`ufw` / `firewalld`). Enforce the tables below on the **cloud / VPC firewall**. Ports come from [`runtime.yml`](group_vars/all/runtime.yml) and [`tenants_global.yml`](group_vars/all/tenants_global.yml).
 
-**SSH brute-force protection:** each pod host runs **fail2ban** (jail `sshd` only, `banaction=nftables`, `backend=systemd`) when `fail2ban: true` (default). It **complements** — does not replace — restricting TCP/22 to admin/bastion at the cloud firewall. Whitelist your deployer/bastion CIDRs in `fail2ban_ignoreip_extra` (localhost and every host `omni_ip_lan` are already ignored). Disable per tenant/host with `fail2ban: false`. Dedicated re-run: `./deploy.sh --action=fail2ban --tenant=<tenant>`.
+**SSH / SIP brute-force protection:** each pod host runs **fail2ban** when `fail2ban: true` (default):
+
+- Jail **`sshd`**: `banaction=nftables`, `backend=systemd` (all pod hosts).
+- Jail **`kamailio-pstn`** (edge / AIO only): reads `journalctl` of `kamailio_pstn.service` for PIKE / unauthorized-origin lines (`filter=kamailio-pike`), bans with `nftables-allports`. Requires Kamailio image with `WITH_ANTIFLOOD` / `PIKE_ENABLE` (see `kamailio_pstn.env`). Disable only this jail with `fail2ban_kamailio_pike: false`.
+
+It **complements** — does not replace — restricting TCP/22 and UDP/5060 at the cloud firewall. Whitelist deployer/bastion CIDRs in `fail2ban_ignoreip_extra` (localhost, every host `omni_ip_lan`, edge `omni_ip_wan`, and IPv4s from `itsp_nodes` are already ignored). Disable entirely with `fail2ban: false`. Dedicated re-run: `./deploy.sh --action=fail2ban --tenant=<tenant>`.
 
 ### Edge host (group `edge`) — public perimeter
 
@@ -700,7 +705,7 @@ Do **not** publish `:9090` on the Edge. Prometheus lives on `omlapp_web` / AIO; 
 
 ### Compute, data and ACD hosts — private VPC only
 
-In AIO + Edge, AIT and fully split layouts these hosts should have **no** user/ITSP ports on the public IP (SSH only, preferably via bastion). Nginx still binds `:80`/`:443` on the `omlapp_web` host — block them from the Internet at the cloud firewall; HAProxy reaches the backend on `omni_ip_lan:443`.
+In AIO + Edge, AIT and fully split layouts these hosts should have **no** user/ITSP ports on the public IP (SSH only, preferably via bastion). When the inventory has group `edge`, Nginx binds `:80`/`:443` only on `omni_ip_lan` (not `0.0.0.0`); HAProxy reaches the backend on `omni_ip_lan:443`.
 
 | Port | Protocol | Component | Scope |
 |------|----------|-----------|-------|

@@ -28,6 +28,7 @@
       - bucket_region is defined and (bucket_region | string | length) > 0
       # Django / web tuning
       - SCA is defined
+      - api_token_expired_after is defined
       - ECCTL is defined
       - LOGIN_FAILURE_LIMIT is defined
       # Dialer base (siempre se renderiza la env, aunque no haya workers locales)

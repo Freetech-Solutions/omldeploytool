@@ -2,13 +2,20 @@
 
 Comparacion analizada: `main...develop-3.0` sobre `ansible/` (HEAD actual de la rama).
 
-## Fail2ban (SSH)
+## API token TTL (`TOKEN_EXPIRED_AFTER_SECONDS`)
+
+- `django.env` ahora inyecta `TOKEN_EXPIRED_AFTER_SECONDS` desde `api_token_expired_after` (`tenants_global.yml`, default 3600 s).
+- Antes el valor no se pasaba y Django usaba el hardcode de `production.py` (9 h). Requiere regenerar `django.env` (`update`/`omlapp`).
+
+## Fail2ban (SSH + Kamailio PSTN)
 
 - Rol `fail2ban`: jail `sshd` con `banaction=nftables` y `backend=systemd` (ufw/firewalld quedan desactivados por `prerequisitos`).
+- Jail **`kamailio-pstn`** en hosts edge/AIO (`oml_runs_edge`): filtro `kamailio-pike` sobre journald (`_SYSTEMD_UNIT=kamailio_pstn.service`), `banaction=nftables-allports`. Matchea `Pike block from <HOST>` y `RECHAZADO origen no autorizado <HOST>`.
+- Kamailio PSTN: `PIKE_ENABLE` en `kamailio_pstn.env` → entrypoint `-A WITH_ANTIFLOOD` (módulo `pike` + `htable`; excluye ITSP/ACD). Requiere imagen `KAMAILIO_IMG` reconstruida con el `.cfg` actualizado.
 - Integrado en `site_core.yml` (tags `install` / `upgrade` / `update` / `fail2ban`) y acción `./deploy.sh --action=fail2ban`.
-- Habilitado por defecto (`fail2ban: true`); anular con `fail2ban: false`. Skip en `oml_devenv`.
-- `ignoreip`: localhost + `omni_ip_lan` del inventario + `fail2ban_ignoreip_extra` (bastion/admin).
-- Variables en `group_vars/all/tenants_global.yml` (`fail2ban_bantime`, `fail2ban_findtime`, `fail2ban_maxretry`, `fail2ban_ignoreip_extra`).
+- Habilitado por defecto (`fail2ban: true`); anular con `fail2ban: false`. Solo Kamailio: `fail2ban_kamailio_pike: false`. Skip en `oml_devenv`.
+- `ignoreip`: localhost + `omni_ip_lan` del inventario + `omni_ip_wan` (edge) + IPv4s de `itsp_nodes` + `fail2ban_ignoreip_extra` (bastion/admin).
+- Variables en `group_vars/all/tenants_global.yml` (`fail2ban_bantime`, `fail2ban_findtime`, `fail2ban_maxretry`, `fail2ban_ignoreip_extra`, `fail2ban_kamailio_pike`).
 
 ## AIO restore con `backup_filename`
 
