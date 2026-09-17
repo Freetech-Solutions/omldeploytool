@@ -1,27 +1,30 @@
 ---
 # Colecciones de Ansible Galaxy requeridas para el deploy de OMniLeads.
-# Se instalan con: ansible-galaxy install -r requirements.yml
+# Versiones exactas, alineadas a ansible-core==2.17.14 (requirements.txt).
+# Instalar: ansible-galaxy collection install -r requirements.yml
+# Si hay una major más nueva ya instalada: agregar --force (galaxy no downgraded sola).
+# No usar --upgrade: sube majors y rompe módulos (p. ej. postgresql 5.x quitó el alias port).
 # (ver ansible/bootstrap.sh).
 collections:
-  # Módulo postgresql_db usado en roles/omlapp y roles/upgrade_from_2X
+  # postgresql_db (roles/omlapp, roles/backup). 5.0.0 exige login_port (no port).
   - name: community.postgresql
-    version: ">=4.2.0"
+    version: "5.0.0"
 
-  # Módulos podman_volume (roles/prerequisitos) y podman_network (roles/dialer)
+  # podman_volume (prerequisitos) y podman_network (dialer)
   - name: containers.podman
-    version: ">=1.19.0"
+    version: "1.20.2"
 
-  # Módulos selinux, mount, sysctl (roles/prerequisitos) y
-  # callbacks profile_tasks / timer declarados en ansible.cfg
+  # selinux, mount, sysctl (prerequisitos); callbacks profile_tasks / timer (ansible.cfg)
   - name: ansible.posix
-    version: ">=1.5.4"
+    version: "2.2.2"
 
-  # Módulos timezone (roles/prerequisitos) y archive (roles/upgrade_from_2X)
+  # timezone (prerequisitos) y archive (upgrade_from_2X).
+  # 13.x pide ansible-core >=2.18; 12.6.5 es la última que soporta 2.17.
   - name: community.general
-    version: ">=8.0.0"
+    version: "12.6.5"
 
-  # Reservadas para filtros/lookups de red (ipaddr, json_query, etc.).
-  # No se usan directamente hoy: revisar antes de quitar si se incorporan
-  # nuevos roles que las requieran.
+  # Filtros/lookups de red (ipaddr, json_query, etc.).
   - name: ansible.netcommon
+    version: "8.7.0"
   - name: ansible.utils
+    version: "6.1.1"
