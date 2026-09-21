@@ -228,6 +228,8 @@ x-acd-ari-env: &acd-ari-env
   TENANT_ID: ${FQDN}
   REDIS_HOST: ${REDIS_HOSTNAME}
   RECORDING_BASE_PATH: /var/spool/asterisk/recording
+  # AMDREC=True: upload async de samples AMD a recordings/amd/. Requiere mismo flag en acd-server.
+  AMDREC: ${AMDREC:-False}
   PYTHON_LOGLEVEL: ${ACD_LOG_LEVEL:-error}
   TZ: ${TZ}
   WEBRTC_TRUNK: webrtc-trunk
@@ -277,6 +279,8 @@ x-asterisk-server-env: &asterisk-server-env
   TZ: ${TZ}
   WEBRTC_PROXY_HOSTNAME: ${KAMAILIO_WEBRTC_HOSTNAME:-kamailio-webrtc}
   WEBRTC_PROXY_PORT: ${KAMAILIO_WEBRTC_UDP_PORT:-10060}
+  # AMDREC=True: MixMonitor del recorte AMD (samples ML). Default off.
+  AMDREC: ${AMDREC:-False}
 
 # Asterisk Conf Generator common template
 x-asterisk-conf-generator-common: &asterisk-conf-generator-common

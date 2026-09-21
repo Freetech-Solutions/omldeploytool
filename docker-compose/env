@@ -163,6 +163,9 @@ ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 ACD_WEBHOOK_TRANSFER_TTL=10
 SHORTCALL_DURATION_THRESHOLD_SEC=5
 ACD_REC_PATH=/var/spool/asterisk/recording
+# AMDREC=True: MixMonitor + upload async de samples AMD a recordings/amd/ (dataset ML). Default off.
+# Debe estar en acd-server y acd-app (mismo valor).
+AMDREC=False
 
 #####################################################################################################
 #                                       FASTAGI                                                     #
