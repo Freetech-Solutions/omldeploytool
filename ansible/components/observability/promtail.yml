@@ -45,6 +45,7 @@
       tags:
         - install
         - upgrade
+        - update
         - validate
 
     - name: OBSERVABILITY Promtail Create config directory
@@ -57,6 +58,7 @@
       tags:
         - install
         - upgrade
+        - update
 
     - name: OBSERVABILITY Promtail Generate configuration
       template:
@@ -70,6 +72,7 @@
       tags:
         - install
         - upgrade
+        - update
         - config
 
     - name: OBSERVABILITY Promtail Deploy systemd service
@@ -84,6 +87,7 @@
       tags:
         - install
         - upgrade
+        - update
 
     - name: OBSERVABILITY Promtail Pull image (using command for compatibility)
       command: podman pull --quiet {{ promtail_img | default('grafana/promtail:latest') }}
@@ -95,6 +99,7 @@
       tags:
         - install
         - upgrade
+        - update
         - images
 
     # - name: OBSERVABILITY Promtail Validate configuration syntax
@@ -128,6 +133,7 @@
       tags:
         - install
         - upgrade
+        - update
         - service
 
     # Task específica para verificar conectividad con Loki
@@ -146,6 +152,7 @@
       tags:
         - install
         - upgrade
+        - update
         - validate
 
     - name: OBSERVABILITY Promtail Display Loki connectivity status
@@ -158,6 +165,7 @@
       tags:
         - install
         - upgrade
+        - update
         - validate
 
     # Task para mostrar información del deployment
@@ -177,6 +185,7 @@
       tags:
         - install
         - upgrade
+        - update
         - info
 
     handlers:

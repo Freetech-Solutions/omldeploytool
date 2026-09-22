@@ -7,11 +7,12 @@ positions:
   sync_period: 1m
 
 clients:
+  - url: "{{ loki_url | default('http://127.0.0.1:3100') }}/loki/api/v1/push"
+    basic_auth:
+      username: "{{ loki_user }}"
+      password: "{{ loki_password }}"
 {% if tenant_id is defined and tenant_id != '' %}
-  - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
-    tenant_id: {{ tenant_id }}
-{% else %}
-  - url: http://{{ loki_host | default('127.0.0.1') }}:3100/loki/api/v1/push
+    tenant_id: "{{ tenant_id }}"
 {% endif %}
     batchsize: 102400
     batchwait: 1s
@@ -22,7 +23,7 @@ clients:
 # ============================================
 # DIALER SERVICE MACROS (Defined first)
 # ============================================
-{%- macro dialer_worker_type_config(worker_type, node_type) -%}
+{% macro dialer_worker_type_config(worker_type, node_type) %}
 - job_name: dialer_process_{{ worker_type }}
   journal:
     json: false
@@ -56,9 +57,9 @@ clients:
       regex: '(.{12}).*'
       target_label: 'container_id'
       replacement: '${1}'
-{%- endmacro -%}
+{% endmacro %}
 
-{%- macro dialer_services_config(node_type, services_list) -%}
+{% macro dialer_services_config(node_type, services_list) %}
 {% for service in services_list %}
 - job_name: {{ service }}
   journal:
@@ -82,10 +83,10 @@ clients:
       target_label: 'container_id'
       replacement: '${1}'
 {% endfor %}
-{%- endmacro -%}
+{% endmacro %}
 
-{%- macro dialer_all_services_block() -%}
-{% set node_type = 'aio' if inventory_hostname in groups.get('omnileads_aio', []) else 'standalone' %}
+{% macro dialer_all_services_block() %}
+{% set node_type = 'aio' if inventory_hostname in groups.get('omnileads_aio', []) else 'dialer' %}
 {{ dialer_worker_type_config('campaign', node_type) | indent(2, true) }}
 {{ dialer_worker_type_config('contact', node_type) | indent(2, true) }}
 {{ dialer_worker_type_config('event', node_type) | indent(2, true) }}
@@ -94,21 +95,20 @@ clients:
   'dialer_dialplan', 'dialer_flask', 'dialer_listener', 'dialer_postgresql',
   'dialer_render_template', 'dialer_scheduler', 'dialer_send_reports',] %}
 {{ dialer_services_config(node_type, all_dialer_services) | indent(2, true) }}
-{%- endmacro -%}
+{% endmacro %}
 
 # ============================================
 # SCRAPE CONFIGURATIONS
 # ============================================
 scrape_configs:
-{% if inventory_hostname in groups.get('omnileads_aio', []) %}
-# ============================================
-# OMNILEADS AIO NODE (All Services)
-# ============================================
-{% set aio_services = [
+{% set data_services = [
+  {'name': 'postgresql', 'unit': 'postgresql.service', 'family': 'infrastructure'},
+  {'name': 'redis', 'unit': 'redis.service', 'family': 'infrastructure'},
+  {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
+] %}
+{% set app_services = [
   {'name': 'background_tasks', 'unit': 'background_tasks.service', 'family': 'omnileads'},
   {'name': 'background_dialer', 'unit': 'background_dialer_tasks.service', 'family': 'omnileads'},
-  {'name': 'asterisk', 'unit': 'asterisk.service', 'family': 'telephony'},
-  {'name': 'asterisk_retrieve_conf', 'unit': 'asterisk_retrieve_conf.service', 'family': 'telephony'},
   {'name': 'nginx', 'unit': 'nginx.service', 'family': 'omnileads'},
   {'name': 'email_events_processor', 'unit': 'email_events_processor.service', 'family': 'omnileads'},
   {'name': 'whatsapp', 'unit': 'whatsapp.service', 'family': 'omnileads'},
@@ -117,15 +117,36 @@ scrape_configs:
   {'name': 'fastagi', 'unit': 'fastagi.service', 'family': 'communication'},
   {'name': 'omlcron', 'unit': 'omlcron.service', 'family': 'processing'},
   {'name': 'daphne', 'unit': 'daphne.service', 'family': 'communication'},
-  {'name': 'postgresql', 'unit': 'postgresql.service', 'family': 'infrastructure'},
-  {'name': 'redis', 'unit': 'redis.service', 'family': 'infrastructure'},
-  {'name': 'rtpengine', 'unit': 'rtpengine.service', 'family': 'telephony'},
   {'name': 'websockets', 'unit': 'websockets.service', 'family': 'communication'},
+] %}
+{% set voice_services = [
+  {'name': 'asterisk', 'unit': 'asterisk.service', 'family': 'telephony'},
+  {'name': 'asterisk_retrieve_conf', 'unit': 'asterisk_retrieve_conf.service', 'family': 'telephony'},
+  {'name': 'rtpengine', 'unit': 'rtpengine.service', 'family': 'telephony'},
   {'name': 'callrec_compressor', 'unit': 'interaction_processor.service', 'family': 'telephony'},
   {'name': 'callrec_transcriber', 'unit': 'callrec_transcriber.service', 'family': 'telephony'},
-  {'name': 'gearman', 'unit': 'gearman.service', 'family': 'processing'},
 ] %}
-{% for service in aio_services %}
+
+{% set node_services = [] %}
+{% set current_node_type = 'unknown' %}
+
+{% if inventory_hostname in groups.get('omnileads_aio', []) %}
+  {% set node_services = data_services + app_services + voice_services %}
+  {% set current_node_type = 'aio' %}
+{% elif inventory_hostname in groups.get('omnileads_data', []) %}
+  {% set node_services = data_services %}
+  {% set current_node_type = 'data' %}
+{% elif inventory_hostname in groups.get('omnileads_app', []) %}
+  {% set node_services = app_services %}
+  {% set current_node_type = 'app' %}
+{% elif inventory_hostname in groups.get('omnileads_voice', []) %}
+  {% set node_services = voice_services %}
+  {% set current_node_type = 'voice' %}
+{% elif inventory_hostname in groups.get('omnileads_dialer', []) %}
+  {% set current_node_type = 'dialer' %}
+{% endif %}
+
+{% for service in node_services %}
   - job_name: {{ service.name }}
     journal:
       json: false
@@ -136,17 +157,13 @@ scrape_configs:
         job: {{ service.name }}
         tenant: {{ tenant_id | default('unknown') }}
         host: {{ inventory_hostname }}
-        node_type: aio
+        node_type: {{ current_node_type }}
         service_family: {{ service.family }}
     relabel_configs:
       - source_labels: ['__journal__systemd_unit']
         target_label: 'unit'
 {% endfor %}
-# All Dialer services on AIO
-{{ dialer_all_services_block() }}
-{% elif inventory_hostname in groups.get('omnileads_dialer', []) %}
-# ============================================
-# DIALER STANDALONE NODE
-# ============================================
+
+{% if inventory_hostname in groups.get('omnileads_aio', []) or inventory_hostname in groups.get('omnileads_dialer', []) %}
 {{ dialer_all_services_block() }}
 {% endif %}
