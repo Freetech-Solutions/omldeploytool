@@ -1,5 +1,6 @@
 ansible/CLAUDE.md
 ansible/group_vars/all/vault.yml
+ansible/group_vars/all/images.yml
 ansible/instances
 ansible/.inventory.yml
 ansible/venv

@@ -139,9 +139,9 @@ bucket_region: us-east-1
 # --- example VULTR: https://ewr1.vultrobjects.com
 # --- example Digital Ocean: https://sfo3.digitaloceanspaces.com
 # --- example onpremise: https://192.168.100.10
-bucket_url: "{{ vault_bucket_url }}"
-bucket_endpoint: "{{ bucket_url }}"
-bucket_endpoint_internal: "{{ bucket_url }}"
+# bucket_url: "{{ vault_bucket_url }}"
+# bucket_endpoint: "{{ bucket_url }}"
+# bucket_endpoint_internal: "{{ bucket_url }}"
 
 #####################################################################################################
 #                                       TTS & STT                                      #
@@ -359,14 +359,15 @@ homer_port: "{{ vault_homer_port }}"
 #####################################################################################################
 # Enable daily PostgreSQL Database backups into centralized Object Storage bucket
 
-backup_bucket_url: "{{ vault_bucket_url }}"
+backup_bucket_url: "{{ vault_digital_ocean_bucket_url }}"
 backup_bucket_name: "{{ vault_backup_bucket_name }}"
-backup_bucket_access_key: "{{ vault_bucket_access_key }}"
-backup_bucket_secret_key: "{{ vault_bucket_secret_key }}"
+backup_bucket_access_key: "{{ vault_digital_ocean_bucket_access_key }}"
+backup_bucket_secret_key: "{{ vault_digital_ocean_bucket_secret_key }}"
+backup_bucket_region: "{{ vault_digital_ocean_bucket_region }}"
 
 # --- if your bucket use a selfsigned SSL cert, uncomment and put this value to true
 # backup_bucket_dont_verify_ssl: False
 
 # Time format from 00:00 to 23:59
 cron_backup_mm: 00
-cron_backup_hh: 01 
+cron_backup_hh: 23 
