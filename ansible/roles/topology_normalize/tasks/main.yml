@@ -37,11 +37,14 @@
   tags:
     - always
 
+# Los flags se fijan en el primer play. Después topology asigna postgres_host y
+# rtpengine_host para el stack propio; si se reevalúa "is defined" en site_restore,
+# un Postgres/RTPengine local queda marcado como externo.
 - name: TOPOLOGY Detect external services
   ansible.builtin.set_fact:
-    postgres_out: "{{ postgres_host is defined }}"
-    rtpengine_out: "{{ rtpengine_host is defined }}"
-    bucket_out: "{{ bucket_url is defined }}"
+    postgres_out: "{{ postgres_out | default(postgres_host is defined) }}"
+    rtpengine_out: "{{ rtpengine_out | default(rtpengine_host is defined) }}"
+    bucket_out: "{{ bucket_out | default(bucket_url is defined) }}"
   tags:
     - always
 
@@ -237,7 +240,7 @@
 # Si no hay bucket de backup dedicado, reutilizar el bucket de aplicación (callrec, etc.).
 - name: TOPOLOGY Normalize backup bucket configuration
   ansible.builtin.set_fact:
-    backup_bucket_url: "{{ backup_bucket_url | default(bucket_url, true) }}"
+    backup_bucket_url: "{{ backup_bucket_url | default(bucket_endpoint, true) }}"
     backup_bucket_name: "{{ backup_bucket_name | default(bucket_name, true) }}"
     backup_bucket_access_key: "{{ backup_bucket_access_key | default(bucket_access_key, true) }}"
     backup_bucket_secret_key: "{{ backup_bucket_secret_key | default(bucket_secret_key, true) }}"
