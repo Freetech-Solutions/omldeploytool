@@ -173,18 +173,6 @@ acd_log_level: info
 
 # acd_pod_cpus: 1
 
-# asterisk_scale: true
-# asterisk_mem_limit: 1G
-# asterisk_pjsip_threadpool_idle_timeout: 120
-# asterisk_pjsip_threadpool_max_size: 25 # 25 for 4 cores, 50 for 8 cores
-# asterisk_pjsip_threadpool_initial_size=8 # number of cores x 2
-# asterisk_pjsip_threadpool_auto_increment=5
-# asterisk_pjsip_timer_t1=100
-# asterisk_pjsip_timer_b=6400
-# asterisk_stasis_initial_size = 10
-# asterisk_stasis_idle_timeout_sec = 120
-# asterisk_stasis_max_size = 60
-
 # voicebot integration
 # voicebot_headers_vars: X-Voicebot-callID: business_id|X-Voicebot-customerID: id_customer|X-Voicebot-CampID: camp_id
 #####################################################################################################

@@ -14,8 +14,8 @@ Label=tier=backend
 PodmanArgs=--cgroups=no-conmon
 Volume=oml_redis:/data
 {% if scale_redis is defined and scale_redis %}
-Volume=/etc/omnileads/redis.conf:/etc/redis/redis.conf
-Exec=redis-server /etc/redis/redis.conf
+Volume=/etc/omnileads/redis.conf:/usr/local/etc/redis/redis.conf:ro
+Exec=redis-server /usr/local/etc/redis/redis.conf
 {% endif %}
 
 [Service]
