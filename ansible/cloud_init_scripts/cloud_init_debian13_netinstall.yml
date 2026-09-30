@@ -1,0 +1,94 @@
+#cloud-config
+# OMniLeads — bootstrap Ansible admin en Debian 13 (Trixie) netinstall / bare metal
+#
+# Uso (NoCloud — típico en netinstall / VM / bare metal):
+#   1. Durante o justo después del install, asegurate de tener cloud-init:
+#        apt install -y cloud-init
+#   2. Semilla NoCloud (elige una):
+#        a) Volumen/ISO con etiqueta CIDATA y archivos:
+#             user-data  ← este archivo
+#             meta-data  ← ver ejemplo al final
+#        b) En el sistema ya instalado:
+#             mkdir -p /var/lib/cloud/seed/nocloud
+#             cp este-archivo /var/lib/cloud/seed/nocloud/user-data
+#             printf 'instance-id: oml-debian13\nlocal-hostname: oml\n' \
+#               > /var/lib/cloud/seed/nocloud/meta-data
+#             cloud-init clean --logs --seed
+#             reboot
+#   3. Reemplazá el placeholder de ssh_authorized_keys por tu llave pública
+#      del deployer (obligatorio: no hay panel que inyecte keys como en DO/Vultr).
+#
+# Tras el primer boot: ssh omladmin@<IP>
+
+ssh_pwauth: false
+disable_root: true
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - python3
+  - sudo
+  - openssh-server
+
+users:
+  - default
+  - name: omladmin
+    gecos: OMniLeads Ansible admin
+    shell: /bin/bash
+    lock_passwd: true
+    groups: [sudo]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    # Obligatorio en netinstall: pegá aquí la(s) llave(s) pública(s) del deployer.
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA...REEMPLAZAR_CON_TU_LLAVE_PUBLICA... deployer@workstation
+
+runcmd:
+  - visudo -c
+  - |
+    set -euo pipefail
+    USER_NAME="omladmin"
+    HOME_DIR="/home/${USER_NAME}"
+    SSH_DIR="${HOME_DIR}/.ssh"
+    AUTH_KEYS="${SSH_DIR}/authorized_keys"
+
+    mkdir -p "${SSH_DIR}"
+    touch "${AUTH_KEYS}"
+
+    # Si el installer dejó llaves en root (opción "SSH key" / late_command), las unimos.
+    if [ -s /root/.ssh/authorized_keys ]; then
+      awk '/ssh-rsa|ssh-ed25519|ecdsa-sha2|sk-ssh-ed25519|sk-ecdsa-sha2/{print}' \
+        /root/.ssh/authorized_keys \
+        | sed -E 's/^.*(ssh-rsa|ssh-ed25519|ecdsa-sha2[^ ]*|sk-ssh-ed25519[^ ]*|sk-ecdsa-sha2[^ ]*)/\1/' \
+        >> "${AUTH_KEYS}"
+    fi
+
+    # Deduplicar; fallar si no queda ninguna llave (evita lockout con disable_root)
+    if [ -s "${AUTH_KEYS}" ]; then
+      sort -u "${AUTH_KEYS}" -o "${AUTH_KEYS}"
+    fi
+    if [ ! -s "${AUTH_KEYS}" ]; then
+      echo "ERROR: no hay SSH keys en omladmin ni en /root/.ssh/authorized_keys" >&2
+      echo "Editá ssh_authorized_keys en el user-data antes de aplicar cloud-init." >&2
+      exit 1
+    fi
+
+    chown -R "${USER_NAME}:${USER_NAME}" "${SSH_DIR}"
+    chmod 700 "${SSH_DIR}"
+    chmod 600 "${AUTH_KEYS}"
+
+    # Refuerzo SSH (Debian: unidad systemd "ssh")
+    mkdir -p /etc/ssh/sshd_config.d
+    cat > /etc/ssh/sshd_config.d/99-oml-hardening.conf <<'EOF'
+    PasswordAuthentication no
+    PermitRootLogin no
+    PubkeyAuthentication yes
+    EOF
+    systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null || true
+    systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+
+final_message: "OMniLeads Debian 13 netinstall cloud-init finalizado. Conectar: ssh omladmin@<IP>"
+
+# --- meta-data de ejemplo (archivo aparte, NoCloud) ---
+# instance-id: oml-debian13
+# local-hostname: oml

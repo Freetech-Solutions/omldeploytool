@@ -48,7 +48,6 @@
       - REDIS_IMG is defined
       - POSTGRES_IMG is defined
       - MINIO_IMG is defined
-      - MINIO_MC_IMG is defined
       - GEARMAN_IMG is defined
       - HAPROXY_IMG is defined
       # Vault (kamailio_webrtc_auth_eph_key se referencia desde runtime.yml -> vault_kamailio_webrtc_auth_eph_key)
@@ -69,8 +68,9 @@
       - ansible_host is defined and (ansible_host | string | length) > 0
       - omni_ip_lan is defined and (omni_ip_lan | string | length) > 0
     fail_msg: >-
-      El host '{{ inventory_hostname }}' no declara ansible_host y/o omni_ip_lan.
-      Cada host del inventario debe definir ambos (ver instances/test_3.0/inventory.yml).
+      El host '{{ inventory_hostname }}' no tiene ansible_host (obligatorio) o
+      omni_ip_lan quedó vacío tras el default a ansible_host. Declará ansible_host
+      y, si la LAN difiere de la IP SSH, omni_ip_lan.
   tags:
     - always
 

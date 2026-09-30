@@ -2,6 +2,21 @@
 # Modelo de inventario: cada grupo pod (data_statefull, edge, omlapp_web, …) declara
 # qué Quadlet corre en ese host; co-localización = mismo host en varios grupos pod.
 # omnileads_aio implica todos los pods en ese host (equivalente al AIO clásico).
+
+# Sembrar omni_ip_lan en todos los hosts antes de resolver peers: site.yml corre plays
+# separados (data → edge → compute) y el play de data ya lee hostvars[<peer>].omni_ip_lan
+# de hosts que aún no ejecutaron tareas. connection: local evita SSH a cada peer.
+- name: TOPOLOGY Default omni_ip_lan from ansible_host when unset
+  ansible.builtin.set_fact:
+    omni_ip_lan: "{{ hostvars[item].omni_ip_lan | default(hostvars[item].ansible_host, true) }}"
+  loop: "{{ groups['all'] | default([]) }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  connection: local
+  run_once: true
+  tags:
+    - always
+
 - name: TOPOLOGY Derive pod membership and layout
   ansible.builtin.set_fact:
     oml_is_aio: "{{ 'omnileads_aio' in group_names }}"
@@ -177,11 +192,11 @@
           else aio_host
         )
       }}
-    # ACD_NODES (kamailio_pstn.env): 127.0.0.1:<acd_trunk_sip_port> solo si Kamailio PSTN
+    # ACD_NODES (kamailio_pstn.env): omni_ip_lan:<acd_trunk_sip_port> si Kamailio PSTN
     # y ACD comparten host (AIO puro o edge+acd co-localizados); en cluster con ACD remoto, acd_peers.
     acd_nodes: >-
       {{
-        ('127.0.0.1:' ~ (acd_trunk_sip_port | default(5070) | string)) if (
+        ((omni_ip_lan | trim) ~ ':' ~ (acd_trunk_sip_port | default(5070) | string)) if (
           oml_is_aio_only
           or (
             (oml_runs_edge | default(false) | bool)

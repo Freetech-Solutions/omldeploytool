@@ -79,6 +79,9 @@
         | unique
         | list
       }}
+    # django_commands / reset-admin: solo si cambió env o Quadlets.
+    # Las migraciones corren siempre (abajo): migrate es idempotente y evita
+    # crash loop de uWSGI (actualizar_permisos) con schema vacío.
     omlapp_bootstrap_required: "{{ omlapp_env_file.changed or (omlapp_quadlet_units.results | default([]) | selectattr('changed', 'equalto', true) | list | length > 0) }}"
   changed_when: false
   tags:
@@ -86,13 +89,9 @@
     - upgrade
     - update
 
-- name: Force handlers to run immediately (Boot up PostgreSQL)
-  meta: flush_handlers
-  tags:
-    - install
-    - upgrade
-    - update
-
+# PostgreSQL ya lo levantó el rol postgresql; NO flush de handlers aquí:
+# reiniciar omnileads.service antes de migrate provoca
+# "relation auth_permission does not exist" en init_uwsgi.sh.
 - name: Wait for PostgreSQL to accept connections
   ansible.builtin.wait_for:
     host: "{{ postgres_host | trim }}"
@@ -102,6 +101,7 @@
     - install
     - upgrade
     - update
+
 - name: POSTGRESQL Create a new database with name {{ postgres_database }}
   postgresql_db:
     name: "{{ postgres_database }}"
@@ -117,18 +117,17 @@
     - upgrade_from_oml_1 is not defined 
     - postgres_out == true
 
-- name: DJANGO run migrations 
+- name: DJANGO run migrations
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} /opt/omnileads/bin/django_migrations.sh"
-  tags:  
+  tags:
     - install
     - upgrade
     - update
-  when: omlapp_bootstrap_required | bool
 
 - name: DJANGO run django_commands
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} --volume=django_static:/opt/omnileads/static {{ APP_IMG }} /opt/omnileads/bin/django_commands.sh"
   tags:
-    - install      
+    - install
   when: omlapp_bootstrap_required | bool
 
 - name: DJANGO reset admin pass
@@ -142,6 +141,14 @@
     # El rol omlapp hereda tags upgrade/update; limitar reset solo a --action=install.
     - "'install' in ansible_run_tags"
 
+# Reiniciar solo después de migrate (handlers notificados por env/Quadlet).
+- name: DJANGO Apply pending omlapp service restarts after migrations
+  meta: flush_handlers
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: DJANGO Enable and start systemd services
   systemd:
     name: "{{ item }}"
@@ -153,3 +160,4 @@
   tags:
     - install
     - upgrade
+    - update
