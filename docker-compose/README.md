@@ -268,7 +268,7 @@ The most useful commands are:
 | `psql <db_user>`               | Open `psql` against `postgresql`                                   |
 | `sngrep` / `asterisk_cli`      | Debug helpers inside `acd-server` (SIP capture / Asterisk CLI)     |
 | `backup` / `restore`           | Backup or restore the PostgreSQL database                          |
-| `inbound-call`                 | Send a test inbound call through the PBX‑Emulator                  |
+| `inbound-call <tel> [n]`      | Send n test inbound calls (default 1) through the PBX‑Emulator    |
 | `dialer-call` / `manual-call`  | Trigger dialer or manual test calls (`tel id_camp id_cust`)        |
 | `hangup-pstn`                  | Hang up all active PSTN calls in the emulator                      |
 | `clean` / `clean-all`          | Docker prune (containers/images/volumes/networks)                  |
@@ -350,7 +350,7 @@ When `PSTN_EMULATOR_MODE=advanced` the last digit decides the outcome:
 Generate an inbound test call:
 
 ```bash
-./oml_manage.sh inbound-call
+./oml_manage.sh inbound-call 01177660010 5
 ```
 
 Hang up every PSTN call in progress:

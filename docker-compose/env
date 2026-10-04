@@ -24,40 +24,39 @@ ACD_HOST_IP=10.22.72.100
 KAMAILIO_PSTN_IP=10.22.72.101
 PSTN_EMULATOR_IP=10.22.72.99
 
-#############7#####################################################################################
+###################################################################################################
 #                                  Components image version                                       #
 #                              versions of each image to deploy                                   #
 ###################################################################################################
 # --- OMniLeads images WEB
-APP_IMG=docker.io/freetechsolutions/omlapp:20260901-f462915c
-NGINX_IMG=docker.io/freetechsolutions/nginx:20260716-bf4395be
-WS_IMG=docker.io/freetechsolutions/websockets:20260306-13838d19
+APP_IMG=docker.io/freetechsolutions/omlapp:20261004-ad594035-enterprise
+NGINX_IMG=docker.io/freetechsolutions/nginx:20260928-a190ec4d
+WS_IMG=docker.io/freetechsolutions/websockets:20260929-8e4e0057
 
 # --- OMniLeads images TEL
-ACD_IMG=docker.io/freetechsolutions/acd:20260901-47c8189d
-KAMAILIO_IMG=docker.io/freetechsolutions/kamailio:20260824-805399ea
-RTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20260713-c32419a6
-CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
-CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3
-FASTAGI_IMG=docker.io/freetechsolutions/fastagi:20260211-0d7a1c9b
+ACD_IMG=docker.io/freetechsolutions/acd:20261004-c94661b0
+KAMAILIO_IMG=docker.io/freetechsolutions/kamailio:20260928-797e092f
+RTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20260930-52ee0f45
+CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20260930-1ada2b56
+CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20260930-1ada2b56
+FASTAGI_IMG=docker.io/freetechsolutions/fastagi:20260928-87b614ca
 
 # --- OMniLeads images DIALER
-DIALER_API_IMG=docker.io/freetechsolutions/dialer_api:20260818-cae334c6
-DIALER_WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20260818-cae334c6
+DIALER_API_IMG=docker.io/freetechsolutions/dialer_api:20260928-78cb3377
+DIALER_WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20260928-78cb3377
+
+# --- OMniLeads utilities images
+BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb
 
 # --- Backend services common images
-REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
+MINIO_IMG=docker.io/freetechsolutions/minio:20260930-83526c54
+REDIS_IMG=docker.io/redis:7.2.16-alpine3.21
 POSTGRES_IMG=docker.io/library/postgres:18-trixie
-MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
-MINIO_MC_IMG=docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 
-BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260422-16161cf0
-
 # QA images
-PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260317-4a8510d1
-NGINX_QA_IMG=docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
-
+PSTN_EMULATOR_IMG=pstn_emulator:latest
+NGINX_QA_IMG=omlqa_nginx:latest
 
 ###################################################################################################
 #                                       DJANGO APP                                                #
@@ -165,7 +164,7 @@ SHORTCALL_DURATION_THRESHOLD_SEC=5
 ACD_REC_PATH=/var/spool/asterisk/recording
 # AMDREC=True: MixMonitor + upload async de samples AMD a recordings/amd/ (dataset ML). Default off.
 # Debe estar en acd-server y acd-app (mismo valor).
-AMDREC=False
+AMDREC=True
 
 #####################################################################################################
 #                                       FASTAGI                                                     #
@@ -351,12 +350,12 @@ DIALER_GEARMAN_JOBS_MANAGE_INCIDENCE_RULES=add-incidence-rule-disposition|create
 DIALER_PYTHON_LOGLEVEL=debug
 
 # --- Call attempts per second
-DIALER_CAPS=1
+DIALER_CAPS=10
 # --- Time between the iterations when there are no contacts to call (in seconds)
-DIALER_TIME_BETWEEN_CALLS=1
+DIALER_TIME_BETWEEN_CALLS=0.5
 
 # --- Workers replicas
-DIALER_PROCESS_CAMPAIGN_REPLICAS=2
+DIALER_PROCESS_CAMPAIGN_REPLICAS=3
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
 
@@ -379,9 +378,9 @@ DIALER_GAMMA_THROTTLE_FLOOR=0.2
 #                                          Monitoring                                                   #
 #########################################################################################################
 
-HOMER_ENABLE=True
+HOMER_ENABLE=False
 # --- IP or hostname that each instance will invoke when locating the other    
-HOMER_HOSTNAME=homer.sephir.tech
+HOMER_HOSTNAME=homer.deomain.com
 HOMER_PORT=9060
 
 #########################################################################################################

@@ -71,7 +71,7 @@ Servicios de datos e infraestructura compartida: bases de datos, caché, almacen
 | Servicio | Función |
 |----------|---------|
 | **postgresql** | Instancia única de PostgreSQL (puerto 5432). Contiene la DB `omnileads` (OML) y la DB `omnidialer` (dialer), creada al init con `omnidialer.sql` — el mismo patrón que el rol Ansible `postgresql`. |
-| **redis** | Cache, sesiones, pub/sub y colas en tiempo real (con RedisGears). Usado por la web, los workers, los websockets y el ACD. |
+| **redis** | Cache, sesiones, pub/sub y colas en tiempo real. Usado por la web, los workers, los websockets y el ACD. |
 | **minio** | Almacenamiento de objetos compatible con S3 para grabaciones y archivos media. API en `:9000` y consola en `:9001`. Con límites de recursos (`1G` / `0.5 CPU`). |
 | **createbuckets** | Tarea one-shot (`restart: "no"`) que, al levantar el stack, crea el bucket `omnileads`, el usuario `omlminio` y asigna la política `readwrite`. |
 | **gearman** | Cola de trabajos distribuidos. La usan el ACD (registro de llamadas), el dialer (campañas/contactos/eventos) y los procesos post-llamada. |

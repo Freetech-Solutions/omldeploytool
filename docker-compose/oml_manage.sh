@@ -397,19 +397,27 @@ clean_all() {
 
 send_call() {
     local telephone="${1:-}"
+    local count="${2:-1}"
     if [[ -z "$telephone" ]]; then
         error "Missing telephone argument."
-        info "Usage: ./manage.sh inbound-call <telephone>"
-        info "Example: ./manage.sh inbound-call 999"
+        info "Usage: ./oml_manage.sh inbound-call <telephone> [count]"
+        info "Example: ./oml_manage.sh inbound-call 01177660010 5"
         exit 1
     fi
-    
+    if ! [[ "$count" =~ ^[1-9][0-9]*$ ]]; then
+        error "Call count must be a positive integer (got: ${count})."
+        info "Usage: ./oml_manage.sh inbound-call <telephone> [count]"
+        info "Example: ./oml_manage.sh inbound-call 01177660010 5"
+        exit 1
+    fi
+
     if ! docker_compose ps -q pbxemulator &>/dev/null; then
         error "PBX Emulator service is not running. Please start it first."
         exit 1
     fi
-    # Nota: Asegurarse de que el argumento se pasa como texto
-    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "999$telephone" -m 1 -r 1 -d 60000 -l 1 || {
+    log "Sending ${count} call(s) to ${telephone}..."
+    # -m total, -r tasa (todas en el mismo segundo), -l simultáneas, -d duración ms
+    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "999$telephone" -m "$count" -r "$count" -d 60000 -l "$count" || {
         error "Failed to send call"
         exit 1
     }
@@ -538,6 +546,35 @@ trigger_manual_test() {
 }
 
 # -----------------------------------------------------------------------------
+# Persist DOCKER_PLATFORM
+# -----------------------------------------------------------------------------
+# Compose interpola ${DOCKER_PLATFORM:-linux/amd64}. El export del rebuild
+# muere con el proceso; si no queda en .env, el `up` siguiente pide amd64
+# y hace pull aunque la imagen local sea arm64.
+persist_docker_platform() {
+    local platform="$1"
+    [[ -n "$platform" ]] || return 0
+
+    if [[ ! -f "$ENV_FILE" ]]; then
+        printf 'DOCKER_PLATFORM=%s\n' "$platform" > "$ENV_FILE"
+        log "DOCKER_PLATFORM=$platform escrito en $ENV_FILE"
+        return 0
+    fi
+
+    if grep -q '^DOCKER_PLATFORM=' "$ENV_FILE"; then
+        local current
+        current="$(grep '^DOCKER_PLATFORM=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+        [[ "$current" == "$platform" ]] && return 0
+        sed -i.bak "s|^DOCKER_PLATFORM=.*|DOCKER_PLATFORM=${platform}|" "$ENV_FILE"
+        rm -f "${ENV_FILE}.bak"
+        log "DOCKER_PLATFORM actualizado a $platform en $ENV_FILE"
+    else
+        printf '\nDOCKER_PLATFORM=%s\n' "$platform" >> "$ENV_FILE"
+        log "DOCKER_PLATFORM=$platform agregado a $ENV_FILE"
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # Rebuild Services
 # -----------------------------------------------------------------------------
 rebuild_services() {
@@ -550,33 +587,31 @@ rebuild_services() {
         if [[ "$arg" =~ ^--platform=(.+)$ ]]; then
             platform="${BASH_REMATCH[1]}"
         elif [[ "$arg" != --platform=* ]]; then
-            build_args+=("$arg")
             if [[ -z "$service_name" ]]; then
                 service_name="$arg"
+            else
+                build_args+=("$arg")
             fi
         fi
     done
     
-    # Set DOCKER_PLATFORM environment variable if platform flag was provided
+    # Set DOCKER_PLATFORM (compose service.platform). No pasar --platform a
+    # `docker compose build`: versiones de Compose lo rechazan ("unknown flag").
     if [[ -n "$platform" ]]; then
         export DOCKER_PLATFORM="$platform"
+        persist_docker_platform "$platform"
         log "Building for platform: $platform"
     fi
     
     if [[ -n "$service_name" ]]; then
         log "Rebuilding image for $service_name..."
-        docker_compose build "${build_args[@]}"
+        docker_compose build "${build_args[@]}" "$service_name"
         docker_compose up -d "$service_name"
         success "Service '$service_name' rebuilt and restarted"
     else
         log "Rebuilding all images cache..."
         docker_compose build "${build_args[@]}"
         success "All images rebuilt"
-    fi
-    
-    # Unset DOCKER_PLATFORM if it was set
-    if [[ -n "$platform" ]]; then
-        unset DOCKER_PLATFORM
     fi
 }
 
@@ -653,7 +688,7 @@ show_help() {
       backup             Backup PostgreSQL database
       restore            Restore PostgreSQL database from backup
       env                Display first 20 env vars from .env
-      inbound-call       Send a test call using the PBX-Emulator
+      inbound-call <tel> [n]  Send n test calls (default 1) using the PBX-Emulator
       dialer-call        Trigger 'call_test_dialer.py' (Usage: tel id_camp id_cust)
       manual-call        Trigger 'call_test_manual.py' (Usage: tel id_camp id_cust)
       hangup-pstn        Hangup all PSTN calls using the PBX-Emulator
@@ -709,14 +744,14 @@ main() {
         health)         check_health ;;
         clean)          clean_system ;;
         clean-all)      clean_all ;;
-        inbound-call)   shift; send_call "${1:-}" ;;
+        inbound-call)   shift; send_call "${1:-}" "${2:-1}" ;;
         dialer-call)    shift; trigger_dialer_test "$@" ;;
         manual-call)    shift; trigger_manual_test "$@" ;;
         hangup-pstn)    hangup_all_pstn_emulator_calls ;;
         backup)         backup_database ;;
         restore)        restore_database ;;
         terminal)       shift; open_terminal "${1:-}" ;;
-        rebuild)        shift; rebuild_services "${1:-}" ;;
+        rebuild)        shift; rebuild_services "$@" ;;
         psql)           shift; open_psql "${1:-}" ;;
         sngrep)         run_sngrep ;;
         asterisk_cli)   run_asterisk_cli ;;

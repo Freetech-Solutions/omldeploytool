@@ -80,9 +80,12 @@
         | list
       }}
     # django_commands / reset-admin: solo si cambió env o Quadlets.
-    # Las migraciones corren siempre (abajo): migrate es idempotente y evita
-    # crash loop de uWSGI (actualizar_permisos) con schema vacío.
+    # Las migraciones corren en cada deploy (abajo), en un solo host: migrate
+    # en paralelo contra el mismo PostgreSQL no es seguro (DuplicateColumn).
     omlapp_bootstrap_required: "{{ omlapp_env_file.changed or (omlapp_quadlet_units.results | default([]) | selectattr('changed', 'equalto', true) | list | length > 0) }}"
+    # Un solo host escribe el esquema compartido. omlapp_web primero (cluster);
+    # omnileads_aio cubre el layout de un solo servidor.
+    omlapp_db_bootstrap_host: "{{ (groups['omlapp_web'] | default([]) + groups['omnileads_aio'] | default([])) | unique | first }}"
   changed_when: false
   tags:
     - install
@@ -119,6 +122,7 @@
 
 - name: DJANGO run migrations
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} /opt/omnileads/bin/django_migrations.sh"
+  when: inventory_hostname == omlapp_db_bootstrap_host
   tags:
     - install
     - upgrade
@@ -128,7 +132,9 @@
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} --volume=django_static:/opt/omnileads/static {{ APP_IMG }} /opt/omnileads/bin/django_commands.sh"
   tags:
     - install
-  when: omlapp_bootstrap_required | bool
+  when:
+    - omlapp_bootstrap_required | bool
+    - inventory_hostname == omlapp_db_bootstrap_host
 
 - name: DJANGO reset admin pass
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} python /opt/omnileads/ominicontacto/manage.py cambiar_admin_password"
@@ -140,6 +146,7 @@
     - omlapp_bootstrap_required | bool
     # El rol omlapp hereda tags upgrade/update; limitar reset solo a --action=install.
     - "'install' in ansible_run_tags"
+    - inventory_hostname == omlapp_db_bootstrap_host
 
 # Reiniciar solo después de migrate (handlers notificados por env/Quadlet).
 - name: DJANGO Apply pending omlapp service restarts after migrations
