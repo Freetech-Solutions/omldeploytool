@@ -229,7 +229,7 @@ Example:
 
 ### Logs
 
-`ansible.cfg` writes the log to `${ANSIBLE_LOG_DIR}/ansible.log` (defaults to `/tmp/oml_install_logs/`). `deploy.sh` creates that directory before each run.
+`deploy.sh` writes the controller log to `${ANSIBLE_LOG_DIR:-/tmp/oml_install_logs}/ansible_<tenant>.log`, where `<tenant>` is the inventory folder (`instances/<tenant>/inventory.yml`). Example: `/tmp/oml_install_logs/ansible_Skycell_Carvacell.log`. Each run appends to that file. `ansible.cfg` `log_path` (`/tmp/oml_install_logs/ansible.log`) applies only when `ansible-playbook` is launched without `deploy.sh`.
 
 # Configuration model (group_vars)
 
