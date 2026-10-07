@@ -21,7 +21,7 @@ ExecStart=/usr/bin/podman run \
   -e CONTAINER_HOST=unix:///run/podman/podman.sock \
   -v /run/podman/podman.sock:/run/podman/podman.sock \
   -u root \
-  {{ prometheus_podman_img }} prometheus-podman-exporter --collector.enable-all --collector.store_labels --collector.enhance-metrics
+  {{ prometheus_podman_img }} prometheus-podman-exporter --collector.enable-all --collector.store-labels --collector.enhance-metrics
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
