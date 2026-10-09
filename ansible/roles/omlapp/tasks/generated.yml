@@ -94,7 +94,7 @@
 
 # PostgreSQL ya lo levantó el rol postgresql; NO flush de handlers aquí:
 # reiniciar omnileads.service antes de migrate provoca
-# "relation auth_permission does not exist" en init_uwsgi.sh.
+# "relation auth_permission does not exist" al arrancar uWSGI.
 - name: Wait for PostgreSQL to accept connections
   ansible.builtin.wait_for:
     host: "{{ postgres_host | trim }}"
@@ -136,6 +136,24 @@
     - omlapp_bootstrap_required | bool
     - inventory_hostname == omlapp_db_bootstrap_host
 
+# Shared-state ops formerly in init_uwsgi.sh (unsafe with ≥2 omlapp_web replicas).
+# Single host only; ACD role runs earlier so AMI/regenerar_asterisk can reach Asterisk.
+- name: DJANGO runtime bootstrap (static, permisos, regenerar_asterisk)
+  ansible.builtin.shell: >-
+    podman run --rm --network=host
+    --env-file /etc/default/django.env
+    -e PGHOST={{ postgres_host | trim }}
+    -e REDIS_HOST={{ redis_host | trim }}
+    --volume=django_static:/opt/omnileads/static
+    --volume=django_media:/opt/omnileads/media_root
+    {{ APP_IMG }}
+    /opt/omnileads/bin/django_runtime_bootstrap.sh
+  when: inventory_hostname == omlapp_db_bootstrap_host
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: DJANGO reset admin pass
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} python /opt/omnileads/ominicontacto/manage.py cambiar_admin_password"
   tags:
@@ -148,7 +166,7 @@
     - "'install' in ansible_run_tags"
     - inventory_hostname == omlapp_db_bootstrap_host
 
-# Reiniciar solo después de migrate (handlers notificados por env/Quadlet).
+# Reiniciar solo después de migrate + runtime bootstrap (handlers notificados por env/Quadlet).
 - name: DJANGO Apply pending omlapp service restarts after migrations
   meta: flush_handlers
   tags:

@@ -123,7 +123,13 @@ PYTHONPATH=/opt/omnileads/ominicontacto
 # --- Django settings module: production or develop
 DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
 # --- Django entrypoint: init_uwsgi.sh or init_devenv.sh
+# Shared-state (collectstatic / permisos / regenerar_asterisk) NO va aquí:
+# usar ./oml_manage.sh django-commands (django_runtime_bootstrap.sh).
 DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_uwsgi.sh
+# Identidad del plano web (omlapp/daphne). Workers Django/dialer escalables
+# NO reciben esta var: usan hostname del contenedor (consumer groups / lease).
+# En Ansible: OML_NODE_ID=inventory_hostname en django.env y dialer.env.
+OML_NODE_ID=omlapp
 
 #####################################################################################################
 #                                       STT & TTS                                                   #
@@ -199,7 +205,7 @@ WEBSOCKET_HOSTNAME=websockets
 WEBSOCKET_PORT=8000
 
 # *** Activete verbose ---> DEBUG:fts.oml.services.websockets,websockets.server
-WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets ;INFO:websockets.server
+WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets;INFO:websockets.server
 
 # --- IP or hostname that each instance will invoke when locating the other    
 WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
@@ -354,10 +360,16 @@ DIALER_CAPS=10
 # --- Time between the iterations when there are no contacts to call (in seconds)
 DIALER_TIME_BETWEEN_CALLS=0.5
 
-# --- Workers replicas
+# --- Workers replicas (defaults 1 = single-host; subir para lab HA Compose)
 DIALER_PROCESS_CAMPAIGN_REPLICAS=3
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
+DIALER_SCHEDULER_REPLICAS=1
+# Django HA listeners / orquestador / background (consumer groups / Channels)
+SUPERVISION_EVENTS_LISTENER_REPLICAS=1
+OMNIDIALER_EVENTS_LISTENER_REPLICAS=1
+WHATSAPP_WORKER_REPLICAS=1
+BACKGROUND_TASKS_REPLICAS=1
 
 DIALER_CHANNEL_AUDIT_INTERVAL_SEC=65
 DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC=50

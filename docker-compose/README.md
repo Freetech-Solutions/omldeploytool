@@ -12,6 +12,7 @@
 
 * [Requirements](#requirements)
 * [Repository layout](#layout)
+* [Bootstrap (required on first bring-up)](#bootstrap)
 * [Quick Localhost Test Environment](#test-env)
 * [Security Considerations](#security)
 * [On‑Premise / Cloud VPS Deployment](#vps-vm)
@@ -45,41 +46,60 @@ On Linux OS, you can install the prerequisites with:
 
 ## Repository layout <a name="layout"></a>
 
-Inside `docker-compose/` you will find three ready‑to‑use stacks. Each one has its own `docker-compose.yml`, `.env` and `oml_manage.sh`:
+The canonical stack lives directly under `docker-compose/` (single compose file for local QA, VPS, and development — see [deploy.md](./deploy.md)). Working copies:
 
-| Folder      | Purpose                                       | Extra services included                                                                 |
-|-------------|-----------------------------------------------|------------------------------------------------------------------------------------------|
-| `test-env/` | Localhost / QA stack                          | PSTN emulator, NGINX‑CGI, RedisInsight, pgAdmin                                          |
-| `prod-env/` | On‑Premise / Cloud VPS production stack       | Minimal stack — no QA or admin tools. `kamailio-pstn` and `rtpengine` run on `network_mode: host` |
-| `dev-env/`  | Development stack (source code mounted)       | Same QA tools as `test-env` + `vue-cli` and `vue-build` for the Vue.js front-end         |
+| File | Role |
+|------|------|
+| `docker-compose-template.yml` | Versioned full stack template |
+| `docker-compose.yml` | Working copy used by Compose (often gitignored; `cp` from the template) |
+| `env` | Variable template |
+| `.env` | Working copy of variables (gitignored) |
+| `oml_manage.sh` | Admin helper (`up`, bootstrap, rebuild, …) |
+| `omnidialer.sql` | Bootstrap SQL for the `omnidialer` DB inside shared PostgreSQL |
 
-The reusable assets at `docker-compose/` are:
+Also: `docker_install_linux.sh`, `deploy.sh`, `custom_conf_examples/`, `.custom_conf/`, `certs/`, `addons/`, `observability/`, `pstn-proxy/`.
 
-- `env` — template with the full list of variables.
-- `oml_manage.sh` — administration helper script (already present inside each environment).
-- `omnidialer.sql` — bootstrap SQL for the `omnidialer` database (created inside the shared `postgresql` instance).
-- `docker_install_linux.sh` — Docker installation helper for Linux.
-- `custom_conf_examples/`, `.custom_conf/`, `certs/`, `addons/`, `observability/`, `pstn-proxy/` — optional/extension assets.
+## Bootstrap (required on first bring-up) <a name="bootstrap"></a>
+
+`omlapp` / Daphne **no longer** run shared-state setup on every start (`init_uwsgi.sh` / `init_devenv.sh` only start the app). After the stack is up you must run a **one-shot bootstrap** so static assets, media permissions, and Asterisk dialplan regen are applied once (HA-safe: one runner, not every web replica).
+
+| Command | What it runs |
+|---------|----------------|
+| `./oml_manage.sh django-commands` | `django_commands.sh` (initial data / migrations helpers) **+** `django_runtime_bootstrap.sh` |
+| `./oml_manage.sh django-runtime-bootstrap` | Only `django_runtime_bootstrap.sh` (`collectstatic`, permisos, `regenerar_asterisk`) |
+| `./oml_manage.sh up -d commands` | Same as `django-commands`, then `up -d` |
+
+`django_runtime_bootstrap.sh` needs Postgres, Redis, MinIO, Gearman, and a **healthy** `acd-server` (AMI). `oml_manage.sh` brings those deps up before running the profile `django-commands`.
+
+**Typical first bring-up:**
+
+```bash
+cd docker-compose
+cp docker-compose-template.yml docker-compose.yml   # if needed
+cp env .env                                         # then edit .env
+./oml_manage.sh up -d commands    # bootstrap + start stack
+# or: ./oml_manage.sh up -d && ./oml_manage.sh django-commands
+./oml_manage.sh reset-pass
+./oml_manage.sh data-generate     # optional demo data
+```
+
+Re-run `django-runtime-bootstrap` after image upgrades that change static files or telephony templates. The image **must** include `/opt/omnileads/bin/django_runtime_bootstrap.sh` (rebuild/`APP_IMG` digest with that script).
 
 ## Quick Localhost Test Environment <a name="test-env"></a>
 
-This environment is ideal for quickly testing the application locally. It is **not** recommended for production.
+Ideal for local QA. Not for production.
 
-```
-cp env test-env/.env
-cd test-env
-./set_test_env.sh
-./oml_manage.sh up -d
+```bash
+cd docker-compose
+cp docker-compose-template.yml docker-compose.yml
+cp env .env
+# adjust .env for localhost if needed (see deploy.md)
+./oml_manage.sh up -d commands
 ./oml_manage.sh reset-pass
 ./oml_manage.sh data-generate
 ```
 
-Once up, open https://localhost and log in with:
-
-- Username: `admin`
-- Password: `admin`
-
-> `set_test_env.sh` rewrites hostnames in `.env` so every service talks to the right container on the `omnileads` bridge network.
+Open https://localhost — `admin` / `admin`.
 
 ## Security Considerations <a name="security"></a>
 
@@ -108,11 +128,12 @@ The SRTP and RTP port ranges, as well as the Kamailio SIP ports, can be customiz
 
 ## On‑Premise / Cloud VPS Deployment <a name="vps-vm"></a>
 
-Suitable for small production deployments (up to ~100 users):
+Suitable for small production deployments (up to ~100 users). Same stack directory:
 
-```
-cp env prod-env/.env
-cd prod-env
+```bash
+cd docker-compose
+cp docker-compose-template.yml docker-compose.yml
+cp env .env
 ```
 
 Edit `.env` and set, at least:
@@ -124,15 +145,12 @@ FQDN=<optional-FQDN>
 
 Then:
 
-```
-./oml_manage.sh up -d
+```bash
+./oml_manage.sh up -d commands   # includes django bootstrap (see Bootstrap)
 ./oml_manage.sh reset-pass
 ```
 
-Log in at `https://<OML_HOSTNAME>` with:
-
-- Username: `admin`
-- Password: `admin`
+Log in at `https://<OML_HOSTNAME>` with `admin` / `admin`.
 
 ### LAN & WAN NIC interfaces
 
@@ -164,11 +182,21 @@ DIALER_TIME_BETWEEN_CALLS=1
 DIALER_PROCESS_CAMPAIGN_REPLICAS=5
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
+DIALER_SCHEDULER_REPLICAS=1
+# Django HA (Streams / Channels) — default 1; set 2+ for local HA lab
+SUPERVISION_EVENTS_LISTENER_REPLICAS=1
+OMNIDIALER_EVENTS_LISTENER_REPLICAS=1
+WHATSAPP_WORKER_REPLICAS=1
+BACKGROUND_TASKS_REPLICAS=1
 ```
 
 - `DIALER_CAPS`: maximum call attempts per second.
 - `DIALER_PROCESS_CAMPAIGN_REPLICAS`: number of `dialer-process-camp` workers; you typically need one replica per concurrent campaign.
 - `DIALER_PROCESS_CONTACT_REPLICAS`, `DIALER_PROCESS_EVENT_REPLICAS`: contact and event processors scale.
+- `DIALER_SCHEDULER_REPLICAS`: agenda scheduler; with 2+ replicas only one holds Redis leader lease `OML:HA:SCHEDULER:LEADER`.
+- Django listener / whatsapp / background-tasks replicas: each container uses its hostname as consumer id (do not set `OML_NODE_ID` on those services; it is only for `omlapp` / `daphne`).
+
+After changing replica vars, recreate from the template (`cp docker-compose-template.yml docker-compose.yml`) and `./oml_manage.sh up -d`. See [docs/redis_streams.md](../docs/redis_streams.md) §9 for HA smoke checks.
 
 The dialer uses the same PostgreSQL instance as OMniLeads (`postgresql`, port `5432`). The `omnidialer` database is created at first boot from `omnidialer.sql`, matching the Ansible `postgresql` role.
 
@@ -254,7 +282,7 @@ The most useful commands are:
 
 | Command                        | Description                                                        |
 |--------------------------------|--------------------------------------------------------------------|
-| `up [-d] [commands]`           | Start the stack. With `commands` runs Django commands first        |
+| `up [-d] [commands]`           | Start the stack. With `commands`, runs bootstrap first (see [Bootstrap](#bootstrap)) |
 | `down [-v]`                    | Stop & remove containers (use `-v` to drop volumes)                |
 | `pull [svc]`                   | Pull images                                                        |
 | `restart` / `stop` / `start`   | Lifecycle helpers, all services or a specific one                  |
@@ -262,13 +290,14 @@ The most useful commands are:
 | `status` / `health`            | Show container status & health of critical services                |
 | `reset-pass`                   | Reset admin password to `admin / admin`                            |
 | `data-generate`                | Generate example data in the database                              |
-| `django-commands`              | Run the `django-commands` one‑off container                        |
+| `django-commands`              | **Required on first bring-up / after app image upgrades:** `django_commands.sh` + `django_runtime_bootstrap.sh` |
+| `django-runtime-bootstrap`     | One-shot: collectstatic / permisos / `regenerar_asterisk` only     |
 | `build-vuejs`                  | Build the Vue.js front‑end assets                                  |
 | `rebuild [svc]`                | Rebuild one or all service images                                  |
 | `psql <db_user>`               | Open `psql` against `postgresql`                                   |
 | `sngrep` / `asterisk_cli`      | Debug helpers inside `acd-server` (SIP capture / Asterisk CLI)     |
 | `backup` / `restore`           | Backup or restore the PostgreSQL database                          |
-| `inbound-call <tel> [n]`      | Send n test inbound calls (default 1) through the PBX‑Emulator    |
+| `inbound-call <tel> [n] [interval_s]` | Send n test inbound calls (default 1); optional seconds between each |
 | `dialer-call` / `manual-call`  | Trigger dialer or manual test calls (`tel id_camp id_cust`)        |
 | `hangup-pstn`                  | Hang up all active PSTN calls in the emulator                      |
 | `clean` / `clean-all`          | Docker prune (containers/images/volumes/networks)                  |
@@ -306,21 +335,18 @@ On Linux, install Docker prerequisites:
 ./docker_install_linux.sh
 ```
 
-Then set up and start the stack:
+Then set up and start the stack (from `docker-compose/`, with source mounts enabled in `.env` — see [deploy.md](./deploy.md)):
 
-```
-cp env dev-env/.env
-cd dev-env
-./set_dev_env.sh
-./oml_manage.sh up -d
+```bash
+cp docker-compose-template.yml docker-compose.yml
+cp env .env
+# set DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh and mount paths as needed
+./oml_manage.sh up -d commands
 ./oml_manage.sh reset-pass
 ./oml_manage.sh data-generate
 ```
 
-Log in at https://localhost with:
-
-- Username: `admin`
-- Password: `admin`
+Log in at https://localhost with `admin` / `admin`.
 
 ## PSTN Emulator (test-env & dev-env) <a name="pstn-emulator"></a>
 
@@ -350,8 +376,10 @@ When `PSTN_EMULATOR_MODE=advanced` the last digit decides the outcome:
 Generate an inbound test call:
 
 ```bash
-./oml_manage.sh inbound-call 01177660010 5
+./oml_manage.sh inbound-call 01177660010 2 5
 ```
+
+That sends 2 calls to `01177660010`, waiting 5 seconds between each origination. Omit the last argument to fire every call in the same second.
 
 Hang up every PSTN call in progress:
 

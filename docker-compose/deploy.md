@@ -35,7 +35,7 @@ Al finalizar, el stack queda listo en `./omldeploytool/docker-compose/`:
 
 ```bash
 cd omldeploytool/docker-compose
-./oml_manage.sh up -d
+./oml_manage.sh up -d commands  # bootstrap Django + start
 ./oml_manage.sh reset-pass      # admin / admin
 ```
 
@@ -57,10 +57,12 @@ cd docker-compose
 cp docker-compose-template.yml docker-compose.yml
 cp env .env
 # editar .env según el escenario (ver "Modos de despliegue")
-./oml_manage.sh up -d
+./oml_manage.sh up -d commands  # django_commands + django_runtime_bootstrap, luego up
 ./oml_manage.sh reset-pass      # admin / admin
 ./oml_manage.sh data-generate   # datos de demo (opcional)
 ```
+
+> **Bootstrap:** `omlapp` ya no ejecuta collectstatic/permisos/`regenerar_asterisk` al arrancar. En el primer levante (o tras cambiar `APP_IMG`) usá `up -d commands` o, con el stack ya up, `./oml_manage.sh django-commands`. Detalle en [README.md § Bootstrap](./README.md#bootstrap).
 
 ---
 
@@ -88,6 +90,7 @@ Componentes del *Automatic Call Distribution*: Asterisk como PBX/ACD, generació
 | **acd-conf-generator** | Genera la configuración de Asterisk (`astconf.py`) a partir de los datos de OMniLeads y la escribe en el volumen compartido `asterisk_conf`. |
 | **acd-server** | Asterisk como PBX/ACD. Gestiona llamadas, colas y grabaciones (volúmenes `asterisk_callrec`, `asterisk_conf`, `asterisk_sounds`). Recibe una IP fija (`ACD_HOST_IP`) dentro de la red `omnileads`. |
 | **acd-app** | Aplicación ARI (Asterisk REST Interface) que orquesta llamadas en Asterisk vía Stasis: transferencias, grabación, integración con el dialer y con la API REST de OMniLeads. |
+| **acd-channel-audit** | Publica en Redis DB 3 la foto de canales dialer PSTN del Asterisk local (`OML:ACD:{node}:CHANNELS` / `RINGING` + heartbeat). Sin Gearman ni dependencia del dialer; no escribe `OML:CALLS:{camp}:DIALER`. |
 
 ---
 
@@ -122,12 +125,12 @@ Workers que ejecutan tareas en segundo plano, listeners de eventos y schedulers 
 
 | Servicio | Función |
 |----------|---------|
-| **whatsapp** | Worker de integración con WhatsApp; procesa mensajes y eventos del canal. |
-| **background-tasks** | Worker general de tareas en segundo plano (emails, reportes, etc.). |
-| **supervision-events-listener** | Escucha eventos de supervisión y los procesa para actualizar estado y reportes. |
-| **presence-heartbeat-scheduler** | Scheduler de heartbeats de presencia de agentes para el dashboard en tiempo real. |
-| **daily-redis-cleanup** | Limpieza diaria de datos temporales en Redis. |
-| **background-dialer-tasks** | Listener `omnidialer_events_listener`; sincroniza estado entre Django y el OMniDialer. |
+| **whatsapp** | msgs-orchestrator / WhatsApp. Escala con `WHATSAPP_WORKER_REPLICAS`. |
+| **background-tasks** | Tareas en segundo plano (Channels). Escala con `BACKGROUND_TASKS_REPLICAS`. |
+| **supervision-events-listener** | Consumer group Streams de supervisión. Escala con `SUPERVISION_EVENTS_LISTENER_REPLICAS`. |
+| **presence-heartbeat-scheduler** | Scheduler de heartbeats de presencia (dejar en 1; usa `run_once`). |
+| **daily-redis-cleanup** | Limpieza diaria de Redis (dejar en 1; usa `run_once`). |
+| **background-dialer-tasks** | `omnidialer_events_listener`. Escala con `OMNIDIALER_EVENTS_LISTENER_REPLICAS`. |
 | **dashboard-agent-scheduler** | Actualización programada del reporte del día actual por agente. |
 | **supervision-agentes-scheduler** | Actualización programada de los reportes de supervisores. |
 | **call-logger** | Worker Gearman que recibe los eventos de llamadas emitidos por el ACD y los persiste en PostgreSQL (duración, disposición, etc.). |
@@ -144,8 +147,8 @@ Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y e
 | **dialer-process-contact** | Worker Gearman: procesamiento de contactos (marcado, resultado, reagenda). Escala con `DIALER_PROCESS_CONTACT_REPLICAS`. |
 | **dialer-process-camp** | Worker Gearman: procesamiento de campañas (estado, progreso). Escala con `DIALER_PROCESS_CAMPAIGN_REPLICAS`. |
 | **dialer-process-event** | Worker Gearman: procesamiento de eventos del dialer. Escala con `DIALER_PROCESS_EVENT_REPLICAS`. |
-| **dialer-scheduler** | Worker Gearman: programación de la agenda de contactos (`schedule-agenda`) y productor periódico de `audit-active-channels`. |
-| **dialer-channel-audit** | Worker Gearman: reconciliación `OML:CALLS` ↔ Asterisk (`audit-active-channels`). |
+| **dialer-scheduler** | Worker Gearman: programación de la agenda (`schedule-agenda`) + enqueue de `audit-active-channels`. Escala con `DIALER_SCHEDULER_REPLICAS` (leader lease Redis). |
+| **dialer-channel-audit** | Worker Gearman `audit-active-channels`: suma fotos Redis de `acd-channel-audit` (`OML:ACD:*`) y corrige `OML:CALLS` con histéresis asimétrica (no Gearman sync a Asterisk). |
 | **dialer-manage-campaign** | Worker Gearman: ciclo de vida de campañas (`create/start/pause/resume/stop/edit/delete-campaign`, `change-database`). |
 | **dialer-send-reports** | Worker Gearman: envío de reportes del dialer. |
 | **dialer-incidence-rules** | Worker Gearman: reglas de incidencia (`add/create/update/delete`). |
@@ -170,7 +173,7 @@ Utilidades auxiliares para administración, QA y desarrollo front-end. Forman pa
 
 | Servicio | Función |
 |----------|---------|
-| **django-commands** | Contenedor one-shot que ejecuta `django_commands.sh` (migraciones, `collectstatic`, etc.) al levantar el stack o bajo demanda con `./oml_manage.sh django-commands`. |
+| **django-commands** | Contenedor one-shot (profile `django-commands`): `django_commands.sh` + `django_runtime_bootstrap.sh` (`collectstatic`, permisos, `regenerar_asterisk`). Requiere `postgresql`/`redis`/`minio`/`gearman`/`acd-server` healthy. No corre en `omlapp` (`init_uwsgi.sh` / `init_devenv.sh` solo arrancan el server). |
 | **pbxemulator** | Emulador PSTN para QA. Simula escenarios de llamadas salientes/entrantes según `PSTN_EMULATOR_MODE` (ver comentarios en `.env`). Expone `4569/udp` y recibe IP fija (`PSTN_EMULATOR_IP`). |
 | **nginxcgi** | Nginx auxiliar de QA que expone scripts CGI internos. Puerto host `8888`. |
 | **redisinsight** | Interfaz web para inspeccionar Redis. Publicado en `127.0.0.1:7963 → 5540`. |
@@ -316,7 +319,10 @@ El helper `oml_manage.sh` envuelve a `docker compose` sobre la copia de trabajo 
 ./oml_manage.sh logs -f <svc>    # logs de un servicio
 ./oml_manage.sh status           # estado y salud de contenedores
 ./oml_manage.sh reset-pass       # reset admin/admin
-./oml_manage.sh django-commands  # migraciones/comandos Django on-demand
+./oml_manage.sh rebuild omlapp            # incluye django_runtime_bootstrap.sh en la imagen
+./oml_manage.sh up -d commands            # first boot: datos + bootstrap (static/permisos/regen)
+./oml_manage.sh django-commands           # mismos one-shots on-demand
+./oml_manage.sh django-runtime-bootstrap  # solo collectstatic/permisos/regenerar_asterisk
 ```
 
 Equivalente directo sin el helper:

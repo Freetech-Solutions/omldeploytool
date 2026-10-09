@@ -1,0 +1,25 @@
+[Unit]
+Description=OMniLeads ACD Channel Audit Publisher
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target acd-server.service
+
+[Container]
+ContainerName=acd-channel-audit
+Image={{ ACD_IMG }}
+Pod=acd.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/acd-channel-audit.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+WorkingDir=/opt/asterisk/ari-app/
+PodmanArgs=--entrypoint=python
+Exec=channel_audit_publisher.py
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

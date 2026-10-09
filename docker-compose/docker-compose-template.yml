@@ -521,6 +521,8 @@ services:
         condition: service_healthy
     environment:
       <<: *django-env
+      # Identidad fija del plano web (workers escalables usan hostname del contenedor).
+      OML_NODE_ID: ${OML_NODE_ID:-omlapp}
       UWSGI_CUSTOM: True
       UWSGI_PROCESSES: ${UWSGI_PROCESSES}
       UWSGI_THREADS: ${UWSGI_THREADS}
@@ -540,12 +542,24 @@ services:
 
   django-commands:
     <<: *django-common
+    profiles: ["django-commands"]
+    restart: "no"
     depends_on:
       <<: *deps-pg-redis-minio
-    command: /opt/omnileads/bin/django_commands.sh
+      gearman:
+        condition: service_healthy
+      acd-server:
+        condition: service_healthy
+    # Initial data + HA-safe shared-state bootstrap (not on every omlapp replica).
+    # regenerar_asterisk needs Asterisk AMI → acd-server must be healthy first.
+    command: >-
+      /bin/bash -c
+      '/opt/omnileads/bin/django_commands.sh &&
+      /opt/omnileads/bin/django_runtime_bootstrap.sh'
     working_dir: /opt/omnileads/ominicontacto
     volumes:
       - django_static:/opt/omnileads/static
+      - django_media:/opt/omnileads/media_root
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
     stop_grace_period: 30s
 
@@ -555,6 +569,7 @@ services:
       <<: *deps-redis
     environment:
       <<: *django-env
+      OML_NODE_ID: ${OML_NODE_ID:-omlapp}
       DAPHNE_ENABLE: "true"
       DAPHNE_PORT: ${DAPHNE_PORT:-8098}
       DJANGO_HOSTNAME: ${DAPHNE_HOSTNAME}
@@ -608,14 +623,20 @@ services:
   whatsapp:
     <<: *django-worker-common
     command: /opt/omnileads/bin/init_whatsapp.sh
+    deploy:
+      replicas: ${WHATSAPP_WORKER_REPLICAS:-1}
 
   background-tasks:
     <<: *django-worker-common
     command: /opt/omnileads/bin/init_worker_bgtasks.sh
+    deploy:
+      replicas: ${BACKGROUND_TASKS_REPLICAS:-1}
 
   supervision-events-listener:
     <<: *django-worker-common
     command: python manage.py supervision_events_listener
+    deploy:
+      replicas: ${SUPERVISION_EVENTS_LISTENER_REPLICAS:-1}
 
   presence-heartbeat-scheduler:
     <<: *django-worker-common
@@ -628,6 +649,8 @@ services:
   background-dialer-tasks:
     <<: *django-worker-common
     command: python manage.py omnidialer_events_listener
+    deploy:
+      replicas: ${OMNIDIALER_EVENTS_LISTENER_REPLICAS:-1}
 
   dashboard-agent-scheduler:
     <<: *django-worker-common
@@ -717,6 +740,28 @@ services:
       - asterisk_callrec:/var/spool/asterisk/recording
       # - ${REPO_PATH}/acd/source/ari-app/:/opt/asterisk/ari-app:ro
 
+  # Publishes local Asterisk dialer-channel snapshot to Redis DB3 (per ACD node).
+  # Does not write OML:CALLS:{camp}:DIALER; no Gearman / dialer dependency.
+  acd-channel-audit:
+    <<: *acd-ari-common
+    entrypoint: [ "python", "channel_audit_publisher.py" ]
+    depends_on:
+      redis:
+        condition: service_healthy
+      acd-server:
+        condition: service_healthy
+    environment:
+      ARI_URL: http://${ACD_HOSTNAME}:${ACD_ARI_PORT}
+      ARI_USER: ${ACD_AMI_USER}
+      ARI_PASSWORD: ${ACD_AMI_PASSWORD}
+      ARI_APP: ${ACD_APP}
+      REDIS_URL: redis://${REDIS_HOSTNAME}:${REDIS_PORT}
+      ACD_AUDIT_NODE_ID: ${ACD_HOSTNAME}
+      ACD_CHANNEL_AUDIT_INTERVAL_SEC: ${ACD_CHANNEL_AUDIT_INTERVAL_SEC:-15}
+      ACD_CHANNEL_AUDIT_HB_TTL_SEC: ${ACD_CHANNEL_AUDIT_HB_TTL_SEC:-45}
+      PYTHON_LOGLEVEL: ${ACD_LOG_LEVEL:-error}
+      TZ: ${TZ}
+
   # ----------------------------------------------------------------------------
   # PROCESSING HEAVY METAL SERVICES
   # ----------------------------------------------------------------------------
@@ -804,6 +849,8 @@ services:
     environment:
       <<: *dialer-worker-env
       GEARMAN_JOBS: "schedule-agenda"
+    deploy:
+      replicas: ${DIALER_SCHEDULER_REPLICAS:-1}
 
   dialer-channel-audit:
     <<: *dialer-worker-common
@@ -929,6 +976,9 @@ services:
   #     PGUSER: ${POSTGRES_USER}
   #     PGPASSWORD: ${POSTGRES_PASSWORD}
   #     PGDATABASE: ${POSTGRES_DB}
+  #     REDIS_HOSTNAME: ${REDIS_HOSTNAME}
+  #     REDIS_PORT: ${REDIS_PORT:-6379}
+  #     REDIS_CALLDATA_DB: "2"
   #     PSTN_HOSTNAME: pbxemulator
   #   ports:
   #     - 127.0.0.1:8888:8808/tcp

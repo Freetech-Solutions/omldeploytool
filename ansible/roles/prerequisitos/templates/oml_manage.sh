@@ -25,6 +25,7 @@ CN_WEBSOCKET=websocket-server
 CN_NGINX=nginx-server
 CN_ACD_SERVER=acd-server
 CN_ACD_APP=acd-app
+CN_ACD_CHANNEL_AUDIT=acd-channel-audit
 CN_ACD_CONF=acd-conf
 CN_FASTAGI=acd-fastagi
 CN_KAMAILIO_WEBRTC=kamailio-webrtc
@@ -47,7 +48,7 @@ declare -A CRITICAL_CN=(
 KNOWN_CONTAINERS=(
   "$CN_POSTGRES" "$CN_REDIS" "$CN_MINIO" "$CN_GEARMAN"
   "$CN_OMLAPP" "$CN_DAPHNE" "$CN_WHATSAPP" "$CN_WEBSOCKET" "$CN_NGINX"
-  "$CN_ACD_CONF" "$CN_ACD_SERVER" "$CN_ACD_APP" "$CN_FASTAGI"
+  "$CN_ACD_CONF" "$CN_ACD_SERVER" "$CN_ACD_APP" "$CN_ACD_CHANNEL_AUDIT" "$CN_FASTAGI"
   "$CN_KAMAILIO_WEBRTC" "$CN_KAMAILIO_PSTN" "$CN_RTPENGINE" "$CN_DIALER_API"
   omlapp-callrec-worker omlapp-dialer-worker omlapp-supervision-agentes-scheduler
   omlapp-daily-redis-cleanup omlapp-presence-heartbeat-scheduler oml-call-logger
@@ -82,7 +83,7 @@ STACK_UNITS_ORDER=(
   supervision_agentes_scheduler.service supervision_events_listener.service
   presence_heartbeat_scheduler.service
   nginx.service
-  acd-config.service acd-server.service acd-app.service acd-fastagi.service
+  acd-config.service acd-server.service acd-app.service acd-channel-audit.service acd-fastagi.service
   kamailio_webrtc.service kamailio_pstn.service rtpengine.service
   dialer_api.service dialer_incidence_rules.service dialer_manage_campaign.service
   dialer_render_template.service dialer_scheduler.service
@@ -388,7 +389,11 @@ run_django_commands() {
         exit 1
     fi
     wait_for_services_healthy 120 "$CN_POSTGRES" "$CN_REDIS" "$CN_MINIO" || exit 1
-    podman run --rm --network=host --env-file "$DJANGO_ENV" "$img" /opt/omnileads/bin/django_commands.sh || {
+    podman run --rm --network=host --env-file "$DJANGO_ENV" \
+        --volume=django_static:/opt/omnileads/static \
+        --volume=django_media:/opt/omnileads/media_root \
+        "$img" /bin/bash -c \
+        '/opt/omnileads/bin/django_commands.sh && /opt/omnileads/bin/django_runtime_bootstrap.sh' || {
         error "django-commands falló"; exit 1
     }
     success "django-commands OK"
@@ -557,6 +562,7 @@ systemctl_restart_one() {
         websockets|websocket) unit=websockets.service ;;
         acd-server|asterisk) unit=acd-server.service ;;
         acd-app) unit=acd-app.service ;;
+        acd-channel-audit) unit=acd-channel-audit.service ;;
         acd-config|acd-conf) unit=acd-config.service ;;
         fastagi) unit=acd-fastagi.service ;;
         kamailio-webrtc) unit=kamailio_webrtc.service ;;
@@ -695,7 +701,7 @@ Comandos (también alias legacy --comando):
   redis-sync          regenerar_asterisk
   dialer-sync         sincronizar_wombat
   redis-clean         flushall en redis-server (confirmación)
-  django-commands <img>  podman run one-shot django_commands.sh
+  django-commands <img>  one-shot django_commands.sh + django_runtime_bootstrap.sh
   backup / restore    Podman + /etc/default/backup.env + BACKUP_RESTORE_IMG
   psql <usuario>      psql en postgresql-server
   psql-reindex        reindex vía omlapp + django.env

@@ -293,7 +293,7 @@ Todos usan `EnvironmentFile=/etc/default/django.env` salvo casos específicos de
 | `dialer_incidence_rules.service` | `dialer-incidence-rules` | `DIALER_WORKER_IMG` | Reglas de incidencias del dialer. |
 | `dialer_render_template.service` | `dialer-render-template` | `DIALER_WORKER_IMG` | Renderizado de plantillas de campaña. |
 | `dialer_scheduler.service` | `dialer-scheduler` | `DIALER_WORKER_IMG` | Job Gearman `schedule-agenda` + encola auditoría periódica. |
-| `dialer_channel_audit.service` | `dialer-channel-audit` | `DIALER_WORKER_IMG` | Job Gearman `audit-active-channels` (reconcilia `OML:CALLS`). |
+| `dialer_channel_audit.service` | `dialer-channel-audit` | `DIALER_WORKER_IMG` | Job Gearman `audit-active-channels`: suma fotos `OML:ACD:*` y corrige `OML:CALLS` con histéresis asimétrica. |
 | `dialer_send_reports.service` | `dialer-send-reports` | `DIALER_WORKER_IMG` | Envío de reportes de campaña. |
 | `dialer_process_campaign@N.service` | `dialer-process-campaign-N` | `DIALER_WORKER_IMG` | Workers de procesamiento de campaña (réplicas). |
 | `dialer_process_contact@N.service` | `dialer-process-contact-N` | `DIALER_WORKER_IMG` | Workers de contactos (plantilla `@`, réplicas vía inventario). |
@@ -320,9 +320,10 @@ La API (`dialer-api`) vive en el pod **`omlapp_web`**, no aquí.
 | `acd-config.service` | `acd-conf` | `ACD_IMG` | Generación/sincronización de configuración Asterisk (`retrieve_conf`). |
 | `acd-server.service` | `acd-server` | `ACD_IMG` | Daemon Asterisk (colas, dialplan, RTP PSTN). |
 | `acd-app.service` | `acd-app` | `ACD_IMG` | ARI Stasis app (lógica de colas OMniLeads). |
+| `acd-channel-audit.service` | `acd-channel-audit` | `ACD_IMG` | Publica foto de canales dialer PSTN del Asterisk local en Redis DB 3 (`OML:ACD:{node}:*`). Sin Gearman; no escribe `OML:CALLS`. |
 | `acd-fastagi.service` | `acd-fastagi` | `FASTAGI_IMG` | FastAGI para scripts de dialplan (`:4573` hacia el pod). |
 
-Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-fastagi`.
+Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-channel-audit` / `acd-fastagi`.
 
 **Upgrade (`--action=upgrade`):** si cambia `acd.pod` (p. ej. migración bridge → `Network=host`), el rol `pods` hace tear-down y recrea la infra Podman antes de que el rol `acd` aplique env vars y reinicie `acd-pod.service`. Coordinar con `telephony_edge` en el mismo upgrade: `kamailio_pstn.env` (`acd_nodes` con `:5070`) y `kamailio_webrtc.env` (`ACD_NET_ADDR`) deben desplegarse en el mismo ciclo. Requiere imagen `ACD_IMG` con trunk PJSIP en `acd_trunk_sip_port` (default `:5070`).
 

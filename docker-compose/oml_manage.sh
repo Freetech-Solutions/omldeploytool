@@ -275,33 +275,40 @@ generate_data() {
 }
 
 # -----------------------------------------------------------------------------
+# Ensure deps for django-commands / runtime bootstrap (incl. ACD for regenerar)
+# -----------------------------------------------------------------------------
+ensure_django_commands_deps() {
+    local deps=(postgresql redis minio gearman acd-server)
+    log "Levantando dependencias para django-commands (${deps[*]})..."
+    docker_compose up -d "${deps[@]}"
+    wait_for_services_healthy 180 "${deps[@]}" || exit 1
+}
+
+# -----------------------------------------------------------------------------
 # Run Django Commands (on-demand)
 # -----------------------------------------------------------------------------
 run_django_commands() {
-    log "Ejecutando django-commands (on-demand)..."
-    
-    # Verificar que los servicios dependientes estén corriendo
-    local required_services=(postgresql redis minio)
-    local missing_services=()
-    
-    for svc in "${required_services[@]}"; do
-        if ! docker_compose ps -q "$svc" &>/dev/null; then
-            missing_services+=("$svc")
-        fi
-    done
-    
-    if (( ${#missing_services[@]} )); then
-        error "Los siguientes servicios requeridos no están corriendo: ${missing_services[*]}"
-        info "Por favor, inicia los servicios primero con: ./oml_manage.sh up -d"
-        exit 1
-    fi
-    
-    # Ejecutar django-commands con el perfil activado
+    log "Ejecutando django-commands + django_runtime_bootstrap (on-demand)..."
+    ensure_django_commands_deps
     docker_compose --profile django-commands run --rm django-commands || {
         error "Failed to execute django-commands"
         exit 1
     }
-    success "django-commands ejecutado exitosamente"
+    success "django-commands + runtime bootstrap OK"
+}
+
+# -----------------------------------------------------------------------------
+# Run only HA-safe runtime bootstrap (static, permisos, regenerar_asterisk)
+# -----------------------------------------------------------------------------
+run_django_runtime_bootstrap() {
+    log "Ejecutando django_runtime_bootstrap.sh (on-demand)..."
+    ensure_django_commands_deps
+    docker_compose --profile django-commands run --rm django-commands \
+        /opt/omnileads/bin/django_runtime_bootstrap.sh || {
+        error "Failed to execute django_runtime_bootstrap"
+        exit 1
+    }
+    success "django_runtime_bootstrap OK"
 }
 
 # -----------------------------------------------------------------------------
@@ -398,16 +405,24 @@ clean_all() {
 send_call() {
     local telephone="${1:-}"
     local count="${2:-1}"
+    local interval="${3:-}"
+    local usage="Usage: ./oml_manage.sh inbound-call <telephone> [count] [interval_seconds]"
     if [[ -z "$telephone" ]]; then
         error "Missing telephone argument."
-        info "Usage: ./oml_manage.sh inbound-call <telephone> [count]"
-        info "Example: ./oml_manage.sh inbound-call 01177660010 5"
+        info "$usage"
+        info "Example: ./oml_manage.sh inbound-call 01177660010 2 5"
         exit 1
     fi
     if ! [[ "$count" =~ ^[1-9][0-9]*$ ]]; then
         error "Call count must be a positive integer (got: ${count})."
-        info "Usage: ./oml_manage.sh inbound-call <telephone> [count]"
-        info "Example: ./oml_manage.sh inbound-call 01177660010 5"
+        info "$usage"
+        info "Example: ./oml_manage.sh inbound-call 01177660010 2 5"
+        exit 1
+    fi
+    if [[ -n "$interval" ]] && ! [[ "$interval" =~ ^[0-9]+$ ]]; then
+        error "Interval must be a non-negative integer in seconds (got: ${interval})."
+        info "$usage"
+        info "Example: ./oml_manage.sh inbound-call 01177660010 2 5"
         exit 1
     fi
 
@@ -415,9 +430,17 @@ send_call() {
         error "PBX Emulator service is not running. Please start it first."
         exit 1
     fi
-    log "Sending ${count} call(s) to ${telephone}..."
-    # -m total, -r tasa (todas en el mismo segundo), -l simultáneas, -d duración ms
-    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "999$telephone" -m "$count" -r "$count" -d 60000 -l "$count" || {
+
+    # Sin intervalo (o 0): todas en el mismo segundo. Con intervalo: 1 llamada por periodo.
+    local -a sipp_rate=(-r "$count")
+    if [[ -n "$interval" && "$interval" -gt 0 ]]; then
+        sipp_rate=(-r 1 -rp "$((interval * 1000))")
+        log "Sending ${count} call(s) to ${telephone}, one every ${interval}s..."
+    else
+        log "Sending ${count} call(s) to ${telephone}..."
+    fi
+    # -m total, -r llamadas por periodo, -rp periodo en ms, -l simultáneas, -d duración ms
+    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "999$telephone" -m "$count" "${sipp_rate[@]}" -d 60000 -l "$count" || {
         error "Failed to send call"
         exit 1
     }
@@ -501,6 +524,18 @@ open_psql() {
 
     log "Opening psql on service 'postgresql' as user '$db_user'..."
     docker_compose exec -it postgresql psql -U "$db_user"
+}
+
+# -----------------------------------------------------------------------------
+# Open Redis CLI (interactive)
+# -----------------------------------------------------------------------------
+run_redis_cli() {
+    if ! docker_compose ps -q redis &>/dev/null; then
+        error "Service 'redis' is not running or does not exist."
+        exit 1
+    fi
+    log "Opening redis-cli in 'redis'..."
+    docker_compose exec -it redis redis-cli
 }
 
 # -----------------------------------------------------------------------------
@@ -665,7 +700,8 @@ show_help() {
 
     Commands:
       up [ -d ] [ commands ]  Start all services (use -d for detached). If 'commands'
-                              is given, runs django-commands before bringing up the stack.
+                              is given, runs django-commands + runtime bootstrap
+                              (needs pg/redis/minio/gearman/acd) before full up.
       down [ -v ]        Stop and remove containers (use -v to remove volumes)
       pull [svc]         Pull images (all or specific service)
       restart [svc]      Restart all or a specific service
@@ -680,15 +716,17 @@ show_help() {
       reset-pass         Reset admin password as admin admin
       force-recreate     Force-recreate services without cache
       data-generate      Generate example data in the database
-      django-commands    Execute django-commands container (on-demand)
+      django-commands    One-shot: django_commands.sh + django_runtime_bootstrap.sh
+      django-runtime-bootstrap  One-shot: only django_runtime_bootstrap.sh
       rebuild [svc]      Rebuild one or all service images
       psql <db_user>   Open interactive psql in postgresql container (psql -U <db_user>)
+      redis-cli          Open interactive redis-cli in the redis container
       sngrep            Open sngrep in acd-server container (SIP debugging)
       asterisk_cli      Open Asterisk CLI in acd-server (asterisk -rvvvvv)
       backup             Backup PostgreSQL database
       restore            Restore PostgreSQL database from backup
       env                Display first 20 env vars from .env
-      inbound-call <tel> [n]  Send n test calls (default 1) using the PBX-Emulator
+      inbound-call <tel> [n] [interval_s]  Send n test calls (default 1); optional seconds between each
       dialer-call        Trigger 'call_test_dialer.py' (Usage: tel id_camp id_cust)
       manual-call        Trigger 'call_test_manual.py' (Usage: tel id_camp id_cust)
       hangup-pstn        Hangup all PSTN calls using the PBX-Emulator
@@ -719,9 +757,6 @@ main() {
                 fi
             done
             if (( run_commands_first )); then
-                log "Levantando dependencias (postgresql, redis, minio)..."
-                docker_compose up -d postgresql redis minio
-                wait_for_services_healthy 120 postgresql redis minio || exit 1
                 run_django_commands
                 log "Levantando el resto del stack..."
                 docker_compose up -d "${UP_ARGS[@]}"
@@ -740,11 +775,12 @@ main() {
         reset-pass)     reset_admin_password ;;
         data-generate)  generate_data ;;
         django-commands) run_django_commands ;;
+        django-runtime-bootstrap) run_django_runtime_bootstrap ;;
         build-vuejs)    build_vuejs ;;
         health)         check_health ;;
         clean)          clean_system ;;
         clean-all)      clean_all ;;
-        inbound-call)   shift; send_call "${1:-}" "${2:-1}" ;;
+        inbound-call)   shift; send_call "${1:-}" "${2:-1}" "${3:-}" ;;
         dialer-call)    shift; trigger_dialer_test "$@" ;;
         manual-call)    shift; trigger_manual_test "$@" ;;
         hangup-pstn)    hangup_all_pstn_emulator_calls ;;
@@ -753,6 +789,7 @@ main() {
         terminal)       shift; open_terminal "${1:-}" ;;
         rebuild)        shift; rebuild_services "$@" ;;
         psql)           shift; open_psql "${1:-}" ;;
+        redis-cli)      run_redis_cli ;;
         sngrep)         run_sngrep ;;
         asterisk_cli)   run_asterisk_cli ;;
         env)            if [[ -f "$ENV_FILE" ]]; then grep -h '^[A-Z_]\+=' "$ENV_FILE" | head -20; else warning ".env not found"; fi ;;

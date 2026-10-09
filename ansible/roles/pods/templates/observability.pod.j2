@@ -4,7 +4,6 @@ Description=OmniLeads Observability Pod
 
 [Pod]
 Network={{ oml_network }}
-PublishPort={{ omni_ip_lan }}:{{ prometheus_node_exporter_port | default(9100) }}:{{ prometheus_node_exporter_port | default(9100) }}
 PublishPort={{ omni_ip_lan }}:{{ prometheus_podman_exporter_port | default(9882) }}:{{ prometheus_podman_exporter_port | default(9882) }}
 {% if oml_runs_omlapp_web | default(false) | bool %}
 PublishPort={{ omni_ip_lan }}:{{ prometheus_server_port | default(9090) }}:{{ prometheus_server_port | default(9090) }}
