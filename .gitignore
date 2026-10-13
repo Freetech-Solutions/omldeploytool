@@ -29,5 +29,22 @@ components-git-repo/custom_app/
 
 .ci-omnileads/
 .cache/
+
+# Packer: caché de build y var-files locales (pueden llevar la API key)
+packer_cache/
+crash.log
+*.auto.pkrvars.hcl
+
+# Terraform: state, caché y var-files locales (pueden llevar el token)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+backend.hcl
+override.tf
+override.tf.json
 .cursor
 .CLAUDE.md

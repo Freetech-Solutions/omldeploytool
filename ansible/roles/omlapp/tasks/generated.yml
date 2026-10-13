@@ -154,6 +154,24 @@
     - upgrade
     - update
 
+# django_static es un volumen Podman de cada host. collectstatic y compress
+# escriben ahí; el manifiesto offline de django-compressor tiene que existir
+# en cada réplica. migrate, permisos y regenerar_asterisk siguen en un solo host.
+- name: DJANGO collectstatic and compress on every omlapp_web replica
+  ansible.builtin.shell: >-
+    podman run --rm --network=host
+    --env-file /etc/default/django.env
+    -e PGHOST={{ postgres_host | trim }}
+    -e REDIS_HOST={{ redis_host | trim }}
+    --volume=django_static:/opt/omnileads/static
+    {{ APP_IMG }}
+    bash -lc 'python3 /opt/omnileads/ominicontacto/manage.py collectstatic --noinput
+    && python3 /opt/omnileads/ominicontacto/manage.py compress'
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: DJANGO reset admin pass
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} python /opt/omnileads/ominicontacto/manage.py cambiar_admin_password"
   tags:

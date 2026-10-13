@@ -1,6 +1,12 @@
 #cloud-config
+# OMniLeads bootstrap for the Ansible admin user on DigitalOcean droplets.
+# DigitalOcean installs the account SSH key for root. This config copies the
+# bare key to omladmin and then sets PermitRootLogin no.
+# Keep this file ASCII-only. cloud-init on Debian 13 rejects bytes above 0x7f.
+# disable_root must stay false. true does not set PermitRootLogin no; it prefixes
+# root's authorized_keys with a forced command that refuses the shell.
 ssh_pwauth: false
-disable_root: true
+disable_root: false
 
 package_update: true
 package_upgrade: false
@@ -15,25 +21,15 @@ users:
     gecos: OMniLeads Ansible admin
     shell: /bin/bash
     lock_passwd: true
-    sudo: ALL=(ALL) NOPASSWD:ALL
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
 
 runcmd:
-  - visudo -c
-  - |
-    # --- Configuración dinámica usando variables de Bash ---
-    USER_NAME="omladmin"
-    HOME_DIR="/home/${USER_NAME}"
-    SSH_DIR="${HOME_DIR}/.ssh"
-    
-    # 1. Creamos el directorio usando la variable
-    mkdir -p "${SSH_DIR}"
-    
-    # 2. Filtramos e inyectamos la llave limpia
-    awk '/ssh-rsa|ssh-ed25519|ecdsa-sha2/{print $NF==""?"":$0}' /root/.ssh/authorized_keys | sed 's/^.*\(ssh-rsa\|ssh-ed25519\|ecdsa-sha2\)/\1/' > "${SSH_DIR}/authorized_keys"
-    
-    # 3. Aplicamos permisos usando la variable de usuario
-    chown -R "${USER_NAME}:${USER_NAME}" "${SSH_DIR}"
-    chmod 700 "${SSH_DIR}"
-    chmod 600 "${SSH_DIR}/authorized_keys"
+  - mkdir -p /home/omladmin/.ssh
+  - grep -E 'ssh-(rsa|ed25519)|ecdsa-sha2' /root/.ssh/authorized_keys | sed 's/^.*\(ssh-rsa\|ssh-ed25519\|ecdsa-sha2\)/\1/' > /home/omladmin/.ssh/authorized_keys
+  - chown -R omladmin:omladmin /home/omladmin/.ssh
+  - chmod 700 /home/omladmin/.ssh
+  - chmod 600 /home/omladmin/.ssh/authorized_keys
+  - printf '%s\n' 'PermitRootLogin no' 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/99-omnileads.conf
+  - systemctl reload ssh
 
-final_message: "OMniLeads cloud-init finalizado. Proceso completado ($(date -R))"
+final_message: "OMniLeads cloud-init finished at $(date -R)"

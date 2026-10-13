@@ -60,6 +60,7 @@ data_stateless_pod_systemd_unit: data_stateless-pod.service
 data_statefull_pod: data-statefull-server
 data_statefull_pod_systemd_unit: data_statefull-pod.service
 telephony_edge_pod_systemd_unit: telephony_edge-pod.service
+observability_pod_systemd_unit: observability-pod.service
 qa_pod_systemd_unit: qa-pod.service
 acd_pod: acd
 dialer_api_pod: dialer
