@@ -252,6 +252,21 @@
   tags:
     - always
 
+# Hostname para callbacks ACD → app (WSS /consumers, HTTPS API).
+# Con edge: LAN del HAProxy (edge_host). No usar fqdn/DNS público — en cloud
+# (p.ej. DO) droplet→IP pública del edge suele dar timeout; la VPC sí llega.
+# Sin edge: nginx_host (LAN del web / AIO).
+- name: TOPOLOGY Normalize OMniLeads hostname for ACD callbacks (LAN)
+  ansible.builtin.set_fact:
+    oml_omnileads_hostname: >-
+      {{
+        (edge_host | trim)
+        if ((oml_tenant_hosts | intersect(groups['edge'] | default([]))) | length > 0)
+        else (nginx_host | trim)
+      }}
+  tags:
+    - always
+
 # Bucket endpoints (S3/MinIO): si el inventario no define bucket_url, inferimos
 # los endpoints público e interno desde bucket_host (computado arriba). Esto evita
 # que las plantillas (acd, omlapp, nginx, interaction_processor, etc.) fallen con

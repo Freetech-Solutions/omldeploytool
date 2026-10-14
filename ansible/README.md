@@ -450,7 +450,7 @@ cp inventory_example_<N>.yml instances/<tenant>/inventory.yml
 For every host the role computes, based on its group membership:
 
 - `oml_layout` (`aio` or `cluster`).
-- Service endpoints used by the templates: `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host`, `dialer_host`.
+- Service endpoints used by the templates: `postgres_host`, `redis_host`, `gearman_host`, `kamailio_host`, `kamailio_pstn_host`, `rtpengine_host`, `nginx_host`, `acd_host`, `dialer_host`, `oml_omnileads_hostname` (LAN del HAProxy/`edge_host` cuando hay `edge`; si no, `nginx_host` — no usar el FQDN público desde ACD).
 - External service overrides (`postgres_host`, `bucket_url`, `rtpengine_host`, `kamailio_pstn_host`) when you declare them in the inventory.
 - The per-component switches (`component_postgresql_enabled`, `component_acd_enabled`, `component_haproxy_enabled`, …) that gate the roles in `playbooks/site_core.yml`.
 

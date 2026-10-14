@@ -154,9 +154,10 @@
     - upgrade
     - update
 
-# django_static es un volumen Podman de cada host. collectstatic y compress
-# escriben ahí; el manifiesto offline de django-compressor tiene que existir
-# en cada réplica. migrate, permisos y regenerar_asterisk siguen en un solo host.
+# django_static es un volumen Podman de cada host. reverse.js no viene en la
+# imagen: lo genera collectstatic_js_reverse. Sin ese archivo, compress falla
+# al renderizar omnileads_ui/base.html. migrate, permisos y regenerar_asterisk
+# siguen en un solo host.
 - name: DJANGO collectstatic and compress on every omlapp_web replica
   ansible.builtin.shell: >-
     podman run --rm --network=host
@@ -165,7 +166,8 @@
     -e REDIS_HOST={{ redis_host | trim }}
     --volume=django_static:/opt/omnileads/static
     {{ APP_IMG }}
-    bash -lc 'python3 /opt/omnileads/ominicontacto/manage.py collectstatic --noinput
+    bash -c 'python3 /opt/omnileads/ominicontacto/manage.py collectstatic_js_reverse
+    && python3 /opt/omnileads/ominicontacto/manage.py collectstatic --noinput
     && python3 /opt/omnileads/ominicontacto/manage.py compress'
   tags:
     - install
