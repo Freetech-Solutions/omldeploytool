@@ -27,7 +27,7 @@ postgres_ha_img: docker.io/omnileads/postgres:240902.02
 postgres_img: docker.io/postgres:14.9-bullseye
 # for upgrade from centos7 1.X:
 #postgres_img: docker.io/omnileads/postgres:230624.01
-minio_img: quay.io/minio/minio:RELEASE.2023-09-27T15-22-50Z
+minio_img: docker.io/omnileads/minio:20261014-83526c54
 gearman_img: docker.io/artefactual/gearmand:1.1.21.2-alpine
 
 # --- Monitoring components images
