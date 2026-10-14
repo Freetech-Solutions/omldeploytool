@@ -81,7 +81,7 @@
 
   - name: MINIO install command line client
     get_url:
-      url: https://dl.min.io/client/mc/release/linux-amd64/mc
+      url: https://dl.min.io/aistor/mc/release/linux-amd64/mc
       dest: '{{ minio_cmd }}'
       mode: '0777'
 
