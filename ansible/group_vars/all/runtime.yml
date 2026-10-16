@@ -89,7 +89,8 @@ kamailio_pstn_container_name: kamailio-pstn-server
 nginx_container_name: oml-nginx-server
 omlapp_daphne_container_name: omlapp-daphne
 omlapp_uwsgi_container_name: omlapp-uwsgi
-omlapp_whatsapp_container_name: omlapp-whatsapp
+omlapp_msgs_orchestrator_container_name: omlapp-msgs-orchestrator
+omlapp_email_fetch_container_name: omlapp-email-fetch
 websocket_container_name: websocket-server
 rtpengine_container_name: rtpengine-server
 pstn_qa_container_name: oml-pstn-server

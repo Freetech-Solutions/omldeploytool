@@ -247,6 +247,16 @@ KAMAILIO_ACD_NODES=${ACD_HOST_IP}:5070
 KAMAILIO_ITSP_NODES=${PSTN_EMULATOR_IP}:5070
 
 KAMAILIO_PSTN_QA=true
+
+# Google Telephony Platform (CX Agent Studio voicebot). Off by default.
+# When true: cert.pem/key.pem (CA-approved FQDN) + ca.pem (https://pki.goog/roots.pem)
+# in KAMAILIO_CERTS_LOCATION; voicebot trunk must send X-OML-Peer: gtp.
+GTP_ENABLE=false
+GTP_SIP_HOST=sa.telephony.goog
+GTP_SIP_PORT=5672
+GTP_PROJECT_ID=
+GTP_DEST_E164=
+GTP_REFER_CAMPAIGN_ID=
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
 #########################################################################################################
@@ -368,7 +378,7 @@ DIALER_SCHEDULER_REPLICAS=1
 # Django HA listeners / orquestador / background (consumer groups / Channels)
 SUPERVISION_EVENTS_LISTENER_REPLICAS=1
 OMNIDIALER_EVENTS_LISTENER_REPLICAS=1
-WHATSAPP_WORKER_REPLICAS=1
+MSGS_ORCHESTRATOR_REPLICAS=1
 BACKGROUND_TASKS_REPLICAS=1
 
 DIALER_CHANNEL_AUDIT_INTERVAL_SEC=65

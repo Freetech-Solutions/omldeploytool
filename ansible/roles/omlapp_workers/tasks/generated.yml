@@ -69,6 +69,59 @@
     - upgrade
     - update
 
+- name: OMLApp Workers check legacy WhatsApp Quadlet file
+  ansible.builtin.stat:
+    path: /etc/containers/systemd/whatsapp.container
+  register: omlapp_workers_legacy_whatsapp_quadlet
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers stop legacy WhatsApp Quadlet unit
+  ansible.builtin.systemd:
+    name: whatsapp.service
+    state: stopped
+    enabled: false
+  when: omlapp_workers_legacy_whatsapp_quadlet.stat.exists
+  failed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers remove legacy WhatsApp Quadlet file
+  ansible.builtin.file:
+    path: /etc/containers/systemd/whatsapp.container
+    state: absent
+  register: omlapp_workers_legacy_whatsapp_removed
+  when: omlapp_workers_legacy_whatsapp_quadlet.stat.exists
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers reload systemd after removing legacy WhatsApp unit
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: omlapp_workers_legacy_whatsapp_removed.changed | default(false)
+  tags:
+    - install
+    - upgrade
+    - update
+
+- name: OMLApp Workers remove leftover omlapp-whatsapp container
+  ansible.builtin.command: podman rm -f omlapp-whatsapp
+  register: omlapp_workers_legacy_whatsapp_container
+  changed_when: >
+    (omlapp_workers_legacy_whatsapp_container.stdout | default('') | length) > 0
+  failed_when: false
+  when: omlapp_workers_legacy_whatsapp_removed.changed | default(false)
+  tags:
+    - install
+    - upgrade
+    - update
+
 - name: OMLApp WorkersCopy Quadlet container units
   template:
     src: "{{ item.src }}"
@@ -84,7 +137,8 @@
     - { src: "supervision_agentes_scheduler.container", dest: "/etc/containers/systemd/supervision_agentes_scheduler.container" }
     - { src: "supervision_events_listener.container", dest: "/etc/containers/systemd/supervision_events_listener.container" }
     - { src: "presence_heartbeat_scheduler.container", dest: "/etc/containers/systemd/presence_heartbeat_scheduler.container" }
-    - { src: "whatsapp.service", dest: "/etc/containers/systemd/whatsapp.container" }
+    - { src: "msgs_orchestrator.container", dest: "/etc/containers/systemd/msgs_orchestrator.container" }
+    - { src: "email_fetch.container", dest: "/etc/containers/systemd/email_fetch.container" }
     
   tags:
     - install
@@ -115,7 +169,8 @@
               'supervision_agentes_scheduler.service',
               'supervision_events_listener.service',
               'presence_heartbeat_scheduler.service',
-              'whatsapp.service'
+              'msgs_orchestrator.service',
+              'email_fetch.service'
             ]
             if omlapp_workers_env_file.changed | default(false) else []
           )
@@ -129,7 +184,8 @@
               'supervision_agentes_scheduler.service',
               'supervision_events_listener.service',
               'presence_heartbeat_scheduler.service',
-              'whatsapp.service'
+              'msgs_orchestrator.service',
+              'email_fetch.service'
             ]
             if omlapp_workers_django_env_file.changed | default(false) else []
           )
@@ -211,7 +267,8 @@
     - supervision_agentes_scheduler.service
     - supervision_events_listener.service
     - presence_heartbeat_scheduler.service
-    - whatsapp.service
+    - msgs_orchestrator.service
+    - email_fetch.service
   tags:
     - install
     - upgrade

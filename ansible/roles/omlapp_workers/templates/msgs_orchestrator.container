@@ -1,5 +1,5 @@
 [Unit]
-Description=OMniLeads WhatsApp Worker
+Description=OMniLeads digital channels orchestrator (WhatsApp, Facebook, Instagram)
 Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
 Wants=network-online.target
 After=network-online.target
@@ -7,11 +7,10 @@ StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Container]
-ContainerName=omlapp-whatsapp
+ContainerName={{ omlapp_msgs_orchestrator_container_name }}
 Image={{ APP_IMG }}
 Pod=omlapp_workers.pod
 EnvironmentFile=/etc/default/django.env
-Environment=GOOGLE_MAPS_CENTER={{ google_maps_center }}
 Label=tier=omlapp
 LogDriver=journald
 PodmanArgs=--cgroups=no-conmon

@@ -213,7 +213,7 @@ En `.env` (tras regenerar `docker-compose.yml` desde la plantilla):
 SUPERVISION_EVENTS_LISTENER_REPLICAS=2
 OMNIDIALER_EVENTS_LISTENER_REPLICAS=2
 DIALER_SCHEDULER_REPLICAS=2
-# opcional: WHATSAPP_WORKER_REPLICAS=2  BACKGROUND_TASKS_REPLICAS=2
+# opcional: MSGS_ORCHESTRATOR_REPLICAS=2  BACKGROUND_TASKS_REPLICAS=2
 ```
 
 Schedulers Django (`presence-heartbeat`, reportes, `daily-redis-cleanup`) se dejan en **1**: ya usan `ha_lock.run_once`.

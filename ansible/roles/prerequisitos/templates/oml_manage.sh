@@ -20,7 +20,8 @@ CN_MINIO=minio-server
 CN_GEARMAN=gearman-server
 CN_OMLAPP=omlapp-uwsgi
 CN_DAPHNE=omlapp-daphne
-CN_WHATSAPP=omlapp-whatsapp
+CN_MSGS_ORCHESTRATOR=omlapp-msgs-orchestrator
+CN_EMAIL_FETCH=omlapp-email-fetch
 CN_WEBSOCKET=websocket-server
 CN_NGINX=nginx-server
 CN_ACD_SERVER=acd-server
@@ -47,7 +48,7 @@ declare -A CRITICAL_CN=(
 # Contenedores conocidos para stats / status ampliado (orden arbitrario)
 KNOWN_CONTAINERS=(
   "$CN_POSTGRES" "$CN_REDIS" "$CN_MINIO" "$CN_GEARMAN"
-  "$CN_OMLAPP" "$CN_DAPHNE" "$CN_WHATSAPP" "$CN_WEBSOCKET" "$CN_NGINX"
+  "$CN_OMLAPP" "$CN_DAPHNE" "$CN_MSGS_ORCHESTRATOR" "$CN_EMAIL_FETCH" "$CN_WEBSOCKET" "$CN_NGINX"
   "$CN_ACD_CONF" "$CN_ACD_SERVER" "$CN_ACD_APP" "$CN_ACD_CHANNEL_AUDIT" "$CN_FASTAGI"
   "$CN_KAMAILIO_WEBRTC" "$CN_KAMAILIO_PSTN" "$CN_RTPENGINE" "$CN_DIALER_API"
   omlapp-callrec-worker omlapp-dialer-worker omlapp-supervision-agentes-scheduler
@@ -77,7 +78,7 @@ KNOWN_PODS=(
 STACK_UNITS_ORDER=(
   omnileads-network.service
   postgresql.service redis.service minio.service gearman.service
-  omnileads.service daphne.service whatsapp.service websockets.service
+  omnileads.service daphne.service msgs_orchestrator.service email_fetch.service websockets.service
   call_logger.service daily_redis_cleanup.service background_dialer_tasks.service
   background_callrec_tasks.service dashboard_agent_scheduler.service
   supervision_agentes_scheduler.service supervision_events_listener.service
@@ -558,7 +559,8 @@ systemctl_restart_one() {
         gearman) unit=gearman.service ;;
         omnileads|omlapp|uwsgi) unit=omnileads.service ;;
         daphne) unit=daphne.service ;;
-        whatsapp) unit=whatsapp.service ;;
+        msgs-orchestrator|msgs_orchestrator|whatsapp) unit=msgs_orchestrator.service ;;
+        email-fetch|email_fetch) unit=email_fetch.service ;;
         websockets|websocket) unit=websockets.service ;;
         acd-server|asterisk) unit=acd-server.service ;;
         acd-app) unit=acd-app.service ;;

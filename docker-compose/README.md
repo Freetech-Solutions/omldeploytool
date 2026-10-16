@@ -186,7 +186,7 @@ DIALER_SCHEDULER_REPLICAS=1
 # Django HA (Streams / Channels) — default 1; set 2+ for local HA lab
 SUPERVISION_EVENTS_LISTENER_REPLICAS=1
 OMNIDIALER_EVENTS_LISTENER_REPLICAS=1
-WHATSAPP_WORKER_REPLICAS=1
+MSGS_ORCHESTRATOR_REPLICAS=1
 BACKGROUND_TASKS_REPLICAS=1
 ```
 
@@ -194,7 +194,7 @@ BACKGROUND_TASKS_REPLICAS=1
 - `DIALER_PROCESS_CAMPAIGN_REPLICAS`: number of `dialer-process-camp` workers; you typically need one replica per concurrent campaign.
 - `DIALER_PROCESS_CONTACT_REPLICAS`, `DIALER_PROCESS_EVENT_REPLICAS`: contact and event processors scale.
 - `DIALER_SCHEDULER_REPLICAS`: agenda scheduler; with 2+ replicas only one holds Redis leader lease `OML:HA:SCHEDULER:LEADER`.
-- Django listener / whatsapp / background-tasks replicas: each container uses its hostname as consumer id (do not set `OML_NODE_ID` on those services; it is only for `omlapp` / `daphne`).
+- Django listener / msgs-orchestrator / background-tasks replicas: each container uses its hostname as consumer id (do not set `OML_NODE_ID` on those services; it is only for `omlapp` / `daphne`).
 
 After changing replica vars, recreate from the template (`cp docker-compose-template.yml docker-compose.yml`) and `./oml_manage.sh up -d`. See [docs/redis_streams.md](../docs/redis_streams.md) §9 for HA smoke checks.
 

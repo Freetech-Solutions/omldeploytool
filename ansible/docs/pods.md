@@ -263,7 +263,8 @@ Varios servicios declaran `Requires=omlapp_web-pod.service`.
 
 | Unidad systemd | Contenedor | Imagen | Función |
 |----------------|------------|--------|---------|
-| `whatsapp.service` | `omlapp-whatsapp` | `APP_IMG` | Integración WhatsApp (si está habilitada). |
+| `msgs_orchestrator.service` | `omlapp-msgs-orchestrator` | `APP_IMG` | Orquestador de canales digitales (`msgs-orchestrator`: WhatsApp, Facebook, Instagram). |
+| `email_fetch.service` | `omlapp-email-fetch` | `APP_IMG` | Canalidad email: IMAP inbound (`run-email-fetch-service`). Una sola réplica. |
 | `call_logger.service` | `oml-call-logger` | `APP_IMG` | Registro de llamadas en background. |
 | `background_dialer_tasks.service` | `omlapp-dialer-worker` | `APP_IMG` | Listener de eventos Omnidialer (`omnidialer_events_listener`). |
 | `background_callrec_tasks.service` | `omlapp-callrec-worker` | `APP_IMG` | Tareas background de grabaciones. |

@@ -337,7 +337,7 @@
     component_websockets_enabled: "{{ oml_runs_omlapp_web }}"
     component_omlapp_enabled: "{{ oml_runs_omlapp_web }}"
     component_omlapp_workers_enabled: "{{ oml_runs_omlapp_workers }}"
-    component_interaction_processor_enabled: "{{ oml_runs_omlapp_workers }}"
+    component_interaction_processor_enabled: "{{ oml_runs_callrec_processor }}"
     component_dialer_enabled: "{{ oml_runs_dialer_workers and dialer_engine is defined and dialer_engine == 'omnidialer' }}"
     component_nginx_enabled: "{{ oml_runs_omlapp_web }}"
     component_call_logger_enabled: "{{ oml_runs_callrec_processor }}"

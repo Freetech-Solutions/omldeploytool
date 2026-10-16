@@ -620,11 +620,15 @@ services:
   # ----------------------------------------------------------------------------
   # OMLAPP WORKERS
   # ----------------------------------------------------------------------------
-  whatsapp:
+  msgs-orchestrator:
     <<: *django-worker-common
     command: /opt/omnileads/bin/init_whatsapp.sh
     deploy:
-      replicas: ${WHATSAPP_WORKER_REPLICAS:-1}
+      replicas: ${MSGS_ORCHESTRATOR_REPLICAS:-1}
+
+  email-fetch:
+    <<: *django-worker-common
+    command: /opt/omnileads/bin/init_email_fetch_service.sh
 
   background-tasks:
     <<: *django-worker-common
@@ -902,6 +906,12 @@ services:
       RTPENGINE_SOCKET: udp:${RTPENGINE_HOSTNAME}:${RTPENGINE_BIND_UDP_PORT}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
       KAMAILIO_PSTN_QA: ${KAMAILIO_PSTN_QA}
+      GTP_ENABLE: ${GTP_ENABLE:-false}
+      GTP_SIP_HOST: ${GTP_SIP_HOST:-sa.telephony.goog}
+      GTP_SIP_PORT: ${GTP_SIP_PORT:-5672}
+      GTP_PROJECT_ID: ${GTP_PROJECT_ID:-}
+      GTP_DEST_E164: ${GTP_DEST_E164:-}
+      GTP_REFER_CAMPAIGN_ID: ${GTP_REFER_CAMPAIGN_ID:-}
       HOMER_ENABLE: ${HOMER_ENABLE}
       HOMER_HOST: ${HOMER_HOSTNAME}
       HOMER_PORT: ${HOMER_PORT}

@@ -125,7 +125,8 @@ Workers que ejecutan tareas en segundo plano, listeners de eventos y schedulers 
 
 | Servicio | Función |
 |----------|---------|
-| **whatsapp** | msgs-orchestrator / WhatsApp. Escala con `WHATSAPP_WORKER_REPLICAS`. |
+| **msgs-orchestrator** | Orquestador de canales digitales (WhatsApp, Facebook, Instagram). Escala con `MSGS_ORCHESTRATOR_REPLICAS`. |
+| **email-fetch** | Canalidad email: IMAP inbound (`run-email-fetch-service`). Una sola réplica. |
 | **background-tasks** | Tareas en segundo plano (Channels). Escala con `BACKGROUND_TASKS_REPLICAS`. |
 | **supervision-events-listener** | Consumer group Streams de supervisión. Escala con `SUPERVISION_EVENTS_LISTENER_REPLICAS`. |
 | **presence-heartbeat-scheduler** | Scheduler de heartbeats de presencia (dejar en 1; usa `run_once`). |

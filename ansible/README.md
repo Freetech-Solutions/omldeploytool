@@ -1122,14 +1122,14 @@ En cada host del tenant, confirmá que journald recibe logs del servicio:
 
 ```bash
 journalctl -u nginx.service -n 3 --no-pager
-journalctl -u whatsapp.service -n 3 --no-pager
+journalctl -u msgs_orchestrator.service -n 3 --no-pager
 ```
 
 En Grafana / Loki (usar el `tenant_id` del inventario, p. ej. `KonectaPortaVoice`):
 
 ```logql
 {tenant="<tenant_id>", job="nginx"}
-{tenant="<tenant_id>", job="whatsapp"}
+{tenant="<tenant_id>", job="msgs_orchestrator"}
 {tenant="<tenant_id>", job="dialer_scheduler"}
 {tenant="<tenant_id>", job="dialer_api"}
 ```
