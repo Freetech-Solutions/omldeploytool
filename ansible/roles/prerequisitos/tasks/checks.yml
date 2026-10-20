@@ -791,33 +791,26 @@
 
 # Obtengo IP publica del nodo
 - name: CHECKS Get public IP address of node
-  shell: curl http://ipinfo.io/ip
+  command: curl --retry 3 --connect-timeout 5 --max-time 10 -fsSL http://ipinfo.io/ip
   register: publicip
-  when: voip_public_hostname is not defined
-  tags: always
-  
-
-# Valido si lo que devolvió la tarea anterior es una IP
-- name: CHECKS Validate IP public obtained
-  shell: if [[ {{ publicip.stdout }} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo 0; else echo 1; fi
-  args:
-    executable: /bin/bash
-  register: ip_val
+  changed_when: false
   failed_when: false
-  when: voip_public_hostname is not defined
+  when:
+    - voip_public_hostname is not defined
+    - omni_ip_wan | default('', true) | trim | length == 0
   tags: always
 
-# Valido si lo que devolvió la tarea anterior es una IP
-- name: CHECKS Validate IP public syntax
-  shell: if [[ {{ publicip.stdout }} =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo 0; else echo 1; fi
-  args:
-    executable: /bin/bash
-  register: ip_val
-  failed_when: false
-  tags: always
-
-- set_fact: omni_ip_wan="{{ publicip.stdout }}"
-  when: voip_public_hostname is not defined
+# Conservo la WAN configurada; sin una IPv4 detectada uso la IP LAN.
+- name: CHECKS Set WAN address with LAN fallback
+  set_fact:
+    omni_ip_wan: >-
+      {{ (publicip.stdout | default('') | trim)
+         if (publicip.rc | default(1) == 0 and
+             (publicip.stdout | default('') | trim) is match(public_ipv4_pattern))
+         else omni_ip_lan }}
+  vars:
+    public_ipv4_pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
+  when: omni_ip_wan | default('', true) | trim | length == 0
   tags: always
 
 # Valido si lo que devolvió la tarea anterior es una IP
