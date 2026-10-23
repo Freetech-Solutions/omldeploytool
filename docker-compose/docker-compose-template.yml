@@ -207,7 +207,7 @@ x-acd-ari-common: &acd-ari-common
 x-acd-ari-env: &acd-ari-env
   ASTERISK_HOST: ${ACD_HOSTNAME}
   ASTERISK_PORT: ${ACD_ARI_PORT}
-  ASTERISK_USER: ${ACD_AMI_USER}  
+  ASTERISK_USER: ${ACD_AMI_USER}
   ASTERISK_PASS: ${ACD_AMI_PASSWORD}
   ACD_WEBHOOK_TRANSFER_TTL: ${ACD_WEBHOOK_TRANSFER_TTL}
   SHORTCALL_DURATION_THRESHOLD_SEC: ${SHORTCALL_DURATION_THRESHOLD_SEC:-5}
@@ -223,13 +223,15 @@ x-acd-ari-env: &acd-ari-env
   OMNILEADS_HOSTNAME: ${NGINX_HOSTNAME}
   OMNILEADS_PROTOCOL: https
   OMNILEADS_VERIFY_SSL: "false"
-  GEARMAN_JOB_SERVERS: ${GEARMAN_JOB_SERVERS}  
+  GEARMAN_JOB_SERVERS: ${GEARMAN_JOB_SERVERS}
   NODE_ID: ${ACD_HOSTNAME}
   TENANT_ID: ${FQDN}
   REDIS_HOST: ${REDIS_HOSTNAME}
   RECORDING_BASE_PATH: /var/spool/asterisk/recording
   # AMDREC=True: upload async de samples AMD a recordings/amd/. Requiere mismo flag en acd-server.
   AMDREC: ${AMDREC:-False}
+  AUDIOSOCKET_ADDR: ${AUDIOSOCKET_ADDR:-audiosocket:9092}
+  AUDIOSOCKET_SESSION_TTL_SEC: ${AUDIOSOCKET_SESSION_TTL_SEC:-3600}
   PYTHON_LOGLEVEL: ${ACD_LOG_LEVEL:-error}
   TZ: ${TZ}
   WEBRTC_TRUNK: webrtc-trunk
@@ -744,8 +746,35 @@ services:
       - asterisk_callrec:/var/spool/asterisk/recording
       # - ${REPO_PATH}/acd/source/ari-app/:/opt/asterisk/ari-app:ro
 
-  # Publishes local Asterisk dialer-channel snapshot to Redis DB3 (per ACD node).
-  # Does not write OML:CALLS:{camp}:DIALER; no Gearman / dialer dependency.
+  audiosocket:
+    <<: *base-service-common
+    build:
+      context: ./$REPO_PATH/audiosocket/
+      dockerfile: Dockerfile
+    image: ${AUDIOSOCKET_IMG:-omnileads/audiosocket:local}
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      AUDIOSOCKET_HOST: "0.0.0.0"
+      AUDIOSOCKET_PORT: "9092"
+      VOICEBOT_VENDOR: ${VOICEBOT_VENDOR:-ces}
+      REDIS_HOST: ${REDIS_HOSTNAME}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${AUDIOSOCKET_REDIS_DB:-0}
+      PROJECT_ID: ${CES_PROJECT_ID}
+      LOCATION: ${CES_LOCATION}
+      APP_ID: ${CES_APP_ID}
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp.json
+      # Handoff: login OML + GESTION_BOT + VoicebotWebhook (user/pass de VOICEBOT_*)
+      OML_API_BASE_URL: ${OML_API_BASE_URL:-http://omlapp:8099}
+      OML_VOICEBOT_USERNAME: ${VOICEBOT_USERNAME:-}
+      OML_VOICEBOT_PASSWORD: ${VOICEBOT_PASSWORD:-}
+      AUDIOSOCKET_DEBUG_PII: ${AUDIOSOCKET_DEBUG_PII:-}
+      TZ: ${TZ}
+    #volumes:
+    #  - ${CES_GCP_JSON_PATH}:/secrets/gcp.json:ro
+
   acd-channel-audit:
     <<: *acd-ari-common
     entrypoint: [ "python", "channel_audit_publisher.py" ]

@@ -175,6 +175,21 @@ acd_log_level: info
 
 # voicebot integration
 # voicebot_headers_vars: X-Voicebot-callID: business_id|X-Voicebot-customerID: id_customer|X-Voicebot-CampID: camp_id
+
+# AudioSocket bridge (CES). Off: el proceso hace fail-fast si APP_ID está vacío.
+# Credencial GCP: instances/<tenant>/google_credentials.json (el mismo JSON que STT gcp).
+audiosocket_enabled: false
+audiosocket_redis_db: 0
+audiosocket_session_ttl_sec: 3600
+voicebot_vendor: ces
+audiosocket_gcp_project_id: ""
+audiosocket_gcp_location: us
+audiosocket_gcp_app_id: ""
+audiosocket_debug_pii: ""
+# Usuario Django del handoff (login + GESTION_BOT + VoicebotWebhook). Vacío omite el handoff.
+# Definir vault_voicebot_username / vault_voicebot_password en vault.yml, o sobreescribir aquí.
+voicebot_username: "{{ vault_voicebot_username | default('', true) }}"
+voicebot_password: "{{ vault_voicebot_password | default('', true) }}"
 #####################################################################################################
 #                                       REDIS                                                       #
 #####################################################################################################

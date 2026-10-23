@@ -172,6 +172,22 @@ ACD_REC_PATH=/var/spool/asterisk/recording
 # Debe estar en acd-server y acd-app (mismo valor).
 AMDREC=True
 
+# Voicebot AudioSocket (ARI externalMedia). Host:port visto desde acd-app / Asterisk.
+AUDIOSOCKET_ADDR=audiosocket:9092
+AUDIOSOCKET_SESSION_TTL_SEC=3600
+AUDIOSOCKET_REDIS_DB=0
+# Vendor del bridge AudioSocket (solo ces por ahora).
+VOICEBOT_VENDOR=ces
+# AUDIOSOCKET_IMG=omnileads/audiosocket:local
+# AUDIOSOCKET_GCP_PROJECT_ID=oml-bots
+# AUDIOSOCKET_GCP_LOCATION=us
+# AUDIOSOCKET_GCP_APP_ID=   # obligatorio (fail-fast si vacío con VOICEBOT_VENDOR=ces)
+# AUDIOSOCKET_GCP_CREDENTIALS=/secrets/gcp.json
+# AUDIOSOCKET_DEBUG_PII=    # 1/true solo troubleshooting (transcripts/teléfonos en logs)
+# Handoff CES: login automático + lookup GESTION_BOT + POST VoicebotWebhook.
+# User/pass = VOICEBOT_USERNAME / VOICEBOT_PASSWORD (más abajo en este archivo).
+OML_API_BASE_URL=http://omlapp:8099
+
 #####################################################################################################
 #                                       FASTAGI                                                     #
 #####################################################################################################

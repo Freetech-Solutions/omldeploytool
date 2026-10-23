@@ -1,0 +1,25 @@
+[Unit]
+Description=OMniLeads AudioSocket bridge
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=audiosocket
+Image={{ AUDIOSOCKET_IMG if (AUDIOSOCKET_IMG | default('') | length) > 0 else 'localhost/audiosocket:devenv' }}
+Pod=acd.pod
+LogDriver=journald
+EnvironmentFile=/etc/default/audiosocket.env
+Label=tier=telephony
+PodmanArgs=--cgroups=no-conmon
+# La imagen corre como appuser (uid 10001) y no puede leer el JSON 0600 del host.
+User=0:0
+Volume=/etc/omnileads/google_credential.json:/secrets/gcp.json:ro
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=70
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

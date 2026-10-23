@@ -124,6 +124,23 @@
   tags:
     - always
 
+- name: CHECKS Validate AudioSocket when enabled
+  ansible.builtin.assert:
+    that:
+      - AUDIOSOCKET_IMG is defined
+      - (AUDIOSOCKET_IMG | string | length) > 0
+      - (voicebot_vendor | default('ces') | lower) != 'ces' or (audiosocket_gcp_app_id | default('') | string | trim | length) > 0
+      - (prerequisitos_tenant_instances_dir ~ '/google_credentials.json') is file
+    fail_msg: >-
+      audiosocket_enabled requiere AUDIOSOCKET_IMG (tag CI en images.yml),
+      audiosocket_gcp_app_id si voicebot_vendor=ces, y
+      {{ prerequisitos_tenant_instances_dir }}/google_credentials.json
+  when:
+    - audiosocket_enabled | default(false) | bool
+    - component_acd_enabled | default(false) | bool
+  tags:
+    - always
+
 - name: CHECKS Validate bucket and MinIO admin when internal MinIO is enabled
   ansible.builtin.assert:
     that:

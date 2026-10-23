@@ -38,6 +38,8 @@ kamailio_pstn_port: 5060
 acd_agent_sip_port: 5160
 acd_trunk_sip_port: 5070
 acd_ari_port: 7088
+# AudioSocket bridge (loopback del pod ACD; no se publica)
+audiosocket_port: 9092
 
 # Django OML vars
 INSTALL_PREFIX: /opt/omnileads/

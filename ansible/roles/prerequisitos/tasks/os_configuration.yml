@@ -90,7 +90,7 @@
   tags:
     - install
 
-- name: OS_CONF Copy google speech credentials json
+- name: OS_CONF Copy Google credentials json
   ansible.builtin.copy:
     src: "{{ prerequisitos_tenant_instances_dir }}/google_credentials.json"
     dest: /etc/omnileads/google_credential.json
@@ -98,9 +98,10 @@
   tags:
     - install
     - upgrade
-  when:
-    - callrec_transcriptions_engine is defined 
-    - callrec_transcriptions_engine == "gcp"
+    - update
+  when: >-
+    (callrec_transcriptions_engine | default('') == 'gcp')
+    or (audiosocket_enabled | default(false) | bool)
 
 - name: OS_CONF Ensure TLS certs directory exists
   ansible.builtin.file:

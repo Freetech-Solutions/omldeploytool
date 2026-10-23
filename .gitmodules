@@ -34,3 +34,6 @@
 [submodule "components-git-repo/asterisk_builder"]
 	path = components-git-repo/asterisk_builder
 	url = https://gitlab.com/omnileads/asterisk_base_img
+[submodule "components-git-repo/audiosocket"]
+	path = components-git-repo/audiosocket
+	url = https://gitlab.com/omnileads/audiosocket.git

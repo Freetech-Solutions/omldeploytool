@@ -312,6 +312,25 @@ run_django_runtime_bootstrap() {
 }
 
 # -----------------------------------------------------------------------------
+# Full First-Time Django Bootstrap
+# -----------------------------------------------------------------------------
+run_bootstrap() {
+    log "Iniciando bootstrap completo de Django (migraciones, comandos iniciales, estáticos, permisos, Asterisk y password admin)..."
+    ensure_django_commands_deps
+    docker_compose --profile django-commands run --rm django-commands \
+        /bin/bash -c '
+            /opt/omnileads/bin/django_migrations.sh &&
+            /opt/omnileads/bin/django_commands.sh &&
+            /opt/omnileads/bin/django_runtime_bootstrap.sh &&
+            python3 /opt/omnileads/ominicontacto/manage.py cambiar_admin_password
+        ' || {
+        error "Failed to execute bootstrap"
+        exit 1
+    }
+    success "Bootstrap inicial de Django completado exitosamente"
+}
+
+# -----------------------------------------------------------------------------
 # Wait for services to be healthy (for up + commands flow)
 # -----------------------------------------------------------------------------
 wait_for_services_healthy() {
@@ -716,6 +735,8 @@ show_help() {
       reset-pass         Reset admin password as admin admin
       force-recreate     Force-recreate services without cache
       data-generate      Generate example data in the database
+      bootstrap          First-time Django bootstrap (migrations, django_commands,
+                         runtime_bootstrap, and admin password reset)
       django-commands    One-shot: django_commands.sh + django_runtime_bootstrap.sh
       django-runtime-bootstrap  One-shot: only django_runtime_bootstrap.sh
       rebuild [svc]      Rebuild one or all service images
@@ -748,15 +769,22 @@ main() {
         up)
             shift
             run_commands_first=0
+            run_bootstrap_first=0
             UP_ARGS=()
             for arg in "$@"; do
                 if [[ "$arg" == "commands" ]]; then
                     run_commands_first=1
+                elif [[ "$arg" == "bootstrap" ]]; then
+                    run_bootstrap_first=1
                 else
                     UP_ARGS+=("$arg")
                 fi
             done
-            if (( run_commands_first )); then
+            if (( run_bootstrap_first )); then
+                run_bootstrap
+                log "Levantando el resto del stack..."
+                docker_compose up -d "${UP_ARGS[@]}"
+            elif (( run_commands_first )); then
                 run_django_commands
                 log "Levantando el resto del stack..."
                 docker_compose up -d "${UP_ARGS[@]}"
@@ -774,6 +802,7 @@ main() {
         status)         show_status ;;
         reset-pass)     reset_admin_password ;;
         data-generate)  generate_data ;;
+        bootstrap)      run_bootstrap ;;
         django-commands) run_django_commands ;;
         django-runtime-bootstrap) run_django_runtime_bootstrap ;;
         build-vuejs)    build_vuejs ;;
@@ -783,7 +812,7 @@ main() {
         inbound-call)   shift; send_call "${1:-}" "${2:-1}" "${3:-}" ;;
         dialer-call)    shift; trigger_dialer_test "$@" ;;
         manual-call)    shift; trigger_manual_test "$@" ;;
-        hangup-pstn)    hangup_all_pstn_emulator_calls ;;
+        hangup-pstn)    hangup_all_psatn_emulator_calls ;;
         backup)         backup_database ;;
         restore)        restore_database ;;
         terminal)       shift; open_terminal "${1:-}" ;;

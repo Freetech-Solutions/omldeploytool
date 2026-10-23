@@ -323,8 +323,9 @@ La API (`dialer-api`) vive en el pod **`omlapp_web`**, no aquí.
 | `acd-app.service` | `acd-app` | `ACD_IMG` | ARI Stasis app (lógica de colas OMniLeads). |
 | `acd-channel-audit.service` | `acd-channel-audit` | `ACD_IMG` | Publica foto de canales dialer PSTN del Asterisk local en Redis DB 3 (`OML:ACD:{node}:*`). Sin Gearman; no escribe `OML:CALLS`. |
 | `acd-fastagi.service` | `acd-fastagi` | `FASTAGI_IMG` | FastAGI para scripts de dialplan (`:4573` hacia el pod). |
+| `audiosocket.service` | `audiosocket` | `AUDIOSOCKET_IMG` | Bridge AudioSocket hacia CES (opcional, `audiosocket_enabled`). Escucha en `127.0.0.1:9092` del namespace del pod; no se publica. |
 
-Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-channel-audit` / `acd-fastagi`.
+Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-channel-audit` / `acd-fastagi` / `audiosocket` (si `audiosocket_enabled`).
 
 **Upgrade (`--action=upgrade`):** si cambia `acd.pod` (p. ej. migración bridge → `Network=host`), el rol `pods` hace tear-down y recrea la infra Podman antes de que el rol `acd` aplique env vars y reinicie `acd-pod.service`. Coordinar con `telephony_edge` en el mismo upgrade: `kamailio_pstn.env` (`acd_nodes` con `:5070`) y `kamailio_webrtc.env` (`ACD_NET_ADDR`) deben desplegarse en el mismo ciclo. Requiere imagen `ACD_IMG` con trunk PJSIP en `acd_trunk_sip_port` (default `:5070`).
 
