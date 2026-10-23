@@ -5,10 +5,12 @@ WantedBy=multi-user.target
 Description=container-oml-websockets-server
 Requires=container-oml-redis
 After=container-oml-redis
+StartLimitIntervalSec=0
 
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
+RestartSec=10
 TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
 ExecStart=/usr/bin/podman run \
