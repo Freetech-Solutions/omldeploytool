@@ -43,7 +43,7 @@ para no contaminar el sistema. La carpeta `ansible/venv/` está incluida en
 [`.gitignore`](../.gitignore).
 
 ```bash
-cd ansible
+cd omldeploytool/ansible
 
 # Crear el venv (la convención del repo es ansible/venv)
 python3 -m venv venv
