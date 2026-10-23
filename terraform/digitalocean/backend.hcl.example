@@ -1,0 +1,8 @@
+# Copiar a ansible/instances/<tenant>/backend.hcl (la carpeta instances/ no se commitea).
+# bucket es el Space de ESE tenant. El endpoint usa la región del Space.
+# No pongas acá la access key: export AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY.
+
+bucket = "nombre-del-space"
+endpoints = {
+  s3 = "https://sfo3.digitaloceanspaces.com"
+}
