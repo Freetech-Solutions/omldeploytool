@@ -4,10 +4,12 @@ Documentation=man:podman-generate-systemd(1)
 Wants=network-online.target asterisk_retrieve_conf.service
 After=network-online.target asterisk_retrieve_conf.service
 RequiresMountsFor=%t/containers
+StartLimitIntervalSec=0
 
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
+RestartSec=10
 TimeoutStopSec=70
 {% if scale_asterisk is defined and scale_asterisk %}
 MemoryMax={{ asterisk_mem_limit | default("1G", true) }}
