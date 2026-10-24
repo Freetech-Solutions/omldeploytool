@@ -338,7 +338,20 @@
     component_omlapp_enabled: "{{ oml_runs_omlapp_web }}"
     component_omlapp_workers_enabled: "{{ oml_runs_omlapp_workers }}"
     component_interaction_processor_enabled: "{{ oml_runs_callrec_processor }}"
-    component_dialer_enabled: "{{ oml_runs_dialer_workers and dialer_engine is defined and dialer_engine == 'omnidialer' }}"
+    # La API (flask.container, Pod=omlapp_web.pod) vive en omlapp_web / omnileads_aio.
+    # En cluster el rol tiene que entrar también en el web node; si no, solo corre
+    # en dialer_workers y esa tarea se salta.
+    component_dialer_enabled: >-
+      {{
+        (
+          (oml_runs_dialer_workers | bool)
+          or (
+            (oml_runs_omlapp_web | bool)
+            and ((groups['dialer_workers'] | default([])) | length > 0)
+          )
+        )
+        and (dialer_engine | default('') == 'omnidialer')
+      }}
     component_nginx_enabled: "{{ oml_runs_omlapp_web }}"
     component_call_logger_enabled: "{{ oml_runs_callrec_processor }}"
     component_observability_prometheus_enabled: >-
