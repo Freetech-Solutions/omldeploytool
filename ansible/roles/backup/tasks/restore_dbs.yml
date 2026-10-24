@@ -22,10 +22,20 @@
           Para restore defina backup_filename, backup_bucket_* (o bucket_* como fallback)
           y BACKUP_RESTORE_IMG en images.yml. backup_filename_OMD es opcional.
 
-    - name: RESTORE Check backup.env exists
-      ansible.builtin.stat:
-        path: /etc/default/backup.env
-      register: oml_restore_backup_env_stat
+    # site_restore corre en omlapp_web antes de prerequisitos: el usuario
+    # omnileads todavía no existe y el template falla en el chown.
+    - name: RESTORE Ensure OS group for backup.env
+      ansible.builtin.group:
+        name: "{{ usuario }}"
+        state: present
+
+    - name: RESTORE Ensure OS user for backup.env
+      ansible.builtin.user:
+        name: "{{ usuario }}"
+        group: "{{ usuario }}"
+        comment: OMniLeads OS user
+        shell: /bin/bash
+        home: "{{ django_deploy_path }}"
 
     - name: RESTORE Ensure backup.env is present
       ansible.builtin.template:
@@ -34,7 +44,6 @@
         mode: '0640'
         owner: "{{ usuario }}"
         group: "{{ usuario }}"
-      when: not oml_restore_backup_env_stat.stat.exists
 
     # postgresql.container declara Pod=data_statefull.pod; MinIO también. El restore debe correr
     # cuando el pod ya está desplegado (roles/pods). Esto refuerza el orden si se usan
@@ -164,6 +173,39 @@
           base omnidialer.
       when:
         - (backup_filename_OMD is not defined) or ((backup_filename_OMD | default('') | length) == 0)
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    # postgresql_db usa el Python del host (psycopg2). El dump corre con
+    # podman. En cluster ninguno de los dos está instalado todavía en omlapp_web.
+    - name: RESTORE Install psycopg2 and podman (Debian)
+      ansible.builtin.apt:
+        name:
+          - python3-psycopg2
+          - podman
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 300
+      when: ansible_os_family == "Debian"
+      tags:
+        - install
+        - upgrade
+        - upgrade_from_2X
+        - postgres
+        - restore
+
+    - name: RESTORE Install psycopg2 and podman (Rocky/Alma)
+      ansible.builtin.dnf:
+        name:
+          - python3-psycopg2
+          - podman
+        state: present
+      when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
       tags:
         - install
         - upgrade

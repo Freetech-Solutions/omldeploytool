@@ -24,8 +24,10 @@ resource "vultr_instance" "node" {
   )
 
   # cloud-init corre solo en el primer boot. Un cambio del YAML no recrea la instancia.
+  # hostname, ssh_key_ids, os_id y snapshot_id recrean la VM. Ignorarlos
+  # permite adoptar una instancia ya creada sin soltar main_ip ni internal_ip.
   lifecycle {
-    ignore_changes = [user_data]
+    ignore_changes = [user_data, hostname, ssh_key_ids, os_id, snapshot_id]
 
     precondition {
       condition     = lower(data.vultr_vpc.oml.region) == lower(var.region)
