@@ -45,6 +45,18 @@ variable "vpc_description" {
   description = "Description de una VPC ya existente en la misma region. Las instancias se crean ahi; Terraform no crea ni borra la VPC."
 }
 
+variable "edge_reserved_ip_id" {
+  type        = string
+  default     = ""
+  description = "ID de una IP reservada ya existente para el edge. Vacio: Vultr asigna una IP publica nueva."
+}
+
+variable "backend_vpc_only" {
+  type        = bool
+  default     = false
+  description = "true: las instancias sin rol edge salen sin IPv4 publica y salen por el NAT de la VPC."
+}
+
 variable "ssh_key_names" {
   type        = list(string)
   description = "Nombres de SSH keys ya cargadas en el panel de Vultr. Con user_scheme root quedan en root; cloud-init las copia a omladmin."

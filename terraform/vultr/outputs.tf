@@ -1,7 +1,7 @@
 locals {
   ansible_hosts = {
     for name, instance in vultr_instance.node : name => {
-      ansible_host = instance.main_ip
+      ansible_host = var.backend_vpc_only && !contains(var.nodes[name].roles, "edge") ? instance.internal_ip : instance.main_ip
       omni_ip_lan  = instance.internal_ip
       roles        = var.nodes[name].roles
     }
@@ -17,7 +17,7 @@ output "vpc_id" {
 }
 
 output "ansible_hosts" {
-  description = "ansible_host es la IP publica. omni_ip_lan es la privada de la VPC. Las dos cambian si la instancia se recrea."
+  description = "ansible_host es la IP publica, o la privada si backend_vpc_only. omni_ip_lan es la privada de la VPC."
   value       = local.ansible_hosts
 }
 

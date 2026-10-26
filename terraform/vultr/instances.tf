@@ -9,12 +9,15 @@ resource "vultr_instance" "node" {
   os_id       = var.snapshot_id == "" ? data.vultr_os.image[0].id : null
   snapshot_id = var.snapshot_id != "" ? var.snapshot_id : null
 
-  vpc_ids           = [data.vultr_vpc.oml.id]
-  ssh_key_ids       = [for key in data.vultr_ssh_key.admin : key.id]
-  user_data         = file(var.user_data_file)
-  user_scheme       = "root"
-  activation_email  = false
-  enable_ipv6       = false
+  vpc_ids          = [data.vultr_vpc.oml.id]
+  ssh_key_ids      = [for key in data.vultr_ssh_key.admin : key.id]
+  user_data        = file(var.user_data_file)
+  user_scheme      = "root"
+  activation_email = false
+  enable_ipv6      = false
+  # null conserva el comportamiento anterior: IP publica efimera y sin vpc_only.
+  reserved_ip_id    = var.edge_reserved_ip_id != "" && contains(each.value.roles, "edge") ? var.edge_reserved_ip_id : null
+  vpc_only          = var.backend_vpc_only && !contains(each.value.roles, "edge") ? true : null
   firewall_group_id = contains(each.value.roles, "edge") ? vultr_firewall_group.edge.id : vultr_firewall_group.ssh.id
 
   tags = concat(
