@@ -13,7 +13,7 @@ EnvironmentFile=/etc/default/redis.env
 Label=tier=backend
 PodmanArgs=--cgroups=no-conmon
 Volume=oml_redis:/data
-{% if scale_redis is defined and scale_redis %}
+{% if scale_redis is defined and (scale_redis | bool) %}
 Volume=/etc/omnileads/redis.conf:/usr/local/etc/redis/redis.conf:ro
 Exec=redis-server /usr/local/etc/redis/redis.conf
 {% endif %}
@@ -22,6 +22,7 @@ Exec=redis-server /usr/local/etc/redis/redis.conf
 Restart=on-failure
 TimeoutStopSec=70
 TimeoutStartSec=900
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
