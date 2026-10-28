@@ -120,8 +120,6 @@
 
 
 - import_playbook: components/observability/prometheus.yml
-  when: 
-    - inventory_hostname in groups['omnileads_app'] or inventory_hostname in groups['omnileads_aio']
 
 
 - import_playbook: components/observability/promtail.yml

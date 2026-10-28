@@ -192,6 +192,17 @@
   tags: 
     - install
 
+- name: MAIN Enable and start PODMAN API socket
+  systemd:
+    name: podman.socket
+    enabled: yes
+    state: started
+  when:
+    - container_orchest == "systemd"
+  tags:
+    - install
+    - upgrade
+
 - name: MAIN Check if Omnileads has been installed previously
   import_tasks: checks.yml
   
