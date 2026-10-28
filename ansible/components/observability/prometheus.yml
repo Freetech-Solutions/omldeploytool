@@ -16,7 +16,7 @@
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 #
 
-- name: OBSERVABILITY Prometheus deployment
+- name: OBSERVABILITY Host exporters deployment
   hosts:
     - omnileads_aio
     - omnileads_app
@@ -27,6 +27,124 @@
     - observability
 
   tasks:
+
+    - name: OBSERVABILITY Copy host exporter Systemd files
+      template:
+        src: "{{ observability_repo_path }}templates/{{ item }}.service"
+        dest: /etc/systemd/system/{{ item }}.service
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - prometheus_node_exporter
+        - prometheus_podman_exporter
+      tags:
+        - install
+        - upgrade
+
+    - name: OBSERVABILITY Enable and restart host exporters
+      systemd:
+        name: "{{ item }}.service"
+        state: restarted
+        enabled: true
+        daemon_reload: true
+      loop:
+        - prometheus_node_exporter
+        - prometheus_podman_exporter
+      tags:
+        - install
+        - upgrade
+
+# Backend exporters run alongside the data services in AIT and on the AIO host.
+- name: OBSERVABILITY Backend exporters deployment
+  hosts:
+    - omnileads_aio
+    - omnileads_data
+  # Keep the previous App exporters if deployment on Data fails.
+  any_errors_fatal: true
+  tags:
+    - all_components
+    - observability
+
+  tasks:
+
+    - name: OBSERVABILITY Set backend exporter environment vars
+      template:
+        src: "{{ observability_repo_path }}templates/{{ item }}"
+        dest: /etc/default/{{ item }}
+        mode: "0664"
+        owner: "{{ usuario }}"
+        group: "{{ usuario }}"
+      loop:
+        - prometheus_postgres.env
+        - prometheus_redis.env
+      tags:
+        - install
+        - upgrade
+
+    - name: OBSERVABILITY Copy backend exporter Systemd files
+      template:
+        src: "{{ observability_repo_path }}templates/{{ item }}.service"
+        dest: /etc/systemd/system/{{ item }}.service
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - prometheus_postgres
+        - prometheus_redis
+        - prometheus_gearman
+      tags:
+        - install
+        - upgrade
+
+    - name: OBSERVABILITY Enable and restart backend exporters
+      systemd:
+        name: "{{ item }}.service"
+        state: restarted
+        enabled: true
+        daemon_reload: true
+      loop:
+        - prometheus_postgres
+        - prometheus_redis
+        - prometheus_gearman
+      tags:
+        - install
+        - upgrade
+
+
+# The Prometheus server and uWSGI exporter remain on App/AIO.
+- name: OBSERVABILITY Prometheus deployment
+  hosts:
+    - omnileads_aio
+    - omnileads_app
+  tags:
+    - all_components
+    - observability
+
+  tasks:
+
+    - name: OBSERVABILITY Collect services for backend exporter migration
+      service_facts:
+      when: inventory_hostname in groups['omnileads_app']
+      tags:
+        - install
+        - upgrade
+
+    - name: OBSERVABILITY Stop and disable previous backend exporters on App
+      systemd:
+        name: "{{ item }}.service"
+        state: stopped
+        enabled: false
+      loop:
+        - prometheus_postgres
+        - prometheus_redis
+        - prometheus_gearman
+      when:
+        - inventory_hostname in groups['omnileads_app']
+        - (item + '.service') in ansible_facts.services
+      tags:
+        - install
+        - upgrade
 
     - name: OBSERVABILITY Ensure Prometheus config directory exists
     # Para dejar prometheus.yml en un path estándar
@@ -63,17 +181,6 @@
         - upgrade
         - update
 
-    - name: OBSERVABILITY OS_CONF podman.socket RedHat distros
-      systemd:
-        name: podman.socket
-        state: started
-        enabled: true
-        daemon_reload: true
-      tags:
-        - install
-        - upgrade
-      when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
-
     - name: OBSERVABILITY Prometheus setting config & variables
       template:
         src: "{{ observability_repo_path }}templates/prometheus.yml"
@@ -95,25 +202,6 @@
       loop:
         - prometheus.service
         - prometheus_uwsgi.service
-        - prometheus_podman_exporter.service
-        - prometheus_postgres.service
-        - prometheus_redis.service
-        - prometheus_gearman.service
-        - prometheus_node_exporter.service
-      tags:
-        - install
-        - upgrade
-
-    - name: OBSERVABILITY Prometheus Set environment vars
-      template:
-        src: "{{ observability_repo_path }}templates/{{ item }}"
-        dest: /etc/default/{{ item }}
-        mode: "0664"
-        owner: "{{ usuario }}"
-        group: "{{ usuario }}"
-      loop:
-        - prometheus_postgres.env
-        - prometheus_redis.env
       tags:
         - install
         - upgrade
@@ -127,13 +215,6 @@
       loop:
         - prometheus
         - prometheus_uwsgi
-        - prometheus_podman_exporter
-        - prometheus_postgres
-        - prometheus_redis
-        - prometheus_gearman
-        - prometheus_node_exporter
       tags:
         - install
         - upgrade
-
-

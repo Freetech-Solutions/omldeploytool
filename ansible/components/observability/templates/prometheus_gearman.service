@@ -20,7 +20,7 @@ ExecStart=/usr/bin/podman run \
   --detach \
   --network=host \
   --name=obs-prometheus-gearman \
-  {{ prometheus_gearman_img }} --addr={{ omni_ip_lan }}:9418 --gearmand=127.0.0.1:4730
+  {{ prometheus_gearman_img }} --addr={{ omni_ip_lan }}:9418 --gearmand={{ gearman_host }}:4730
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
