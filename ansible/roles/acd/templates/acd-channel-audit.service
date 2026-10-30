@@ -17,7 +17,8 @@ PodmanArgs=--entrypoint=python
 Exec=channel_audit_publisher.py
 
 [Service]
-Restart=on-failure
+Restart=always
+RestartSec=5
 TimeoutStopSec=70
 TimeoutStartSec=900
 

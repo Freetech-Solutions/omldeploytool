@@ -264,12 +264,14 @@
   loop: "{{ dialer_managed_services }}"
   tags: [install, upgrade, update]
 
-# state:started no recrea contenedores si la unidad ya corre con imagen vieja; restarted tras daemon-reload.
+# state:restarted recrea contenedores tras daemon-reload. No usar enabled:yes:
+# las plantillas dialer_process_*@.service están masked (legacy) y systemctl
+# enable de @N falla con "Unit …@.service is masked". El arranque en boot lo
+# cubren los symlinks Quadlet @N.container en /etc/containers/systemd/.
 - name: DIALER Restart process worker replicas to apply Quadlet image
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: restarted
-    enabled: yes
   loop: "{{ dialer_process_worker_replica_services | default([]) }}"
   when:
     - oml_has_dialer_workers | default(false) | bool
