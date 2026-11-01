@@ -266,18 +266,18 @@ rtpengine_log_level: 1
 #                                       DIALER                                                      #
 #####################################################################################################
 
-# --- Call attempts per second
-dialer_caps: 3
-# --- Number of dialer container replicas
-dialer_process_campaign_replicas: 5
-dialer_process_event_replicas: 1
-
 # --- gearmand (data_stateless). Override per tenant in vars.yml if needed.
 # gearman_threads: I/O worker threads (-t). gearman_backlog: listen backlog.
 # gearman_job_retries: retries when a worker fails a job.
 gearman_threads: 4
 gearman_backlog: 1024
 gearman_job_retries: 3
+
+# --- Call attempts per second
+dialer_caps: 3
+# --- Number of dialer container replicas
+dialer_process_campaign_replicas: 5
+dialer_process_event_replicas: 3
 
 # --- Periodic dialer channel audit (Redis OML:CALLS vs active Asterisk channels)
 # Interval in seconds between audit jobs. Set to 0 or a negative value to disable the scheduler job.
@@ -292,6 +292,26 @@ dialer_reserve_grace_sec: 30
 dialer_max_abandon_rate: 0.03
 dialer_warm_up_sample_size: 50
 dialer_predictive_tick_ms: 1000
+# Piso de P_hit en pacing (C_dial ∝ 1/P_hit). Evita explosión con hit rates muy bajos.
+dialer_hit_rate_floor: 0.05
+# α del EWMA de abandono (DROP_RATE_EWMA → γ). Ventana efectiva ≈ 2/α − 1 connects.
+dialer_drop_rate_alpha: 0.1
+# ART fallback (s) para t_ring sin muestra en CAMP:{id}:ART.
+dialer_default_art_sec: 15
+# Piso (s) del tiempo residual en P_lib; evita remaining ≤ 0.
+dialer_p_lib_remaining_eps: 1.0
+# Kill-switch global del predictivo. false → campañas predictive caen a progresivo.
+dialer_predictive_enabled: true
+# Piso de γ al acercarse / pasar D_max (soft hold).
+dialer_gamma_throttle_floor: 0.2
+# P0 origin guardrails (abort CAPS batch on event backlog / CALLS−Ast drift)
+dialer_origin_guardrails_enabled: true
+dialer_guardrail_process_event_queued_max: 100
+dialer_guardrail_calls_ast_delta_max: 15
+dialer_guardrail_phase_calls_delta_max: 20
+# 0 = disabled. Tenant-wide originates/s across process-campaign workers.
+dialer_global_caps: 0
+dialer_require_endpoints: false
 
 # --- Log level for Dialer, 0: Error, 1: Warning, 2: Debug
 dialer_log_level: 2

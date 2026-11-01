@@ -6,14 +6,45 @@ bucket_access_key: "{{ vault_digital_ocean_bucket_access_key }}"
 bucket_secret_key: "{{ vault_digital_ocean_bucket_secret_key }}"
 bucket_region: "{{ vault_digital_ocean_bucket_region }}"
 certs: custom
-dialer_caps: 1
-dialer_process_campaign_replicas: 1
 fqdn: "{{ vault_tenant_example_1_fqdn }}"
 itsp_nodes: "{{ vault_tenant_example_1_itsp_nodes }}"
-kamailio_webrtc_iface: "{{ vault_digital_ocean_lan_nic }}"            
-ssl_cert_file_name: "{{ vault_ssl_sephir_cert_file_name }}"        
+kamailio_webrtc_iface: "{{ vault_digital_ocean_lan_nic }}"
+ssl_cert_file_name: "{{ vault_ssl_sephir_cert_file_name }}"
 ssl_key_file_name: "{{ vault_ssl_sephir_key_file_name }}"
 swap_space: 4G
+tenant_id: tenant_example_1
+TZ: America/Argentina/Cordoba
+wazuh: false
+
+# ------ Dialer
+dialer_caps: 1
+dialer_time_between_calls: 1
+dialer_process_campaign_replicas: 5
+dialer_process_contact_replicas: 1
+dialer_process_event_replicas: 3
+dialer_log_level: 1
+dialer_channel_audit_interval_sec: 60
+dialer_channel_audit_lock_ttl_sec: 55
+dialer_reserve_grace_sec: 30
+dialer_max_abandon_rate: 0.10
+dialer_warm_up_sample_size: 50
+dialer_predictive_tick_ms: 1000
+dialer_hit_rate_floor: 0.05
+dialer_drop_rate_alpha: 0.1
+dialer_default_art_sec: 15
+dialer_p_lib_remaining_eps: 1.0
+dialer_predictive_enabled: true
+dialer_gamma_throttle_floor: 0.2
+# P0 origin guardrails (abort CAPS batch on event backlog / CALLS−Ast drift)
+dialer_origin_guardrails_enabled: true
+dialer_guardrail_process_event_queued_max: 100
+dialer_guardrail_calls_ast_delta_max: 15
+dialer_guardrail_phase_calls_delta_max: 20
+# 0 = disabled. Tenant-wide originates/s across process-campaign workers.
+dialer_global_caps: 0
+dialer_require_endpoints: false
+
+# ------ Postgres
 postgres_password: "{{ vault_konecta_postgres_password }}"
 postgres_shm: 1g
 postgres_max_wal_size: 2GB
@@ -22,9 +53,22 @@ postgres_shared_buffers: 2GB
 postgres_idle_in_transaction_session_timeout: 300000
 postgres_statement_timeout: 120000
 postgres_effective_cache_size: 2GB
+
+# ------ Redis / uWSGI / Gearman / ACD
+scale_redis: false
+# redis_maxmemory: 3gb
+# redis_maxmemory_policy: noeviction
+# redis_tcp_backlog: 2048
+# redis_maxclients: 5000
+# redis_lazyfree_lazy_eviction: true
+# redis_lazyfree_lazy_expire: true
+scale_uwsgi: false
 uwsgi_processes: 4
 uwsgi_threads: 2
+uwsgi_listen_queue_size: 100
+uwsgi_worker_reload_mercy: 60
 uwsgi_evil_reload_on_rss: 10240
-tenant_id: tenant_example_1
-TZ: America/Argentina/Cordoba
-wazuh: false
+gearman_threads: 4
+gearman_backlog: 1024
+gearman_job_retries: 3
+# asterisk_mem_limit: 2500M
