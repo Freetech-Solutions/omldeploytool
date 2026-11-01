@@ -199,7 +199,7 @@ Typical parameters:
 | `omlapp-workers`                                                                      | `playbooks/site.yml` (tags `omlapp-workers,gather_facts`)                                 | Workers of the omlapp pod.                                                                                                                                                                                                                                                                   |
 | `observability`                                                                       | `playbooks/site.yml` (tags `observability,gather_facts`, `oml_observability_deploy=true`) | Prometheus + exporters + Promtail.                                                                                                                                                                                                                                                           |
 | `wazuh-agent`                                                                         | `playbooks/site.yml` (tags `wazuh-agent,gather_facts`)                                    | Wazuh Agent OS (repo oficial + enrollment). Requiere `wazuh_manager`. Desactivar con `wazuh: false` en el inventario.                                                                                                                                                                        |
-| `fail2ban`                                                                            | `playbooks/site.yml` (tags `fail2ban,gather_facts`)                                       | fail2ban: jail SSH (`nftables`) en todos los hosts; jail `kamailio-pstn` (journald + PIKE, `nftables-allports`) en edge/AIO. On by default; disable with `fail2ban: false`. Whitelist bastion/admin in `fail2ban_ignoreip_extra`; disable solo Kamailio con `fail2ban_kamailio_pike: false`. |
+| `fail2ban`                                                                            | `playbooks/site.yml` (tags `fail2ban,gather_facts`)                                       | fail2ban: jail SSH (`nftables`) en todos los hosts; jail `kamailio-pstn` (journald + PIKE, `nftables-allports`) en edge/AIO; HTTPS probes (`nginx-https` en AIO sin grupo edge, `haproxy-https` en edge). On by default; disable with `fail2ban: false`. Whitelist bastion/admin in `fail2ban_ignoreip_extra`; disable solo Kamailio / HTTPS con `fail2ban_kamailio_pike` / `fail2ban_nginx_https` / `fail2ban_haproxy_https: false`. |
 | `postgres` / `redis` / `minio` / `gearman`                                            | `playbooks/site.yml`                                                                      | Single data role re-run.                                                                                                                                                                                                                                                                     |
 | `data`                                                                                | `playbooks/site.yml`                                                                      | All data roles (postgres, redis, minio, gearman).                                                                                                                                                                                                                                            |
 | `telephony-edge`                                                                      | `playbooks/site.yml`                                                                      | Edge telephony role (`rtpengine`, Kamailio WebRTC/PSTN).                                                                                                                                                                                                                                     |
@@ -729,12 +729,27 @@ The diagram is the AIO + Edge posture: the **Tenant Edge Server** holds the publ
 
 Ansible disables OS firewalls (`ufw` / `firewalld`). Enforce the tables below on the **cloud / VPC firewall**. Ports come from `[runtime.yml](group_vars/all/runtime.yml)` and `[tenants_global.yml](group_vars/all/tenants_global.yml)`.
 
-**SSH / SIP brute-force protection:** each pod host runs **fail2ban** when `fail2ban: true` (default):
+**SSH / SIP / HTTPS probe protection:** each pod host runs **fail2ban** when `fail2ban: true` (default):
 
 - Jail `sshd`: `banaction=nftables`, `backend=systemd` (all pod hosts).
 - Jail `kamailio-pstn` (edge / AIO only): reads `journalctl` of `kamailio_pstn.service` for PIKE / unauthorized-origin lines (`filter=kamailio-pike`), bans with `nftables-allports`. Requires Kamailio image with `WITH_ANTIFLOOD` / `PIKE_ENABLE` (see `kamailio_pstn.env`). Disable only this jail with `fail2ban_kamailio_pike: false`.
+- Jail `nginx-https` (AIO / inventories **without** group `edge`): reads `nginx.service` access logs for scanner URIs (`.php`, `/wp-admin`, `/.env`, …) and bans TCP 80/443. Disable with `fail2ban_nginx_https: false`.
+- Jail `haproxy-https` (hosts in group `edge`): same URI heuristics on `haproxy.service` httplog (public TLS terminator in cluster). Disable with `fail2ban_haproxy_https: false`.
 
-It **complements** — does not replace — restricting TCP/22 and UDP/5060 at the cloud firewall. Whitelist deployer/bastion CIDRs in `fail2ban_ignoreip_extra` (localhost, every host `omni_ip_lan`, edge `omni_ip_wan`, and IPv4s from `itsp_nodes` are already ignored). Disable entirely with `fail2ban: false`. Dedicated re-run: `./deploy.sh --action=fail2ban --tenant=<tenant>`.
+HTTPS jails are tuned from `[tenants_global.yml](group_vars/all/tenants_global.yml)` (override per tenant in `instances/<tenant>/vars.yml`):
+
+| Variable | Default | Role |
+| -------- | ------- | ---- |
+| `fail2ban_https_maxretry` / `findtime` / `bantime` | 20 / 10m / 1h | Thresholds (higher than SSH to avoid noise) |
+| `fail2ban_https_banaction` | `nftables` | Use `nftables-allports` to drop all traffic from the IP |
+| `fail2ban_https_probe_patterns` | `.env`, `wp-admin`, `.php`, … | Regex fragments matched in the request URI |
+| `fail2ban_https_status` | 400, 401, 403, 404, 444 | HTTP statuses that count with a probe URI |
+| `fail2ban_https_methods` | GET, POST, HEAD, … | HTTP methods in the filter |
+| `fail2ban_ignoreip_extra` | `[]` | Extra whitelist (bastion / admin) |
+
+They do **not** match generic API `403` (permissions). Web login brute-force is handled by **django-defender**, not fail2ban.
+
+It **complements** — does not replace — restricting TCP/22, 80/443 and UDP/5060 at the cloud firewall. Whitelist deployer/bastion CIDRs in `fail2ban_ignoreip_extra` (localhost, every host `omni_ip_lan`, edge `omni_ip_wan`, and IPv4s from `itsp_nodes` are already ignored). Disable entirely with `fail2ban: false`. Dedicated re-run: `./deploy.sh --action=fail2ban --tenant=<tenant>`.
 
 ### Edge host (group `edge`) — public perimeter
 
@@ -908,6 +923,25 @@ You can override any of these in `[group_vars/all/images.yml](group_vars/all/ima
 APP_IMG: registry.example.com/omlapp:240117.01-enterprise
 ACD_IMG: registry.example.com/acd:240102.01
 ```
+
+### Vultr Container Registry (or any private registry)
+
+Keep `images.yml` with the standard `docker.io/freetechsolutions|omnileads` prefixes and set a registry override. `topology_normalize` rewrites OMniLeads image prefixes at deploy time; third-party images (postgres, redis, prometheus, …) stay on their original registries.
+
+```yaml
+# instances/<tenant>/vars.yml  (or tenants_global.yml / runtime.yml)
+oml_container_registry: "lax.vultrcr.com/omnileads"
+```
+
+```yaml
+# group_vars/all/vault.yml
+vault_container_registry_user: "<vultr-cr-username>"
+vault_container_registry_password: "<vultr-cr-api-key>"
+```
+
+The `prerequisitos` role runs `podman login` against `container_registry_url` (derived from `oml_container_registry`, e.g. `lax.vultrcr.com`) and stores credentials in `/etc/containers/auth.json` so Quadlet units can pull after reboot.
+
+GitLab CI publishes to Vultr under demand: set `PUSH_VULTR=true` (Hub + Vultr) or `DOCKER_REGISTRY=vultr` (Vultr only) when running the component pipelines. Credentials: `VULTR_CR_USERNAME` + `VULTR_CR_PASSWORD` (or `VULTR_CR_API_KEY`).
 
 To **force a re-pull** during the next deploy, set `force_image_pull: true` in `[runtime.yml](group_vars/all/runtime.yml)` or override it per tenant in the inventory.
 

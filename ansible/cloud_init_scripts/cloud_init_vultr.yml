@@ -9,12 +9,9 @@ ssh_pwauth: false
 disable_root: false
 
 # Vultr vendor-data often upgrades packages and delays SSH.
-package_update: true
+# The Packer snapshot already includes python3, sudo, and omladmin.
+package_update: false
 package_upgrade: false
-
-packages:
-  - python3
-  - sudo
 
 users:
   - default
@@ -26,6 +23,14 @@ users:
     sudo: "ALL=(ALL) NOPASSWD:ALL"
 
 runcmd:
+  - |
+    set -euo pipefail
+    if ! command -v sudo >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y python3 sudo
+    fi
+    usermod -aG sudo omladmin
   - visudo -c
   - |
     set -euo pipefail

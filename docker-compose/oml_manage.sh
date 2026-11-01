@@ -267,8 +267,13 @@ restore_database() {
 # Init Environment data example
 # -----------------------------------------------------------------------------
 generate_data() {
+    local agents="${1:-199}"
+    if ! [[ "$agents" =~ ^[0-9]+$ ]] || (( agents < 1 )); then
+        error "data-generate espera un entero positivo (cantidad de agentes ag1..agN)"
+        exit 1
+    fi
     docker_compose exec -T omlapp \
-        python3 manage.py inicializar_entorno || {
+        python3 manage.py inicializar_entorno --qa-agents "$agents" || {
         error "Failed to generate example data"
         exit 1
     }
@@ -708,6 +713,145 @@ compose_version() {
 }
 
 # -----------------------------------------------------------------------------
+# Agents status (Kamailio Redis DB1 + OML:AGENT Redis DB0)
+# -----------------------------------------------------------------------------
+# Cruzar usrloc Kamailio (DB1 location:entry::*) con OML:AGENT:* (DB0).
+# Salida: USERNAME | STATUS KAM | STATUS AGCONSOLE
+agents_status() {
+    if ! docker_compose ps -q redis &>/dev/null; then
+        error "Service 'redis' is not running or does not exist."
+        exit 1
+    fi
+
+    local now_fmt
+    now_fmt=$(docker_compose exec -T redis date '+%Y-%m-%d %H:%M:%S')
+
+    local lua_script
+    # ARGV[1] = now as 'YYYY-MM-DD HH:MM:SS' (same format as Kamailio expires)
+    lua_script='
+local now = ARGV[1]
+redis.call("SELECT", 1)
+local sip_state = {}
+local cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "location:entry::*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local username = redis.call("HGET", key, "username")
+    local expires = redis.call("HGET", key, "expires")
+    if username and username ~= "" then
+      local st = "EXPIRED"
+      if expires and expires ~= "" and expires >= now then
+        st = "REGISTERED"
+      end
+      local prev = sip_state[username]
+      if prev ~= "REGISTERED" then
+        sip_state[username] = st
+      end
+    end
+  end
+until cursor == "0"
+
+redis.call("SELECT", 0)
+local agents = {}
+cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "OML:AGENT:*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local id = redis.call("HGET", key, "id")
+    if not id or id == "" then
+      id = string.match(key, "OML:AGENT:(%d+)$") or ""
+    end
+    local name = redis.call("HGET", key, "NAME") or ""
+    local sip = redis.call("HGET", key, "SIP") or ""
+    local status = redis.call("HGET", key, "STATUS") or ""
+    local voicebot = redis.call("HGET", key, "VOICEBOT") or ""
+    if status == "" then status = "OFFLINE" end
+    local kam = "UNREGISTERED"
+    if voicebot == "1" then
+      kam = "VOICEBOT"
+    elseif sip ~= "" and sip_state[sip] then
+      kam = sip_state[sip]
+    end
+    local username = name
+    if username == "" then username = "agent-" .. id end
+    username = username .. " (id:" .. id .. " sip:" .. sip .. ")"
+    table.insert(agents, {tonumber(id) or 0, username, kam, status})
+  end
+until cursor == "0"
+
+table.sort(agents, function(a, b) return a[1] < b[1] end)
+
+local out = {}
+for _, row in ipairs(agents) do
+  table.insert(out, row[2] .. "\t" .. row[3] .. "\t" .. row[4])
+end
+return out
+'
+
+    local rows
+    rows=$(docker_compose exec -T redis redis-cli --raw EVAL "$lua_script" 0 "$now_fmt") || {
+        error "Failed to query Redis for agents status"
+        exit 1
+    }
+
+    if [[ -z "${rows//[$'\t\r\n ']/}" ]]; then
+        warning "No OML:AGENT:* keys found in Redis DB0"
+        return 0
+    fi
+
+    local color_kam color_ag
+    color_kam() {
+        case "$1" in
+            REGISTERED) printf '%s' "${GREEN}$1${NC}" ;;
+            EXPIRED)    printf '%s' "${YELLOW}$1${NC}" ;;
+            VOICEBOT)   printf '%s' "${CYAN}$1${NC}" ;;
+            *)          printf '%s' "${RED}$1${NC}" ;;
+        esac
+    }
+    color_ag() {
+        case "$1" in
+            READY)                          printf '%s' "${GREEN}$1${NC}" ;;
+            ONCALL|RINGING|DIALING)         printf '%s' "${CYAN}$1${NC}" ;;
+            PAUSED*|PAUSE*|ACW|POSTCALL)    printf '%s' "${YELLOW}$1${NC}" ;;
+            OFFLINE|"")                     printf '%s' "${RED}${1:-OFFLINE}${NC}" ;;
+            *)                              printf '%s' "$1" ;;
+        esac
+    }
+
+    printf '\n'
+    printf "%-42s %-14s %s\n" "USERNAME" "STATUS KAM" "STATUS AGCONSOLE"
+    printf '%s\n' "----------------------------------------------------------------------"
+    while IFS=$'\t' read -r username kam_status ag_status; do
+        [[ -z "$username" ]] && continue
+        # Detect mismatch: console online but SIP not registered
+        local kam_col ag_col
+        if [[ "$ag_status" != "OFFLINE" && -n "$ag_status" && "$kam_status" == "UNREGISTERED" ]]; then
+            kam_col="${RED}${kam_status}${NC}"
+            ag_col="${YELLOW}${ag_status}${NC}"
+        else
+            kam_col=$(color_kam "$kam_status")
+            ag_col=$(color_ag "$ag_status")
+        fi
+        printf "%-42s %-24s %s\n" "$username" "$kam_col" "$ag_col"
+    done <<< "$rows"
+    printf '\n'
+}
+
+agents_cmd() {
+    local sub="${1:-status}"
+    case "$sub" in
+        status|"") agents_status ;;
+        *)
+            error "Unknown agents subcommand: $sub"
+            info "Usage: ./oml_manage.sh agents status"
+            exit 1
+            ;;
+    esac
+}
+
+# -----------------------------------------------------------------------------
 # Display Help
 # -----------------------------------------------------------------------------
 show_help() {
@@ -728,13 +872,14 @@ show_help() {
       start   [svc]      Start all or a specific service
       logs    [-f] [svc] Show or follow logs
       status             Show container status + averages + raw stats
+      agents [status]    List agents: SIP (Kamailio Redis DB1) vs console (OML:AGENT DB0)
       health             Perform health check of critical services
       build-vuejs        Build VueJS assets
       clean              Prune stopped containers, unused images/volumes/networks
       clean-all          Full system prune (including volumes and images)
       reset-pass         Reset admin password as admin admin
       force-recreate     Force-recreate services without cache
-      data-generate      Generate example data in the database
+      data-generate [n]  Generate example data (agents ag1..agN; default 199)
       bootstrap          First-time Django bootstrap (migrations, django_commands,
                          runtime_bootstrap, and admin password reset)
       django-commands    One-shot: django_commands.sh + django_runtime_bootstrap.sh
@@ -800,8 +945,9 @@ main() {
         force-recreate) shift; log "Force-recreating..."; docker_compose up -d --force-recreate "$@" ;;
         logs)           shift; docker_compose logs "$@" ;;
         status)         show_status ;;
+        agents)         shift; agents_cmd "${1:-status}" ;;
         reset-pass)     reset_admin_password ;;
-        data-generate)  generate_data ;;
+        data-generate)  shift; generate_data "${1:-}" ;;
         bootstrap)      run_bootstrap ;;
         django-commands) run_django_commands ;;
         django-runtime-bootstrap) run_django_runtime_bootstrap ;;

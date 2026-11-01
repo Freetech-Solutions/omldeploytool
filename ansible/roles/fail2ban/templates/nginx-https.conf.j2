@@ -1,0 +1,12 @@
+# Managed by Ansible — OMniLeads fail2ban filter for nginx HTTPS probes.
+# Matches journald lines from nginx.service (LogDriver=journald, access_log → stdout).
+# log_format main: $remote_addr ... "$http_x_forwarded_for"
+#
+# Prefer X-Forwarded-For when present (proxy); else $remote_addr (AIO / direct TLS).
+# Patterns / status / methods: fail2ban_https_* in tenants_global.yml (o vars del tenant).
+
+[Definition]
+failregex = ^<HOST> - \S+ \[.*?\] "(?:{{ fail2ban_https_method_alt }}) [^"]*(?:{{ fail2ban_https_probe_alt }})[^"]*" (?:{{ fail2ban_https_status_alt }}) \d+ "[^"]*" "[^"]*"(?:\s|$)
+            ^\S+ - \S+ \[.*?\] "(?:{{ fail2ban_https_method_alt }}) [^"]*(?:{{ fail2ban_https_probe_alt }})[^"]*" (?:{{ fail2ban_https_status_alt }}) \d+ "[^"]*" "[^"]*" "<HOST>(?:, [^"]*)?"
+ignoreregex =
+datepattern = {^LN-BEG}

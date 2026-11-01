@@ -190,5 +190,33 @@
 - name: MAIN Validate normalized variables
   import_tasks: checks_validate.yml
 
+# Login persistente a registries privados (p. ej. Vultr CR). authfile en
+# /etc/containers/auth.json para que Quadlet/systemd (root) lo use tras reboot.
+- name: MAIN Podman login to private container registry
+  containers.podman.podman_login:
+    registry: "{{ container_registry_url }}"
+    username: "{{ container_registry_user }}"
+    password: "{{ container_registry_password }}"
+    authfile: /etc/containers/auth.json
+  become: true
+  no_log: true
+  when:
+    - (container_registry_user | default('') | string | length) > 0
+    - (container_registry_password | default('') | string | length) > 0
+    - (container_registry_url | default('') | string | length) > 0
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
+
+- name: MAIN Ensure Podman registry authfile permissions
+  ansible.builtin.file:
+    path: /etc/containers/auth.json
+    owner: root
+    group: root
+    mode: '0600'
+  become: true
+  when:
+    - (container_registry_user | default('') | string | length) > 0
+    - (container_registry_password | default('') | string | length) > 0
+  tags: "{{ (['install'] + ['upgrade'] + ['update'] + prerequisitos_partial_deploy_tags) | unique }}"
+
 - name: MAIN First configuration in server or servers
   import_tasks: os_configuration.yml

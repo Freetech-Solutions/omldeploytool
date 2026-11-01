@@ -11,6 +11,21 @@ certs_location: /etc/omnileads/certs
 swap_file: /swapfile
 # Container image registry
 container_image_registry: docker.io
+# Prefijo de registry para imágenes propias de OMniLeads (APP_IMG, ACD_IMG, …).
+# Vacío = mantiene los prefijos de images.yml (docker.io/freetechsolutions|omnileads).
+# Ejemplo Vultr: "lax.vultrcr.com/omnileads"
+oml_container_registry: ""
+# Servidor de login Podman (host sin path). Si oml_container_registry está set,
+# se deriva el host (lax.vultrcr.com); si no, usa container_image_registry.
+container_registry_url: >-
+  {{
+    (oml_container_registry | regex_replace('^https?://', '') | regex_replace('/.*$', ''))
+    if (oml_container_registry | default('') | string | trim | length > 0)
+    else container_image_registry
+  }}
+# Credenciales opcionales (Vault) para registries privados (p. ej. Vultr CR).
+container_registry_user: "{{ vault_container_registry_user | default('', true) }}"
+container_registry_password: "{{ vault_container_registry_password | default('', true) }}"
 # Container orchestrator
 container_orchest: systemd
 # Force image pull

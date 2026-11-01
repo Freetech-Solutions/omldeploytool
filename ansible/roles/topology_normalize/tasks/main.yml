@@ -291,7 +291,17 @@
 # ACD (acd.env SIP_PROXY): en cómputo apunta al Kamailio del edge; en edge/AIO es local.
 - name: TOPOLOGY Default kamailio_pstn_host when not set in inventory
   ansible.builtin.set_fact:
-    kamailio_pstn_host: "{{ edge_host if (oml_runs_omlapp_web or oml_runs_omlapp_workers or oml_runs_dialer_workers or oml_runs_acd or oml_runs_callrec_processor) and not ('edge' in group_names) else omni_ip_lan }}"
+    kamailio_pstn_host: >-
+      {{
+        edge_host
+        if (
+          (oml_runs_omlapp_web or oml_runs_omlapp_workers
+           or oml_runs_dialer_workers or oml_runs_acd
+           or oml_runs_callrec_processor)
+          and not ('edge' in group_names)
+        )
+        else omni_ip_lan
+      }}
   when:
     - kamailio_pstn_host is not defined
     - oml_runs_edge or oml_is_aio or oml_runs_omlapp_web or oml_runs_omlapp_workers or oml_runs_dialer_workers or oml_runs_acd or oml_runs_callrec_processor
@@ -322,6 +332,43 @@
     - dialer_engine == "omnidialer"
   tags:
     - always
+
+# Reescribir prefijo docker.io/(freetechsolutions|omnileads)/ → oml_container_registry/
+# cuando el tenant apunta a un registry propio (p. ej. Vultr CR). No aplica a devenv
+# (localhost/*:devenv) ni a imágenes de terceros (postgres, redis, prometheus, …).
+- name: TOPOLOGY Rewrite OMniLeads image prefixes for custom registry
+  when:
+    - (oml_container_registry | default('') | string | trim | length) > 0
+    - not (oml_devenv | default(false) | bool)
+    - vars[item] is defined
+    - (vars[item] | default('') | string | length) > 0
+    - (vars[item] | string) is match(_oml_img_re)
+  tags:
+    - always
+  vars:
+    _oml_reg: >-
+      {{ oml_container_registry
+         | regex_replace('^https?://', '')
+         | regex_replace('/+$', '') }}
+    _oml_img_re: "^docker\\.io/(freetechsolutions|omnileads)/"
+  ansible.builtin.set_fact:
+    "{{ item }}": "{{ vars[item] | regex_replace(_oml_img_re, _oml_reg ~ '/') }}"
+  loop:
+    - APP_IMG
+    - NGINX_IMG
+    - WS_IMG
+    - ACD_IMG
+    - KAMAILIO_IMG
+    - RTPENGINE_IMG
+    - CALLREC_COMPRESSOR_IMG
+    - CALLREC_TRANSCRIBER_IMG
+    - FASTAGI_IMG
+    - AUDIOSOCKET_IMG
+    - DIALER_API_IMG
+    - DIALER_WORKER_IMG
+    - BACKUP_RESTORE_IMG
+    - PSTN_EMULATOR_IMG
+    - NGINX_QA_IMG
 
 - name: TOPOLOGY Compute component switches
   ansible.builtin.set_fact:

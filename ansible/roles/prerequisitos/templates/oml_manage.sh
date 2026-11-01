@@ -676,6 +676,160 @@ up_with_commands() {
     stack_start
 }
 
+# -----------------------------------------------------------------------------
+# Agents status (Kamailio Redis DB1 + OML:AGENT Redis DB0)
+# -----------------------------------------------------------------------------
+# Preferir redis-server local; si no corre aquí, REDIS_HOSTNAME de django.env
+# (despliegues clusterizados).
+redis_cli_eval() {
+    local lua_script=$1
+    local now_fmt=$2
+    if container_running "$CN_REDIS"; then
+        podman exec -T "$CN_REDIS" redis-cli --raw EVAL "$lua_script" 0 "$now_fmt"
+        return
+    fi
+    local host
+    host=$(grep -E '^REDIS_HOSTNAME=' "$DJANGO_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    if [[ -z "$host" ]]; then
+        host=$(grep -E '^REDIS' "$DJANGO_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    fi
+    [[ -n "$host" ]] || {
+        error "Redis local no corre y no hay REDIS_HOSTNAME en $DJANGO_ENV"
+        return 1
+    }
+    podman run --rm --network=host docker.io/library/redis redis-cli -h "$host" --raw EVAL "$lua_script" 0 "$now_fmt"
+}
+
+agents_status() {
+    local now_fmt
+    if container_running "$CN_REDIS"; then
+        now_fmt=$(podman exec -T "$CN_REDIS" date '+%Y-%m-%d %H:%M:%S')
+    else
+        now_fmt=$(date '+%Y-%m-%d %H:%M:%S')
+    fi
+
+    local lua_script
+    lua_script='
+local now = ARGV[1]
+redis.call("SELECT", 1)
+local sip_state = {}
+local cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "location:entry::*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local username = redis.call("HGET", key, "username")
+    local expires = redis.call("HGET", key, "expires")
+    if username and username ~= "" then
+      local st = "EXPIRED"
+      if expires and expires ~= "" and expires >= now then
+        st = "REGISTERED"
+      end
+      local prev = sip_state[username]
+      if prev ~= "REGISTERED" then
+        sip_state[username] = st
+      end
+    end
+  end
+until cursor == "0"
+
+redis.call("SELECT", 0)
+local agents = {}
+cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "OML:AGENT:*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local id = redis.call("HGET", key, "id")
+    if not id or id == "" then
+      id = string.match(key, "OML:AGENT:(%d+)$") or ""
+    end
+    local name = redis.call("HGET", key, "NAME") or ""
+    local sip = redis.call("HGET", key, "SIP") or ""
+    local status = redis.call("HGET", key, "STATUS") or ""
+    local voicebot = redis.call("HGET", key, "VOICEBOT") or ""
+    if status == "" then status = "OFFLINE" end
+    local kam = "UNREGISTERED"
+    if voicebot == "1" then
+      kam = "VOICEBOT"
+    elseif sip ~= "" and sip_state[sip] then
+      kam = sip_state[sip]
+    end
+    local username = name
+    if username == "" then username = "agent-" .. id end
+    username = username .. " (id:" .. id .. " sip:" .. sip .. ")"
+    table.insert(agents, {tonumber(id) or 0, username, kam, status})
+  end
+until cursor == "0"
+
+table.sort(agents, function(a, b) return a[1] < b[1] end)
+
+local out = {}
+for _, row in ipairs(agents) do
+  table.insert(out, row[2] .. "\t" .. row[3] .. "\t" .. row[4])
+end
+return out
+'
+
+    local rows
+    rows=$(redis_cli_eval "$lua_script" "$now_fmt") || {
+        error "No se pudo consultar Redis para agents status"
+        exit 1
+    }
+
+    if [[ -z "${rows//[$'\t\r\n ']/}" ]]; then
+        warning "No hay claves OML:AGENT:* en Redis DB0"
+        return 0
+    fi
+
+    color_kam() {
+        case "$1" in
+            REGISTERED) printf '%s' "${GREEN}$1${NC}" ;;
+            EXPIRED)    printf '%s' "${YELLOW}$1${NC}" ;;
+            VOICEBOT)   printf '%s' "${CYAN}$1${NC}" ;;
+            *)          printf '%s' "${RED}$1${NC}" ;;
+        esac
+    }
+    color_ag() {
+        case "$1" in
+            READY)                          printf '%s' "${GREEN}$1${NC}" ;;
+            ONCALL|RINGING|DIALING)         printf '%s' "${CYAN}$1${NC}" ;;
+            PAUSED*|PAUSE*|ACW|POSTCALL)    printf '%s' "${YELLOW}$1${NC}" ;;
+            OFFLINE|"")                     printf '%s' "${RED}${1:-OFFLINE}${NC}" ;;
+            *)                              printf '%s' "$1" ;;
+        esac
+    }
+
+    printf '\n'
+    printf "%-42s %-14s %s\n" "USERNAME" "STATUS KAM" "STATUS AGCONSOLE"
+    printf '%s\n' "----------------------------------------------------------------------"
+    while IFS=$'\t' read -r username kam_status ag_status; do
+        [[ -z "$username" ]] && continue
+        local kam_col ag_col
+        if [[ "$ag_status" != "OFFLINE" && -n "$ag_status" && "$kam_status" == "UNREGISTERED" ]]; then
+            kam_col="${RED}${kam_status}${NC}"
+            ag_col="${YELLOW}${ag_status}${NC}"
+        else
+            kam_col=$(color_kam "$kam_status")
+            ag_col=$(color_ag "$ag_status")
+        fi
+        printf "%-42s %-24s %s\n" "$username" "$kam_col" "$ag_col"
+    done <<< "$rows"
+    printf '\n'
+}
+
+agents_cmd() {
+    local sub="${1:-status}"
+    case "$sub" in
+        status|"") agents_status ;;
+        *)
+            error "Subcomando agents desconocido: $sub"
+            info "Uso: oml_manage agents status"
+            exit 1
+            ;;
+    esac
+}
+
 show_help() {
     cat <<'EOF'
 
@@ -686,6 +840,7 @@ Uso principal:
 
 Comandos (también alias legacy --comando):
   status              Estado, stats y validación de contenedores conocidos
+  agents [status]     Agentes: SIP (Kamailio Redis DB1) vs consola (OML:AGENT DB0)
   health              Salud de servicios críticos
   stack-up            systemctl start de unidades Quadlet conocidas (orden)
   stack-down          systemctl stop en orden inverso
@@ -745,6 +900,7 @@ main() {
     case "$cmd" in
         help|--help|-h|"") show_help ;;
         status)            show_status ;;
+        agents)            agents_cmd "${1:-status}" ;;
         health)            check_health ;;
 
         stack-up)          stack_start ;;

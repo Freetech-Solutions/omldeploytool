@@ -19,6 +19,12 @@ upgrade_from_2X: false
 # --- time zone (for example: America/Argentina/Cordoba)
 TZ: America/Argentina/Cordoba
 
+# --- Container registry override for OMniLeads images (APP_IMG, ACD_IMG, …).
+# --- Vacío = prefijos de images.yml (docker.io/freetechsolutions|omnileads).
+# --- Ejemplo Vultr CR: "lax.vultrcr.com/omnileads"
+# --- Credenciales: vault_container_registry_user / vault_container_registry_password
+# oml_container_registry: "lax.vultrcr.com/omnileads"
+
 # --- TLS/SSL Certs configuration (selfsigned, custom or certbot letsencrypt)
 # --- https://gitlab.com/omnileads/omldeploytool/-/blob/develop/ansible/README.md?ref_type=heads#tls-cert-provisioning
 certs: selfsigned
@@ -266,6 +272,13 @@ dialer_caps: 3
 dialer_process_campaign_replicas: 5
 dialer_process_event_replicas: 1
 
+# --- gearmand (data_stateless). Override per tenant in vars.yml if needed.
+# gearman_threads: I/O worker threads (-t). gearman_backlog: listen backlog.
+# gearman_job_retries: retries when a worker fails a job.
+gearman_threads: 4
+gearman_backlog: 1024
+gearman_job_retries: 3
+
 # --- Periodic dialer channel audit (Redis OML:CALLS vs active Asterisk channels)
 # Interval in seconds between audit jobs. Set to 0 or a negative value to disable the scheduler job.
 dialer_channel_audit_interval_sec: 60
@@ -300,12 +313,15 @@ google_maps_center: '{ "lat": -31.416668, "lng": -64.183334 }'
 google_api_key: "{{ vault_google_api_key }}"
 google_cloud_projectid: "{{ vault_google_cloud_projectid }}"
 
-#------------------------------------- Fail2ban (SSH + Kamailio PSTN) ----------------------------------
+#------------------------------------- Fail2ban (SSH + Kamailio PSTN + HTTPS) ---------------------------
 # --- Jail sshd en cada host de pods (nftables; ufw/firewalld están desactivados).
 # --- Jail kamailio-pstn en hosts edge/AIO (journald de kamailio_pstn.service + PIKE).
+# --- HTTPS probes: jail nginx-https (AIO sin grupo edge) o haproxy-https (grupo edge).
+# --- Login web: lo cubre django-defender (Redis); no hay jail fail2ban de /accounts/login/.
 # --- Override por tenant: instances/<tenant>/vars.yml
 # --- Disable por host/tenant: fail2ban: false en inventory.yml o vars.yml
-# --- Disable solo PIKE/jail Kamailio: fail2ban_kamailio_pike: false
+# --- Disable solo PIKE / HTTPS: fail2ban_kamailio_pike / fail2ban_nginx_https /
+# ---   fail2ban_haproxy_https: false
 #
 fail2ban: true
 fail2ban_bantime: 1h
@@ -315,6 +331,33 @@ fail2ban_maxretry: 5
 fail2ban_ignoreip_extra: []
 # --- PIKE antiflood en Kamailio PSTN + jail fail2ban kamailio-pstn (hosts edge).
 fail2ban_kamailio_pike: true
+# --- HTTPS (probes de escáner; no 403 genéricos de API).
+fail2ban_nginx_https: true
+fail2ban_haproxy_https: true
+fail2ban_https_bantime: 1h
+fail2ban_https_findtime: 10m
+fail2ban_https_maxretry: 20
+# --- nftables = solo 80/443 del jail; nftables-allports = drop todo el tráfico de la IP.
+fail2ban_https_banaction: nftables
+# --- Fragmentos regex del URI (se unen con |). Escapar metacaracteres (p. ej. \.php).
+fail2ban_https_probe_patterns:
+  - '/\.env'
+  - '/\.git'
+  - '/wp-admin'
+  - '/wp-login'
+  - '/xmlrpc'
+  - '/phpmyadmin'
+  - '/adminer'
+  - '/cgi-bin'
+  - '/actuator'
+  - '/vendor/phpunit'
+  - '/HNAP1'
+  - '/manager/html'
+  - '\.php(?:\?|\s|")'
+  - '\.asp(?:\?|\s|")'
+  - '\.aspx(?:\?|\s|")'
+fail2ban_https_status: [400, 401, 403, 404, 444]
+fail2ban_https_methods: [GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS]
 
 #------------------------------------- Wazuh Agent ----------------------------------
 # --- OS agent (FIM / logs) enrolled to a central Wazuh Manager.

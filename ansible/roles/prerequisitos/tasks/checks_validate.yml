@@ -9,6 +9,25 @@
 # Cualquier extensión nueva debería seguir este orden y mantener tags: [always] para que
 # corra incluso con --tags acotados.
 
+- name: CHECKS Validate container registry credentials are paired
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          (container_registry_user | default('') | string | length) == 0
+          and (container_registry_password | default('') | string | length) == 0
+        )
+        or (
+          (container_registry_user | default('') | string | length) > 0
+          and (container_registry_password | default('') | string | length) > 0
+        )
+    fail_msg: >-
+      container_registry_user y container_registry_password deben declararse juntos
+      (vía vault_container_registry_user / vault_container_registry_password).
+    success_msg: "Credenciales de container registry: OK (ambas vacías o ambas definidas)"
+  tags:
+    - always
+
 - name: CHECKS Validate required global variables
   ansible.builtin.assert:
     that:

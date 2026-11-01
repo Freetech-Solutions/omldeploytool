@@ -467,8 +467,13 @@ GOOGLE_CLOUD_PROJECTID=your_project_id
 #      25%  -> music on hold, no greeting
 #      50%  -> "hola" greeting + music on hold (simulates a human answer, for AMD)
 #    Music length is random as well: 1/3 15s, 1/3 27s, 1/3 full track.
+# ---prod_dialer: mix prod-like on the answered path + local NOANSWER/BUSY/CONGESTION
+#    (complementa Kamailio QA). Aprox:
+#      30% NOANSWER, 10% BUSY, 5% CONGESTION, 7% SHORTCALL,
+#      40% humano (15/27/full MOH + hola), 8% music-only (AMD harder).
+#    Tip: contact base con ~40-50% prefijos 08x/09x + resto "limpios" → hit-rate realista.
 
-PSTN_EMULATOR_MODE=test_dialer
+PSTN_EMULATOR_MODE=prod_dialer
 
 # --- dial2softphone: 100% of the calls are sent to the softphone.
 # ---mode_1: 100% answered, play music and transfer with SIP REFER.
