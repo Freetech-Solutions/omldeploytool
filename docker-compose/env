@@ -205,6 +205,12 @@ WEBSOCKET_EXT_PORT=8000
 # *** Activete verbose ---> DEBUG:fts.oml.services.websockets,websockets.server
 WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets ;INFO:websockets.server
 
+# --- Authentication of /consumers
+# Origins users reach the web UI from, comma separated (add :port if it isn't 443)
+WS_ALLOWED_ORIGINS=https://${OML_HOSTNAME},https://${PUBLIC_IP},https://${FQDN}
+# Secret shared by websockets and acd-config-generator (deploy.sh replaces the placeholder)
+WS_ACD_SECRET=CHANGE_ME_WS_ACD_SECRET
+
 # ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
 # ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
 # *** For redis sentinel cluster ---> redis+sentinel://master/sentinel_01,sentinel_02,sentinel_03

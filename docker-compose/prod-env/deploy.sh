@@ -171,6 +171,12 @@ deploy_omnileads() {
     fi
   fi
 
+  # Secret compartido entre websockets y acd-config-generator
+  if grep -qE '^WS_ACD_SECRET=CHANGE_ME' .env; then
+    ws_acd_secret=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)
+    sed -i "s|^WS_ACD_SECRET=.*$|WS_ACD_SECRET=${ws_acd_secret}|" .env
+  fi
+
   # NAT opcional (fuerza valor, comente o no la línea original)
   if [[ -n "${NAT_IPV4:-}" ]]; then
     sed -i "s|^#\?SIP_NAT_IPADDR=.*$|SIP_NAT_IPADDR=${NAT_IPV4}|" .env

@@ -392,6 +392,8 @@ all:
     dialer_log_level: 1
     # --- Dialer API user & password
     dialer_password: demo
+    # --- Secret shared by the websockets server and asterisk_retrieve_conf (change it!)
+    ws_acd_secret: CHANGE_ME_WS_ACD_SECRET
     
     # --- dialer_user (only if you have your Wombat dialer)
     dialer_user: demoadmin
