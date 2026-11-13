@@ -297,7 +297,7 @@ The most useful commands are:
 | `psql <db_user>`               | Open `psql` against `postgresql`                                   |
 | `sngrep` / `asterisk_cli`      | Debug helpers inside `acd-server` (SIP capture / Asterisk CLI)     |
 | `backup` / `restore`           | Backup or restore the PostgreSQL database                          |
-| `inbound-call <tel> [n] [interval_s]` | Send n test inbound calls (default 1); optional seconds between each |
+| `inbound-call <tel> [n] [interval_s] [duration]` | Send n test inbound calls; duration: `15`\|`27`\|`full` (default `full`) |
 | `dialer-call` / `manual-call`  | Trigger dialer or manual test calls (`tel id_camp id_cust`)        |
 | `hangup-pstn`                  | Hang up all active PSTN calls in the emulator                      |
 | `clean` / `clean-all`          | Docker prune (containers/images/volumes/networks)                  |
@@ -358,6 +358,8 @@ Its behavior is controlled by `PSTN_EMULATOR_MODE` in `.env`:
 |-------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | `default`                     | 100% of the calls are answered                                                                                        |
 | `dial2softphone`              | 100% of the calls are sent to the testing softphone                                                                   |
+| `test_dialer`                 | 100% Answer; ~25% shortcall / ~25% music-only / ~50% hola+music                                                       |
+| `prod_dialer`                 | Outbound-like mix on clean numbers: ~20% AMD music / ~35% NOANSWER / ~3% CONGESTION / ~7% SHORTCALL / ~35% human (+hola). SIP BUSY/404/… via Kamailio QA prefixes `08x`/`09x` |
 | `ans_busy`                    | 50% answered / 50% BUSY                                                                                               |
 | `ans_busy_congestion_noans`   | 25% ANSWER / 25% BUSY / 25% CONGESTION / 25% NO ANSWER                                                                |
 | `advanced`                    | Decision based on the **last digit** of the dialed number (see table below)                                           |
@@ -377,9 +379,10 @@ Generate an inbound test call:
 
 ```bash
 ./oml_manage.sh inbound-call 01177660010 2 5
+./oml_manage.sh inbound-call 01177660010 2 5 27
 ```
 
-That sends 2 calls to `01177660010`, waiting 5 seconds between each origination. Omit the last argument to fire every call in the same second.
+That sends 2 calls to `01177660010`, waiting 5 seconds between each origination. Optional 4th argument sets the caller-side music duration after answer: `15`, `27`, or `full` (default). Omit interval (or pass `0`) to fire every call in the same second.
 
 Hang up every PSTN call in progress:
 

@@ -1,24 +1,24 @@
 ---
 # --- OMniLeads images WEB
-APP_IMG: docker.io/freetechsolutions/omlapp:20261022-28cea8c2
-NGINX_IMG: docker.io/freetechsolutions/nginx:20260928-a190ec4d
-WS_IMG: docker.io/freetechsolutions/websockets:20261007-57cd0854
+APP_IMG: docker.io/freetechsolutions/omlapp:20261111-e8a55a17
+NGINX_IMG: docker.io/omnileads/nginx:20261111-5a2d2f4d
+WS_IMG: docker.io/omnileads/websockets:20261111-f1c83db4
 
 # --- OMniLeads images TEL
-ACD_IMG: docker.io/freetechsolutions/acd:20261022-20c542bb
-KAMAILIO_IMG: docker.io/freetechsolutions/kamailio:20261014-fc03de4b
-RTPENGINE_IMG: docker.io/freetechsolutions/rtpengine:20260930-52ee0f45
+ACD_IMG: docker.io/omnileads/acd:20261111-2c73a6b5
+KAMAILIO_IMG: docker.io/omnileads/kamailio:20261111-b8eac91c
+RTPENGINE_IMG: docker.io/omnileads/rtpengine:20261111-2d151aef
 CALLREC_COMPRESSOR_IMG: docker.io/freetechsolutions/callrec_compressor:20260930-1ada2b56
 CALLREC_TRANSCRIBER_IMG: docker.io/freetechsolutions/callrec_transcriber:20260930-1ada2b56
-FASTAGI_IMG: docker.io/freetechsolutions/fastagi:20260928-87b614ca
-AUDIOSOCKET_IMG: docker.io/omnileads/audiosocket:20261022-88866a1f
+FASTAGI_IMG: docker.io/omnileads/fastagi:20261111-7e0ee29f
+AUDIOSOCKET_IMG: docker.io/omnileads/audiosocket:20261111-9b4ed267
 
 # --- OMniLeads images DIALER
-DIALER_API_IMG: docker.io/freetechsolutions/dialer_api:20261007-618bf657
-DIALER_WORKER_IMG: docker.io/freetechsolutions/dialer_worker:20261007-618bf657
+DIALER_API_IMG: docker.io/freetechsolutions/dialer_worker:20261113-deefd7cc
+DIALER_WORKER_IMG: docker.io/freetechsolutions/dialer_worker:20261113-deefd7cc
 
 # --- OMniLeads utilities images
-BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20260826-7b87c8fb
+BACKUP_RESTORE_IMG: docker.io/freetechsolutions/backup_restore:20261111-1cb48093
 
 # --- Backend services common images
 MINIO_IMG: docker.io/freetechsolutions/minio:20260930-83526c54

@@ -46,6 +46,14 @@
           + (['prometheus.container', 'prometheus_uwsgi.container'] if (oml_runs_omlapp_web | default(false) | bool) else [])
           + (['prometheus_postgres.container'] if (oml_runs_data_statefull | default(false) | bool) else [])
           + (['prometheus_redis.container', 'prometheus_gearman.container'] if (oml_runs_data_stateless | default(false) | bool) else [])
+          + (
+              ['prometheus_dialer_pacing.container']
+              if (
+                (oml_runs_data_stateless | default(false) | bool)
+                and (dialer_engine | default('omnidialer') == 'omnidialer')
+              )
+              else []
+            )
         )
       }}
     observability_envs: >-
@@ -53,6 +61,14 @@
         (
           (['prometheus_postgres.env'] if (oml_runs_data_statefull | default(false) | bool) else [])
           + (['prometheus_redis.env'] if (oml_runs_data_stateless | default(false) | bool) else [])
+          + (
+              ['prometheus_dialer_pacing.env']
+              if (
+                (oml_runs_data_stateless | default(false) | bool)
+                and (dialer_engine | default('omnidialer') == 'omnidialer')
+              )
+              else []
+            )
         )
       }}
   changed_when: false

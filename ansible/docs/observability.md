@@ -89,6 +89,7 @@ Plantilla: `roles/pods/templates/observability.pod.j2`
 | 9187   | postgres_exporter | data_statefull \| omnileads_aio |
 | 9121   | redis_exporter | data_stateless \| omnileads_aio |
 | 9418   | gearman_exporter | data_stateless \| omnileads_aio |
+| 7099   | dialer_pacing_exporter | data_stateless \| omnileads_aio (`omnidialer`) |
 
 ### Prometheus del tenant
 
@@ -124,7 +125,7 @@ El rol `observability_prometheus` se habilita cuando el host ejecuta algún tier
 | Todos los hosts | node_exporter + podman_exporter |
 | omlapp_web / AIO | + prometheus + uwsgi_exporter |
 | data_statefull | + postgres_exporter |
-| data_stateless | + redis_exporter + gearman_exporter |
+| data_stateless | + redis_exporter + gearman_exporter + dialer_pacing_exporter (`dialer_engine=omnidialer`) |
 
 Además, Prometheus scrapea endpoints nativos (no presisan de un container exporter) en edge, ACD y telephony que no viven en `observability.pod`.
 
@@ -194,6 +195,16 @@ Además, Prometheus scrapea endpoints nativos (no presisan de un container expor
 - **Job Prometheus:** `{{ tenant_id }}_acd_app`
 - **Labels:** `tenant`, `component=acd_app`
 - **Puerto:** `acd_app_metrics_port` (default `7098`), publicado en `omni_ip_lan` vía `acd.pod`
+
+#### dialer_pacing_exporter (7099)
+
+- **Host:** data_stateless / AIO (contenedor `obs-prometheus-dialer-pacing`, pod `observability`)
+- **Imagen:** `DIALER_WORKER_IMG` con `Exec=python3 omnidialer_metrics.py`
+- **Propósito:** Snapshot Redis DB3 (`CAMP:{id}:PACING` / CHANNELS / COUNTER / CALLS) → gauges `omnidialer_*` para soak predictivo.
+- **Job Prometheus:** `{{ tenant_id }}_dialer_pacing`
+- **Labels:** `tenant`, `component=dialer_pacing`
+- **Puerto:** `dialer_pacing_exporter_port` (default `7099`), publicado en `omni_ip_lan` vía `observability.pod`
+- **Dashboard:** `OmniDialer_Pacing.json` (uid `oml-omnidialer-pacing`)
 
 #### rtpengine_metrics (22223)
 
@@ -607,6 +618,7 @@ Fuente: `group_vars/all/runtime.yml`
 | `prometheus_gearman_exporter_port` | 9418 |
 | `prometheus_uwsgi_exporter_port` | 9117 |
 | `acd_app_metrics_port` | 7098 |
+| `dialer_pacing_exporter_port` | 7099 |
 | `kamailio_pstn_metrics_port` | 9273 |
 | `kamailio_webrtc_metrics_port` | 9274 |
 | `haproxy_metrics_port` | 8404 |

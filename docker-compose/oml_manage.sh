@@ -430,41 +430,60 @@ send_call() {
     local telephone="${1:-}"
     local count="${2:-1}"
     local interval="${3:-}"
-    local usage="Usage: ./oml_manage.sh inbound-call <telephone> [count] [interval_seconds]"
+    local duration="${4:-full}"
+    local usage="Usage: ./oml_manage.sh inbound-call <telephone> [count] [interval_seconds] [duration]"
+    local example="Example: ./oml_manage.sh inbound-call 01177660010 2 5 27"
     if [[ -z "$telephone" ]]; then
         error "Missing telephone argument."
         info "$usage"
-        info "Example: ./oml_manage.sh inbound-call 01177660010 2 5"
+        info "duration: 15 | 27 | full (default: full)"
+        info "$example"
         exit 1
     fi
     if ! [[ "$count" =~ ^[1-9][0-9]*$ ]]; then
         error "Call count must be a positive integer (got: ${count})."
         info "$usage"
-        info "Example: ./oml_manage.sh inbound-call 01177660010 2 5"
+        info "$example"
         exit 1
     fi
     if [[ -n "$interval" ]] && ! [[ "$interval" =~ ^[0-9]+$ ]]; then
         error "Interval must be a non-negative integer in seconds (got: ${interval})."
         info "$usage"
-        info "Example: ./oml_manage.sh inbound-call 01177660010 2 5"
+        info "$example"
         exit 1
     fi
+    case "$duration" in
+        15|27|full) ;;
+        *)
+            error "Duration must be 15, 27, or full (got: ${duration})."
+            info "$usage"
+            info "$example"
+            exit 1
+            ;;
+    esac
 
     if ! docker_compose ps -q pbxemulator &>/dev/null; then
         error "PBX Emulator service is not running. Please start it first."
         exit 1
     fi
 
+    local sipp_exten
+    case "$duration" in
+        15) sipp_exten="99915${telephone}" ;;
+        27) sipp_exten="99927${telephone}" ;;
+        *)  sipp_exten="999${telephone}" ;;
+    esac
+
     # Sin intervalo (o 0): todas en el mismo segundo. Con intervalo: 1 llamada por periodo.
     local -a sipp_rate=(-r "$count")
     if [[ -n "$interval" && "$interval" -gt 0 ]]; then
         sipp_rate=(-r 1 -rp "$((interval * 1000))")
-        log "Sending ${count} call(s) to ${telephone}, one every ${interval}s..."
+        log "Sending ${count} call(s) to ${telephone} (duration=${duration}), one every ${interval}s..."
     else
-        log "Sending ${count} call(s) to ${telephone}..."
+        log "Sending ${count} call(s) to ${telephone} (duration=${duration})..."
     fi
     # -m total, -r llamadas por periodo, -rp periodo en ms, -l simultáneas, -d duración ms
-    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "999$telephone" -m "$count" "${sipp_rate[@]}" -d 60000 -l "$count" || {
+    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "$sipp_exten" -m "$count" "${sipp_rate[@]}" -d 60000 -l "$count" || {
         error "Failed to send call"
         exit 1
     }
@@ -892,7 +911,7 @@ show_help() {
       backup             Backup PostgreSQL database
       restore            Restore PostgreSQL database from backup
       env                Display first 20 env vars from .env
-      inbound-call <tel> [n] [interval_s]  Send n test calls (default 1); optional seconds between each
+      inbound-call <tel> [n] [interval_s] [duration]  Send n test calls; duration: 15|27|full (default full)
       dialer-call        Trigger 'call_test_dialer.py' (Usage: tel id_camp id_cust)
       manual-call        Trigger 'call_test_manual.py' (Usage: tel id_camp id_cust)
       hangup-pstn        Hangup all PSTN calls using the PBX-Emulator
@@ -955,10 +974,10 @@ main() {
         health)         check_health ;;
         clean)          clean_system ;;
         clean-all)      clean_all ;;
-        inbound-call)   shift; send_call "${1:-}" "${2:-1}" "${3:-}" ;;
+        inbound-call)   shift; send_call "${1:-}" "${2:-1}" "${3:-}" "${4:-full}" ;;
         dialer-call)    shift; trigger_dialer_test "$@" ;;
         manual-call)    shift; trigger_manual_test "$@" ;;
-        hangup-pstn)    hangup_all_psatn_emulator_calls ;;
+        hangup-pstn)    hangup_all_pstn_emulator_calls ;;
         backup)         backup_database ;;
         restore)        restore_database ;;
         terminal)       shift; open_terminal "${1:-}" ;;

@@ -49,6 +49,8 @@ postgres_port: 5432
 kamailio_wss_port: 10060
 kamailio_webrtc_udp_port: 10060
 kamailio_pstn_port: 5060
+# Optional WAN advertise port if DNAT uses a non-5060 public port (defaults to kamailio_pstn_port)
+# kamailio_pstn_public_port: 25060
 # Asterisk PJSIP listen ports (Kamailio PSTN stays on kamailio_pstn_port)
 acd_agent_sip_port: 5160
 acd_trunk_sip_port: 5070
@@ -125,6 +127,7 @@ prometheus_redis_exporter_port: 9121
 prometheus_gearman_exporter_port: 9418
 prometheus_uwsgi_exporter_port: 9117
 acd_app_metrics_port: 7098
+dialer_pacing_exporter_port: 7099
 kamailio_pstn_metrics_port: 9273
 kamailio_webrtc_metrics_port: 9274
 haproxy_metrics_port: 8404

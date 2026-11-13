@@ -61,3 +61,10 @@ scrape_configs:
         labels:
           tenant: 'Konecta_Verloop_AIO'
           component: 'acd_app'
+
+  - job_name: 'Konecta_Verloop_dialer_pacing'
+    static_configs:
+      - targets: ['dialer-metrics:7099']
+        labels:
+          tenant: 'Konecta_Verloop_AIO'
+          component: 'dialer_pacing'

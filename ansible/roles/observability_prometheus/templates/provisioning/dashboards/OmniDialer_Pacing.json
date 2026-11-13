@@ -1,0 +1,371 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "OMniDialer pacing soak M0–M2: C_DIAL/GAMMA/P_HIT/DROP, CALLS vs channels, pacing_up/age, AMD vs ANS_AG.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Salud pacing",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "red", "index": 0, "text": "Down" },
+                "1": { "color": "green", "index": 1, "text": "Up" }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_metrics_scrape_ok{tenant=~\"$tenant\"}",
+          "legendFormat": "scrape",
+          "refId": "A"
+        }
+      ],
+      "title": "Exporter scrape OK",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "red", "index": 0, "text": "stall" },
+                "1": { "color": "green", "index": 1, "text": "live" }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_campaign_pacing_up{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "camp {{campaign_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "pacing_up",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
+      "id": 3,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_campaign_pacing_snapshot_age_seconds{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "age {{campaign_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "PACING snapshot age",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_campaign_mode{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "{{mode}}",
+          "refId": "A"
+        }
+      ],
+      "title": "MODE",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Pacing / canales",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 10,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_campaign_c_dial{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "C_DIAL {{campaign_id}}",
+          "refId": "A"
+        },
+        {
+          "expr": "omnidialer_campaign_gamma{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "GAMMA {{campaign_id}}",
+          "refId": "B"
+        },
+        {
+          "expr": "omnidialer_campaign_p_hit{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "P_HIT {{campaign_id}}",
+          "refId": "C"
+        },
+        {
+          "expr": "omnidialer_campaign_drop_rate_ewma{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "DROP {{campaign_id}}",
+          "refId": "D"
+        },
+        {
+          "expr": "omnidialer_campaign_a_free{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "A_FREE {{campaign_id}}",
+          "refId": "E"
+        }
+      ],
+      "title": "C_DIAL / GAMMA / P_HIT / DROP / A_FREE",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 11,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_campaign_calls{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "CALLS {{campaign_id}}",
+          "refId": "A"
+        },
+        {
+          "expr": "omnidialer_campaign_channels{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", phase=\"RINGING\"}",
+          "legendFormat": "RINGING {{campaign_id}}",
+          "refId": "B"
+        },
+        {
+          "expr": "omnidialer_campaign_channels{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", phase=\"WAITING_AGENT\"}",
+          "legendFormat": "WAITING_AGENT {{campaign_id}}",
+          "refId": "C"
+        },
+        {
+          "expr": "omnidialer_campaign_channels{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", phase=\"ONCALL\"}",
+          "legendFormat": "ONCALL {{campaign_id}}",
+          "refId": "D"
+        }
+      ],
+      "title": "CALLS vs CHANNELS",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 102,
+      "title": "Contadores sesión (AMD / answered)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "id": 20,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "omnidialer_campaign_counter{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", name=\"ATTEMPTED_CALLS\"}",
+          "legendFormat": "ATTEMPTED {{campaign_id}}",
+          "refId": "A"
+        },
+        {
+          "expr": "omnidialer_campaign_counter{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", name=\"ANSWERED_PSTN\"}",
+          "legendFormat": "ANS_PSTN {{campaign_id}}",
+          "refId": "B"
+        },
+        {
+          "expr": "omnidialer_campaign_counter{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", name=\"ANSWERED_AGENT\"}",
+          "legendFormat": "ANS_AG {{campaign_id}}",
+          "refId": "C"
+        },
+        {
+          "expr": "omnidialer_campaign_counter{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\", name=\"AMD\"}",
+          "legendFormat": "AMD {{campaign_id}}",
+          "refId": "D"
+        },
+        {
+          "expr": "omnidialer_campaign_throttle_latched{tenant=~\"$tenant\", campaign_id=~\"$campaign_id\"}",
+          "legendFormat": "THROTTLE {{campaign_id}}",
+          "refId": "E"
+        }
+      ],
+      "title": "AMD vs ANS_AG / attempted / throttle",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["OML", "Dialer", "Pacing", "OMniDialer"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": { "type": "prometheus" },
+        "definition": "label_values(omnidialer_campaign_calls, tenant)",
+        "includeAll": true,
+        "allValue": ".*",
+        "label": "Tenant",
+        "multi": false,
+        "name": "tenant",
+        "query": {
+          "query": "label_values(omnidialer_campaign_calls, tenant)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "prometheus" },
+        "definition": "label_values(omnidialer_campaign_calls{tenant=~\"$tenant\"}, campaign_id)",
+        "includeAll": true,
+        "allValue": ".*",
+        "label": "Campaign",
+        "multi": true,
+        "name": "campaign_id",
+        "query": {
+          "query": "label_values(omnidialer_campaign_calls{tenant=~\"$tenant\"}, campaign_id)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "OML OMniDialer Pacing",
+  "uid": "oml-omnidialer-pacing",
+  "version": 1,
+  "weekStart": ""
+}

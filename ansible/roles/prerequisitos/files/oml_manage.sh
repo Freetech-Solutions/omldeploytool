@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-{% raw %}
 # =============================================================================
 # OMniLeads — gestión Podman + systemd (Quadlet)
 # Basado en docker-compose/oml_manage.sh; nombres alineados con ContainerName=
@@ -8,10 +7,12 @@
 # =============================================================================
 set -euo pipefail
 
-# Imagen backup/restore (misma variable que backup.sh del rol prerequisitos)
-{% endraw %}
-BACKUP_RESTORE_IMG="{{ backup_restore_img | default('') }}"
-{% raw %}
+# Imagen backup/restore (Ansible escribe /etc/default/oml_manage.env)
+OML_MANAGE_ENV=/etc/default/oml_manage.env
+BACKUP_RESTORE_IMG="${BACKUP_RESTORE_IMG:-}"
+if [[ -z "$BACKUP_RESTORE_IMG" && -f "$OML_MANAGE_ENV" ]]; then
+    BACKUP_RESTORE_IMG=$(grep -E '^BACKUP_RESTORE_IMG=' "$OML_MANAGE_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+fi
 
 # --- Nombres de contenedor (Quadlet ContainerName=) ---
 CN_POSTGRES=postgresql-server
@@ -364,7 +365,7 @@ dialer_sync() {
 
 backup_database() {
     [[ -f "$BACKUP_ENV" ]] || { error "Falta $BACKUP_ENV (backup no configurado en este nodo)"; exit 1; }
-    [[ -n "$BACKUP_RESTORE_IMG" ]] || { error "BACKUP_RESTORE_IMG vacío (definir backup_restore_img en Ansible)"; exit 1; }
+    [[ -n "$BACKUP_RESTORE_IMG" ]] || { error "BACKUP_RESTORE_IMG vacío (definir en $OML_MANAGE_ENV o images.yml)"; exit 1; }
     local fn="pgsql-backup-$(date +%Y%m%d_%H%M).sql"
     podman run --rm --network=host --env-file "$BACKUP_ENV" -e "BACKUP_FILENAME=$fn" \
         "$BACKUP_RESTORE_IMG" python backup.py || {
@@ -406,7 +407,7 @@ send_inbound_call() {
     local target="${OML_SIPP_TARGET:-127.0.0.1:5060}"
     if container_running "$CN_PSTN_QA"; then
         require_container_running "$CN_PSTN_QA" || exit 1
-        podman exec -T "$CN_PSTN_QA" sipp -sn uac "$target" -s "999$telephone" -m 1 -r 1 -d 60000 -l 1 || {
+        podman exec "$CN_PSTN_QA" sipp -sn uac "$target" -s "999$telephone" -m 1 -r 1 -d 60000 -l 1 || {
             error "Fallo sipp"; exit 1
         }
     else
@@ -417,7 +418,7 @@ send_inbound_call() {
 
 hangup_pstn() {
     if container_running "$CN_PSTN_QA"; then
-        podman exec -T "$CN_PSTN_QA" asterisk -rx "channel request hangup all" || {
+        podman exec "$CN_PSTN_QA" asterisk -rx "channel request hangup all" || {
             error "Fallo hangup"; exit 1
         }
     else
@@ -432,7 +433,7 @@ dialer_call_test() {
     local inst="${DIALER_PC_INSTANCE:-1}"
     local cname="dialer-process-campaign-${inst}"
     require_container_running "$cname" || exit 1
-    podman exec -T "$cname" python3 call_test_dialer.py "$id_camp" || {
+    podman exec "$cname" python3 call_test_dialer.py "$id_camp" || {
         error "call_test_dialer.py falló"; exit 1
     }
 }
@@ -449,7 +450,7 @@ manual_call_test() {
         exit 1
     fi
     require_container_running "$mc" || exit 1
-    podman exec -T "$mc" python3 call_test_dialer.py "$telephone" "$id_camp" "$id_customer" "$id_agent" 1 1 15 15 || {
+    podman exec "$mc" python3 call_test_dialer.py "$telephone" "$id_camp" "$id_customer" "$id_agent" 1 1 15 15 || {
         error "manual-call falló"; exit 1
     }
 }
@@ -601,7 +602,7 @@ clean_all() {
 
 show_bucket() {
     require_container_running "$CN_OMLAPP" || exit 1
-    podman exec -T "$CN_OMLAPP" bash -c 'aws --endpoint-url "$S3_ENDPOINT" s3 ls --recursive "s3://${S3_BUCKET_NAME}"' || {
+    podman exec "$CN_OMLAPP" bash -c 'aws --endpoint-url "$S3_ENDPOINT" s3 ls --recursive "s3://${S3_BUCKET_NAME}"' || {
         error "show-bucket falló (¿variables S3 en django.env?)"; exit 1
     }
 }
@@ -617,7 +618,7 @@ redis_clean_cache() {
     read -rp "¿Flushall en Redis? (y/N): " ans
     [[ "$ans" =~ ^[Yy]$ ]] || { info "Cancelado"; return 0; }
     require_container_running "$CN_REDIS" || exit 1
-    podman exec -T "$CN_REDIS" redis-cli flushall
+    podman exec "$CN_REDIS" redis-cli flushall
     success "Redis flushall OK"
 }
 
@@ -685,7 +686,7 @@ redis_cli_eval() {
     local lua_script=$1
     local now_fmt=$2
     if container_running "$CN_REDIS"; then
-        podman exec -T "$CN_REDIS" redis-cli --raw EVAL "$lua_script" 0 "$now_fmt"
+        podman exec "$CN_REDIS" redis-cli --raw EVAL "$lua_script" 0 "$now_fmt"
         return
     fi
     local host
@@ -703,7 +704,7 @@ redis_cli_eval() {
 agents_status() {
     local now_fmt
     if container_running "$CN_REDIS"; then
-        now_fmt=$(podman exec -T "$CN_REDIS" date '+%Y-%m-%d %H:%M:%S')
+        now_fmt=$(podman exec "$CN_REDIS" date '+%Y-%m-%d %H:%M:%S')
     else
         now_fmt=$(date '+%Y-%m-%d %H:%M:%S')
     fi
@@ -1002,4 +1003,3 @@ main() {
 }
 
 main "$@"
-{% endraw %}

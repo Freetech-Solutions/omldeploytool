@@ -24,6 +24,13 @@
             (acd_host | trim) ~ ':' ~ (acd_ari_port | default(7088) | string),
             (acd_host | trim) ~ ':' ~ (acd_app_metrics_port | default(7098) | string),
             (rtpengine_host | trim) ~ ':' ~ (rtpengine_metrics_port | default(22223) | string),
+          ]
+          + (
+            [(redis_host | trim) ~ ':' ~ (dialer_pacing_exporter_port | default(7099) | string)]
+            if (dialer_engine | default('omnidialer') == 'omnidialer')
+            else []
+          )
+          + [
             (kamailio_pstn_host | default(edge_host) | trim) ~ ':' ~ (kamailio_pstn_metrics_port | default(9273) | string),
             (kamailio_host | trim) ~ ':' ~ (kamailio_webrtc_metrics_port | default(9274) | string),
             (omni_ip_lan | trim) ~ ':' ~ (prometheus_server_port | default(9090) | string)

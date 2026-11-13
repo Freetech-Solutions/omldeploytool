@@ -387,6 +387,7 @@ Rol Ansible: [`roles/addons`](../roles/addons/). Sin tag `-enterprise` en `APP_I
 | `:9187` | `obs-prometheus-postgres` / `prometheus_postgres.service` | `data_statefull`, AIO |
 | `:9121` | `obs-prometheus-redis` / `prometheus_redis.service` | `data_stateless`, AIO |
 | `:9418` | `obs-prometheus-gearman` / `prometheus_gearman.service` | `data_stateless`, AIO |
+| `:7099` | `obs-prometheus-dialer-pacing` / `prometheus_dialer_pacing.service` | `data_stateless`, AIO (`dialer_engine=omnidialer`) |
 
 Documentación ampliada de scrape, Loki y Homer: [`observability.md`](observability.md).
 

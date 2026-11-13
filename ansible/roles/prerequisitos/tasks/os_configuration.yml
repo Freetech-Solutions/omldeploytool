@@ -217,10 +217,19 @@
   when: certs == "certbot"
 
 - name: OS_CONF Copy oml_manage script
-  ansible.builtin.template:
-    src: "templates/oml_manage.sh"
+  ansible.builtin.copy:
+    src: oml_manage.sh
     dest: /usr/local/bin/oml_manage
     mode: '0755'
+  tags:
+    - install
+    - upgrade
+
+- name: OS_CONF Deploy oml_manage env (BACKUP_RESTORE_IMG)
+  ansible.builtin.template:
+    src: oml_manage.env
+    dest: /etc/default/oml_manage.env
+    mode: '0644'
   tags:
     - install
     - upgrade

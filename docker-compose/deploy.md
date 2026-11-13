@@ -86,7 +86,7 @@ Componentes del *Automatic Call Distribution*: Asterisk como PBX/ACD, generació
 
 | Servicio | Función |
 |----------|---------|
-| **fastagi** | Servicio FastAGI consultado por Asterisk para lógica de llamadas (AMD, enrutamiento, etc.). Conecta con PostgreSQL, Redis y Gearman. |
+| **fastagi** | Servicio FastAGI consultado por Asterisk para variables de canal desde Redis (`omni-retrieve-conf`) y persistencia de encuestas (`omni-survey-answer`). Conecta con PostgreSQL y Redis. |
 | **acd-conf-generator** | Genera la configuración de Asterisk (`astconf.py`) a partir de los datos de OMniLeads y la escribe en el volumen compartido `asterisk_conf`. |
 | **acd-server** | Asterisk como PBX/ACD. Gestiona llamadas, colas y grabaciones (volúmenes `asterisk_callrec`, `asterisk_conf`, `asterisk_sounds`). Recibe una IP fija (`ACD_HOST_IP`) dentro de la red `omnileads`. |
 | **acd-app** | Aplicación ARI (Asterisk REST Interface) que orquesta llamadas en Asterisk vía Stasis: transferencias, grabación, integración con el dialer y con la API REST de OMniLeads. |

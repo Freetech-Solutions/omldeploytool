@@ -89,7 +89,7 @@ email_smtp_relay: false
 
 scale_uwsgi: true
 uwsgi_processes: 4
-uwsgi_threads: 1
+uwsgi_threads: 2
 uwsgi_listen_queue_size: 2048
 uwsgi_worker_reload_mercy: 60
 uwsgi_evil_reload_on_rss: 3096
@@ -202,12 +202,14 @@ voicebot_password: "{{ vault_voicebot_password | default('', true) }}"
 # Redis performance tuning
 # https://loadforge.com/guides/enhancing-redis-performance-top-configuration-tweaks-to-accelerate-data-access
 # scale_redis: True
-# redis_maxmemory: 2gb
-# redis_maxmemory_policy: allkeys-lru
-# redis_tcp_backlog: 511
-# redis_maxclients: 2000
-# redis_lazyfree_lazy_eviction: yes
-# redis_lazyfree_lazy_expire: yes
+
+redis_maxmemory: 2gb
+redis_maxmemory_policy: allkeys-lru
+redis_tcp_backlog: 1024
+redis_maxclients: 3000
+redis_lazyfree_lazy_eviction: yes
+redis_lazyfree_lazy_expire: yes
+
 
 #####################################################################################################
 #                                       TELEPHONY EDGE PROXY                                        #
@@ -228,6 +230,10 @@ kamailio_log_level: 0
 # if you have your own instances put here the IP or hostname, otherwise leave commented
 # kamailio_pstn_host: 172.16.201.2
 kamailio_pstn_port: 5060
+# Optional: WAN SIP port advertised when the edge DNAT maps
+#   public:kamailio_pstn_public_port -> host:kamailio_pstn_port
+# (e.g. MikroTik 25060 -> 172.x.x.x:5060). Defaults to kamailio_pstn_port.
+# kamailio_pstn_public_port: 25060
 
 kamailio_webrtc_iface: eth1
 
@@ -266,18 +272,18 @@ rtpengine_log_level: 1
 #                                       DIALER                                                      #
 #####################################################################################################
 
-# --- Call attempts per second
-dialer_caps: 3
-# --- Number of dialer container replicas
-dialer_process_campaign_replicas: 5
-dialer_process_event_replicas: 1
-
 # --- gearmand (data_stateless). Override per tenant in vars.yml if needed.
 # gearman_threads: I/O worker threads (-t). gearman_backlog: listen backlog.
 # gearman_job_retries: retries when a worker fails a job.
 gearman_threads: 4
 gearman_backlog: 1024
 gearman_job_retries: 3
+
+# --- Call attempts per second
+dialer_caps: 5
+# --- Number of dialer container replicas
+dialer_process_campaign_replicas: 5
+dialer_process_event_replicas: 3
 
 # --- Periodic dialer channel audit (Redis OML:CALLS vs active Asterisk channels)
 # Interval in seconds between audit jobs. Set to 0 or a negative value to disable the scheduler job.
@@ -289,9 +295,43 @@ dialer_channel_audit_lock_ttl_sec: 55
 # lower OML:CALLS because the newly originated PSTN channel may not be visible in Asterisk yet.
 dialer_reserve_grace_sec: 30
 # Predictive pacing globals (override via env on dialer workers)
-dialer_max_abandon_rate: 0.03
+dialer_max_abandon_rate: 0.08
 dialer_warm_up_sample_size: 50
 dialer_predictive_tick_ms: 1000
+# Piso de P_hit en pacing (C_dial ∝ 1/P_hit). Evita explosión con hit rates muy bajos.
+dialer_hit_rate_floor: 0.02
+# α del EWMA de abandono (DROP_RATE_EWMA → γ). Ventana efectiva ≈ 2/α − 1 connects.
+dialer_drop_rate_alpha: 0.05
+# ART fallback (s) para t_ring sin muestra en CAMP:{id}:ART.
+dialer_default_art_sec: 15
+# Piso (s) del tiempo residual en P_lib; evita remaining ≤ 0.
+dialer_p_lib_remaining_eps: 1.0
+# Kill-switch global del predictivo. false → campañas predictive caen a R=1 (sin boost).
+dialer_predictive_enabled: true
+# Piso de γ al acercarse / pasar D_max (soft hold).
+dialer_gamma_throttle_floor: 0.4
+# Legacy tick count (fallback si STREAK_SEC no está). Preferir streak_sec.
+dialer_throttle_streak_k: 45
+# Segundos wall-clock con D ≥ D_max antes de latchear kill-switch (R=1).
+dialer_throttle_streak_sec: 45
+# Mínimo HIT_COUNT antes de poder engarzar el latch (muestra para EWMA/cum).
+dialer_throttle_min_hits: 20
+# Tope duro de sobremarcado: C_dial ≤ A_net * ratio − ringing. 0 = off.
+# Deploy conservador (3): en lab con P_hit bajo el ratio frena; en prod con hit
+# real + connects humanos conviene partir acá y subir a 4–5 solo si READY wait
+# crece y DROP/ABAND siguen bajo D_max.
+dialer_max_dial_ratio: 5
+# P0 origin guardrails (abort CAPS batch on event backlog / CALLS−Ast drift)
+# High CPU usage, disabled by default
+dialer_origin_guardrails_enabled: false
+dialer_guardrail_process_event_queued_max: 100
+dialer_guardrail_calls_ast_delta_max: 15
+dialer_guardrail_phase_calls_delta_max: 20
+# 0 = disabled. Tenant-wide originates/s across process-campaign workers.
+dialer_global_caps: 0
+dialer_require_endpoints: false
+# M0: attempt_id en reserve → Gearman (cupo sigue contact/callid). false = off.
+dialer_attempt_id_enabled: true
 
 # --- Log level for Dialer, 0: Error, 1: Warning, 2: Debug
 dialer_log_level: 2
