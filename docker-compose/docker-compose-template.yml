@@ -177,15 +177,20 @@ x-dialer-worker-common: &dialer-worker-common
     DIALER_CHANNEL_AUDIT_INTERVAL_SEC: ${DIALER_CHANNEL_AUDIT_INTERVAL_SEC:-60}
     DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC: ${DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC:-55}
     DIALER_RESERVE_GRACE_SEC: ${DIALER_RESERVE_GRACE_SEC:-30}
-    DIALER_MAX_ABANDON_RATE: ${DIALER_MAX_ABANDON_RATE:-0.03}
+    DIALER_MAX_ABANDON_RATE: ${DIALER_MAX_ABANDON_RATE:-0.08}
     DIALER_WARM_UP_SAMPLE_SIZE: ${DIALER_WARM_UP_SAMPLE_SIZE:-50}
     DIALER_PREDICTIVE_TICK_MS: ${DIALER_PREDICTIVE_TICK_MS:-1000}
-    DIALER_HIT_RATE_FLOOR: ${DIALER_HIT_RATE_FLOOR:-0.05}
-    DIALER_DROP_RATE_ALPHA: ${DIALER_DROP_RATE_ALPHA:-0.1}
+    DIALER_HIT_RATE_FLOOR: ${DIALER_HIT_RATE_FLOOR:-0.02}
+    DIALER_DROP_RATE_ALPHA: ${DIALER_DROP_RATE_ALPHA:-0.05}
     DIALER_DEFAULT_ART_SEC: ${DIALER_DEFAULT_ART_SEC:-15}
     DIALER_P_LIB_REMAINING_EPS: ${DIALER_P_LIB_REMAINING_EPS:-1.0}
     DIALER_PREDICTIVE_ENABLED: ${DIALER_PREDICTIVE_ENABLED:-true}
-    DIALER_GAMMA_THROTTLE_FLOOR: ${DIALER_GAMMA_THROTTLE_FLOOR:-0.2}
+    DIALER_GAMMA_THROTTLE_FLOOR: ${DIALER_GAMMA_THROTTLE_FLOOR:-0.4}
+    DIALER_THROTTLE_STREAK_K: ${DIALER_THROTTLE_STREAK_K:-45}
+    DIALER_THROTTLE_STREAK_SEC: ${DIALER_THROTTLE_STREAK_SEC:-45}
+    DIALER_THROTTLE_MIN_HITS: ${DIALER_THROTTLE_MIN_HITS:-20}
+    DIALER_MAX_DIAL_RATIO: ${DIALER_MAX_DIAL_RATIO:-3}
+    DIALER_ATTEMPT_ID_ENABLED: ${DIALER_ATTEMPT_ID_ENABLED:-true}
     TZ: ${TZ}
 
 # ACD common template
@@ -207,10 +212,11 @@ x-acd-ari-common: &acd-ari-common
 x-acd-ari-env: &acd-ari-env
   ASTERISK_HOST: ${ACD_HOSTNAME}
   ASTERISK_PORT: ${ACD_ARI_PORT}
-  ASTERISK_USER: ${ACD_AMI_USER}  
+  ASTERISK_USER: ${ACD_AMI_USER}
   ASTERISK_PASS: ${ACD_AMI_PASSWORD}
   ACD_WEBHOOK_TRANSFER_TTL: ${ACD_WEBHOOK_TRANSFER_TTL}
   SHORTCALL_DURATION_THRESHOLD_SEC: ${SHORTCALL_DURATION_THRESHOLD_SEC:-5}
+  FAILOVER_DIALPLAN_ENABLED: ${FAILOVER_DIALPLAN_ENABLED:-false}
   ARI_URL: http://${ACD_HOSTNAME}:${ACD_ARI_PORT}
   ARI_USER: ${ACD_AMI_USER}
   ARI_PASSWORD: ${ACD_AMI_PASSWORD}
@@ -223,11 +229,15 @@ x-acd-ari-env: &acd-ari-env
   OMNILEADS_HOSTNAME: ${NGINX_HOSTNAME}
   OMNILEADS_PROTOCOL: https
   OMNILEADS_VERIFY_SSL: "false"
-  GEARMAN_JOB_SERVERS: ${GEARMAN_JOB_SERVERS}  
+  GEARMAN_JOB_SERVERS: ${GEARMAN_JOB_SERVERS}
   NODE_ID: ${ACD_HOSTNAME}
   TENANT_ID: ${FQDN}
   REDIS_HOST: ${REDIS_HOSTNAME}
   RECORDING_BASE_PATH: /var/spool/asterisk/recording
+  # AMDREC=True: upload async de samples AMD a recordings/amd/. Requiere mismo flag en acd-server.
+  AMDREC: ${AMDREC:-False}
+  AUDIOSOCKET_ADDR: ${AUDIOSOCKET_ADDR:-audiosocket:9092}
+  AUDIOSOCKET_SESSION_TTL_SEC: ${AUDIOSOCKET_SESSION_TTL_SEC:-3600}
   PYTHON_LOGLEVEL: ${ACD_LOG_LEVEL:-error}
   TZ: ${TZ}
   WEBRTC_TRUNK: webrtc-trunk
@@ -277,6 +287,8 @@ x-asterisk-server-env: &asterisk-server-env
   TZ: ${TZ}
   WEBRTC_PROXY_HOSTNAME: ${KAMAILIO_WEBRTC_HOSTNAME:-kamailio-webrtc}
   WEBRTC_PROXY_PORT: ${KAMAILIO_WEBRTC_UDP_PORT:-10060}
+  # AMDREC=True: MixMonitor del recorte AMD (samples ML). Default off.
+  AMDREC: ${AMDREC:-False}
 
 # Asterisk Conf Generator common template
 x-asterisk-conf-generator-common: &asterisk-conf-generator-common
@@ -517,6 +529,8 @@ services:
         condition: service_healthy
     environment:
       <<: *django-env
+      # Identidad fija del plano web (workers escalables usan hostname del contenedor).
+      OML_NODE_ID: ${OML_NODE_ID:-omlapp}
       UWSGI_CUSTOM: True
       UWSGI_PROCESSES: ${UWSGI_PROCESSES}
       UWSGI_THREADS: ${UWSGI_THREADS}
@@ -536,12 +550,24 @@ services:
 
   django-commands:
     <<: *django-common
+    profiles: ["django-commands"]
+    restart: "no"
     depends_on:
       <<: *deps-pg-redis-minio
-    command: /opt/omnileads/bin/django_commands.sh
+      gearman:
+        condition: service_healthy
+      acd-server:
+        condition: service_healthy
+    # Initial data + HA-safe shared-state bootstrap (not on every omlapp replica).
+    # regenerar_asterisk needs Asterisk AMI → acd-server must be healthy first.
+    command: >-
+      /bin/bash -c
+      '/opt/omnileads/bin/django_commands.sh &&
+      /opt/omnileads/bin/django_runtime_bootstrap.sh'
     working_dir: /opt/omnileads/ominicontacto
     volumes:
       - django_static:/opt/omnileads/static
+      - django_media:/opt/omnileads/media_root
       - django_callrec_zip:/opt/omnileads/asterisk/var/spool/asterisk/monitor
     stop_grace_period: 30s
 
@@ -551,6 +577,7 @@ services:
       <<: *deps-redis
     environment:
       <<: *django-env
+      OML_NODE_ID: ${OML_NODE_ID:-omlapp}
       DAPHNE_ENABLE: "true"
       DAPHNE_PORT: ${DAPHNE_PORT:-8098}
       DJANGO_HOSTNAME: ${DAPHNE_HOSTNAME}
@@ -601,17 +628,27 @@ services:
   # ----------------------------------------------------------------------------
   # OMLAPP WORKERS
   # ----------------------------------------------------------------------------
-  whatsapp:
+  msgs-orchestrator:
     <<: *django-worker-common
     command: /opt/omnileads/bin/init_whatsapp.sh
+    deploy:
+      replicas: ${MSGS_ORCHESTRATOR_REPLICAS:-1}
+
+  email-fetch:
+    <<: *django-worker-common
+    command: /opt/omnileads/bin/init_email_fetch_service.sh
 
   background-tasks:
     <<: *django-worker-common
     command: /opt/omnileads/bin/init_worker_bgtasks.sh
+    deploy:
+      replicas: ${BACKGROUND_TASKS_REPLICAS:-1}
 
   supervision-events-listener:
     <<: *django-worker-common
     command: python manage.py supervision_events_listener
+    deploy:
+      replicas: ${SUPERVISION_EVENTS_LISTENER_REPLICAS:-1}
 
   presence-heartbeat-scheduler:
     <<: *django-worker-common
@@ -624,6 +661,8 @@ services:
   background-dialer-tasks:
     <<: *django-worker-common
     command: python manage.py omnidialer_events_listener
+    deploy:
+      replicas: ${OMNIDIALER_EVENTS_LISTENER_REPLICAS:-1}
 
   dashboard-agent-scheduler:
     <<: *django-worker-common
@@ -667,9 +706,6 @@ services:
       <<: *deps-pg-redis
     command: python /app/fastagi.py
     environment:
-      DIALER_AMD_ENDPOINT: ${DIALER_API_HOST}
-      GEARMAN_JOB_SERVERS: ${GEARMAN_JOB_SERVERS}
-      OMNILEADS_HOSTNAME: ${NGINX_HOSTNAME}
       PGHOST: ${POSTGRES_HOSTNAME}
       PGPORT: ${POSTGRES_PORT}
       PGUSER: ${POSTGRES_USER}
@@ -712,6 +748,55 @@ services:
     volumes:
       - asterisk_callrec:/var/spool/asterisk/recording
       # - ${REPO_PATH}/acd/source/ari-app/:/opt/asterisk/ari-app:ro
+
+  audiosocket:
+    <<: *base-service-common
+    build:
+      context: ./$REPO_PATH/audiosocket/
+      dockerfile: Dockerfile
+    image: ${AUDIOSOCKET_IMG:-omnileads/audiosocket:local}
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      AUDIOSOCKET_HOST: "0.0.0.0"
+      AUDIOSOCKET_PORT: "9092"
+      VOICEBOT_VENDOR: ${VOICEBOT_VENDOR:-ces}
+      REDIS_HOST: ${REDIS_HOSTNAME}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${AUDIOSOCKET_REDIS_DB:-0}
+      PROJECT_ID: ${CES_PROJECT_ID}
+      LOCATION: ${CES_LOCATION}
+      APP_ID: ${CES_APP_ID}
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp.json
+      # Handoff: login OML + GESTION_BOT + VoicebotWebhook (user/pass de VOICEBOT_*)
+      OML_API_BASE_URL: ${OML_API_BASE_URL:-http://omlapp:8099}
+      OML_VOICEBOT_USERNAME: ${VOICEBOT_USERNAME:-}
+      OML_VOICEBOT_PASSWORD: ${VOICEBOT_PASSWORD:-}
+      AUDIOSOCKET_DEBUG_PII: ${AUDIOSOCKET_DEBUG_PII:-}
+      TZ: ${TZ}
+    #volumes:
+    #  - ${CES_GCP_JSON_PATH}:/secrets/gcp.json:ro
+
+  acd-channel-audit:
+    <<: *acd-ari-common
+    entrypoint: [ "python", "channel_audit_publisher.py" ]
+    depends_on:
+      redis:
+        condition: service_healthy
+      acd-server:
+        condition: service_healthy
+    environment:
+      ARI_URL: http://${ACD_HOSTNAME}:${ACD_ARI_PORT}
+      ARI_USER: ${ACD_AMI_USER}
+      ARI_PASSWORD: ${ACD_AMI_PASSWORD}
+      ARI_APP: ${ACD_APP}
+      REDIS_URL: redis://${REDIS_HOSTNAME}:${REDIS_PORT}
+      ACD_AUDIT_NODE_ID: ${ACD_HOSTNAME}
+      ACD_CHANNEL_AUDIT_INTERVAL_SEC: ${ACD_CHANNEL_AUDIT_INTERVAL_SEC:-5}
+      ACD_CHANNEL_AUDIT_HB_TTL_SEC: ${ACD_CHANNEL_AUDIT_HB_TTL_SEC:-45}
+      PYTHON_LOGLEVEL: ${ACD_LOG_LEVEL:-error}
+      TZ: ${TZ}
 
   # ----------------------------------------------------------------------------
   # PROCESSING HEAVY METAL SERVICES
@@ -800,6 +885,8 @@ services:
     environment:
       <<: *dialer-worker-env
       GEARMAN_JOBS: "schedule-agenda"
+    deploy:
+      replicas: ${DIALER_SCHEDULER_REPLICAS:-1}
 
   dialer-channel-audit:
     <<: *dialer-worker-common
@@ -831,6 +918,19 @@ services:
       <<: *dialer-worker-env
       GEARMAN_JOBS: "render-template"
 
+  dialer-metrics:
+    <<: *dialer-worker-common
+    command: ["python3", "omnidialer_metrics.py"]
+    environment:
+      <<: *dialer-worker-env
+      REDIS_DIALER_DB: "3"
+      DIALER_METRICS_PORT: "7099"
+      DIALER_METRICS_ADDR: "0.0.0.0"
+    ports:
+      - "${DIALER_METRICS_HOST_PORT:-7099}:7099"
+    deploy:
+      replicas: 1
+
   # ----------------------------------------------------------------------------
   # TELEPHONY EDGE SERVICES
   # ----------------------------------------------------------------------------
@@ -848,9 +948,18 @@ services:
       IPADDR_PUBLIC: ${KAMAILIO_PSTN_IP}
       IPADDR_PRIVATE: ${KAMAILIO_PSTN_IP}
       ITSP_NODES: ${KAMAILIO_ITSP_NODES}
+      KAMAILIO_UDP_PORT: ${KAMAILIO_PSTN_UDP_PORT:-5060}
+      # Empty → entrypoint defaults PUBLIC to KAMAILIO_UDP_PORT
+      KAMAILIO_PUBLIC_UDP_PORT: ${KAMAILIO_PSTN_PUBLIC_UDP_PORT:-}
       RTPENGINE_SOCKET: udp:${RTPENGINE_HOSTNAME}:${RTPENGINE_BIND_UDP_PORT}
       KAMAILIO_CERTS_LOCATION: ${KAMAILIO_CERTS_LOCATION}
       KAMAILIO_PSTN_QA: ${KAMAILIO_PSTN_QA}
+      GTP_ENABLE: ${GTP_ENABLE:-false}
+      GTP_SIP_HOST: ${GTP_SIP_HOST:-sa.telephony.goog}
+      GTP_SIP_PORT: ${GTP_SIP_PORT:-5672}
+      GTP_PROJECT_ID: ${GTP_PROJECT_ID:-}
+      GTP_DEST_E164: ${GTP_DEST_E164:-}
+      GTP_REFER_CAMPAIGN_ID: ${GTP_REFER_CAMPAIGN_ID:-}
       HOMER_ENABLE: ${HOMER_ENABLE}
       HOMER_HOST: ${HOMER_HOSTNAME}
       HOMER_PORT: ${HOMER_PORT}
@@ -925,6 +1034,9 @@ services:
   #     PGUSER: ${POSTGRES_USER}
   #     PGPASSWORD: ${POSTGRES_PASSWORD}
   #     PGDATABASE: ${POSTGRES_DB}
+  #     REDIS_HOSTNAME: ${REDIS_HOSTNAME}
+  #     REDIS_PORT: ${REDIS_PORT:-6379}
+  #     REDIS_CALLDATA_DB: "2"
   #     PSTN_HOSTNAME: pbxemulator
   #   ports:
   #     - 127.0.0.1:8888:8808/tcp

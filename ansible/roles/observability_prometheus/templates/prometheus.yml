@@ -66,6 +66,15 @@ scrape_configs:
           tenant: '{{ tenant_id }}'
           component: 'acd_app'
 
+{% if (dialer_engine | default('omnidialer') == 'omnidialer') %}
+  - job_name: '{{ tenant_id }}_dialer_pacing'
+    static_configs:
+      - targets: ['{{ redis_host | trim }}:{{ dialer_pacing_exporter_port | default(7099) }}']
+        labels:
+          tenant: '{{ tenant_id }}'
+          component: 'dialer_pacing'
+{% endif %}
+
   - job_name: '{{ tenant_id }}_rtpengine'
     static_configs:
       - targets: ['{{ rtpengine_host | trim }}:{{ rtpengine_metrics_port | default(22223) }}']

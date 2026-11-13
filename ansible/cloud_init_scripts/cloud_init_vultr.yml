@@ -1,0 +1,79 @@
+#cloud-config
+# OMniLeads bootstrap for the Ansible admin user on Vultr instances.
+# Attach the account SSH key with user scheme root. This config copies the bare
+# key to omladmin and then sets PermitRootLogin no.
+# Keep this file ASCII-only. cloud-init on Debian 13 rejects bytes above 0x7f.
+# disable_root must stay false. true does not set PermitRootLogin no; it prefixes
+# root's authorized_keys with a forced command that refuses the shell.
+ssh_pwauth: false
+disable_root: false
+
+# Vultr vendor-data often upgrades packages and delays SSH.
+# The Packer snapshot already includes python3, sudo, and omladmin.
+package_update: false
+package_upgrade: false
+
+users:
+  - default
+  - name: omladmin
+    gecos: OMniLeads Ansible admin
+    shell: /bin/bash
+    lock_passwd: true
+    groups: sudo
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+
+runcmd:
+  - |
+    set -euo pipefail
+    if ! command -v sudo >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y python3 sudo
+    fi
+    usermod -aG sudo omladmin
+  - visudo -c
+  - |
+    set -euo pipefail
+    USER_NAME="omladmin"
+    HOME_DIR="/home/${USER_NAME}"
+    SSH_DIR="${HOME_DIR}/.ssh"
+    AUTH_KEYS="${SSH_DIR}/authorized_keys"
+
+    mkdir -p "${SSH_DIR}"
+
+    # Scheme root leaves the panel key in /root. Limited user login leaves it
+    # in /home/linuxuser. Keep only the key material, without a command= prefix.
+    : > "${AUTH_KEYS}.tmp"
+    for SRC in \
+      /root/.ssh/authorized_keys \
+      /home/linuxuser/.ssh/authorized_keys
+    do
+      if [ -s "${SRC}" ]; then
+        awk '/ssh-rsa|ssh-ed25519|ecdsa-sha2|sk-ssh-ed25519|sk-ecdsa-sha2/{print}' "${SRC}" \
+          | sed -E 's/^.*(ssh-rsa|ssh-ed25519|ecdsa-sha2[^ ]*|sk-ssh-ed25519[^ ]*|sk-ecdsa-sha2[^ ]*)/\1/' \
+          >> "${AUTH_KEYS}.tmp"
+      fi
+    done
+
+    if [ ! -s "${AUTH_KEYS}.tmp" ]; then
+      echo "ERROR: no SSH keys found in root or linuxuser; root SSH stays open" >&2
+      exit 1
+    fi
+    sort -u "${AUTH_KEYS}.tmp" > "${AUTH_KEYS}"
+    rm -f "${AUTH_KEYS}.tmp"
+
+    chown -R "${USER_NAME}:${USER_NAME}" "${SSH_DIR}"
+    chmod 700 "${SSH_DIR}"
+    chmod 600 "${AUTH_KEYS}"
+
+    mkdir -p /etc/ssh/sshd_config.d
+    cat > /etc/ssh/sshd_config.d/99-oml-hardening.conf <<'EOF'
+    PasswordAuthentication no
+    PermitRootLogin no
+    PubkeyAuthentication yes
+    EOF
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+    fi
+
+final_message: "OMniLeads Vultr cloud-init finished. Connect with ssh omladmin@<IP>"

@@ -144,7 +144,8 @@ scrape_configs:
   {'name': 'supervision_agentes_scheduler', 'unit': 'supervision_agentes_scheduler.service', 'family': 'omlapp-worker'},
   {'name': 'supervision_events_listener', 'unit': 'supervision_events_listener.service', 'family': 'omlapp-worker'},
   {'name': 'presence_heartbeat_scheduler', 'unit': 'presence_heartbeat_scheduler.service', 'family': 'omlapp-worker'},
-  {'name': 'whatsapp', 'unit': 'whatsapp.service', 'family': 'communication'},
+  {'name': 'msgs_orchestrator', 'unit': 'msgs_orchestrator.service', 'family': 'communication'},
+  {'name': 'email_fetch', 'unit': 'email_fetch.service', 'family': 'communication'},
   {'name': 'kamailio_pstn', 'unit': 'kamailio_pstn.service', 'family': 'telephony'},
   {'name': 'kamailio_webrtc', 'unit': 'kamailio_webrtc.service', 'family': 'telephony'},
   {'name': 'rtpengine', 'unit': 'rtpengine.service', 'family': 'telephony'},
@@ -230,7 +231,8 @@ scrape_configs:
   {'name': 'supervision_agentes_scheduler', 'unit': 'supervision_agentes_scheduler.service', 'family': 'omlapp-worker'},
   {'name': 'supervision_events_listener', 'unit': 'supervision_events_listener.service', 'family': 'omlapp-worker'},
   {'name': 'presence_heartbeat_scheduler', 'unit': 'presence_heartbeat_scheduler.service', 'family': 'omlapp-worker'},
-  {'name': 'whatsapp', 'unit': 'whatsapp.service', 'family': 'communication'},
+  {'name': 'msgs_orchestrator', 'unit': 'msgs_orchestrator.service', 'family': 'communication'},
+  {'name': 'email_fetch', 'unit': 'email_fetch.service', 'family': 'communication'},
 ] %}
 {{ journal_services_block('workers', worker_services) | indent(2, true) }}
 {% endif %}

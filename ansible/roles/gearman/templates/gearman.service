@@ -11,12 +11,13 @@ Pod=data_stateless.pod
 LogDriver=journald
 Label=tier=backend
 PodmanArgs=--cgroups=no-conmon
-Exec=gearmand -t 1
+Exec=gearmand -t {{ gearman_threads | default(4) }} --backlog={{ gearman_backlog | default(1024) }} --job-retries={{ gearman_job_retries | default(3) }}
 
 [Service]
 Restart=on-failure
 TimeoutStopSec=70
 TimeoutStartSec=900
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target

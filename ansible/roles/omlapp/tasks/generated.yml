@@ -79,20 +79,22 @@
         | unique
         | list
       }}
+    # django_commands / reset-admin: solo si cambió env o Quadlets.
+    # Las migraciones corren en cada deploy (abajo), en un solo host: migrate
+    # en paralelo contra el mismo PostgreSQL no es seguro (DuplicateColumn).
     omlapp_bootstrap_required: "{{ omlapp_env_file.changed or (omlapp_quadlet_units.results | default([]) | selectattr('changed', 'equalto', true) | list | length > 0) }}"
+    # Un solo host escribe el esquema compartido. omlapp_web primero (cluster);
+    # omnileads_aio cubre el layout de un solo servidor.
+    omlapp_db_bootstrap_host: "{{ (groups['omlapp_web'] | default([]) + groups['omnileads_aio'] | default([])) | unique | first }}"
   changed_when: false
   tags:
     - install
     - upgrade
     - update
 
-- name: Force handlers to run immediately (Boot up PostgreSQL)
-  meta: flush_handlers
-  tags:
-    - install
-    - upgrade
-    - update
-
+# PostgreSQL ya lo levantó el rol postgresql; NO flush de handlers aquí:
+# reiniciar omnileads.service antes de migrate provoca
+# "relation auth_permission does not exist" al arrancar uWSGI.
 - name: Wait for PostgreSQL to accept connections
   ansible.builtin.wait_for:
     host: "{{ postgres_host | trim }}"
@@ -102,6 +104,7 @@
     - install
     - upgrade
     - update
+
 - name: POSTGRESQL Create a new database with name {{ postgres_database }}
   postgresql_db:
     name: "{{ postgres_database }}"
@@ -117,19 +120,59 @@
     - upgrade_from_oml_1 is not defined 
     - postgres_out == true
 
-- name: DJANGO run migrations 
+- name: DJANGO run migrations
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} /opt/omnileads/bin/django_migrations.sh"
-  tags:  
+  when: inventory_hostname == omlapp_db_bootstrap_host
+  tags:
     - install
     - upgrade
     - update
-  when: omlapp_bootstrap_required | bool
 
 - name: DJANGO run django_commands
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} --volume=django_static:/opt/omnileads/static {{ APP_IMG }} /opt/omnileads/bin/django_commands.sh"
   tags:
-    - install      
-  when: omlapp_bootstrap_required | bool
+    - install
+  when:
+    - omlapp_bootstrap_required | bool
+    - inventory_hostname == omlapp_db_bootstrap_host
+
+# Shared-state ops formerly in init_uwsgi.sh (unsafe with ≥2 omlapp_web replicas).
+# Single host only; ACD role runs earlier so AMI/regenerar_asterisk can reach Asterisk.
+- name: DJANGO runtime bootstrap (static, permisos, regenerar_asterisk)
+  ansible.builtin.shell: >-
+    podman run --rm --network=host
+    --env-file /etc/default/django.env
+    -e PGHOST={{ postgres_host | trim }}
+    -e REDIS_HOST={{ redis_host | trim }}
+    --volume=django_static:/opt/omnileads/static
+    --volume=django_media:/opt/omnileads/media_root
+    {{ APP_IMG }}
+    /opt/omnileads/bin/django_runtime_bootstrap.sh
+  when: inventory_hostname == omlapp_db_bootstrap_host
+  tags:
+    - install
+    - upgrade
+    - update
+
+# django_static es un volumen Podman de cada host. reverse.js no viene en la
+# imagen: lo genera collectstatic_js_reverse. Sin ese archivo, compress falla
+# al renderizar omnileads_ui/base.html. migrate, permisos y regenerar_asterisk
+# siguen en un solo host.
+- name: DJANGO collectstatic and compress on every omlapp_web replica
+  ansible.builtin.shell: >-
+    podman run --rm --network=host
+    --env-file /etc/default/django.env
+    -e PGHOST={{ postgres_host | trim }}
+    -e REDIS_HOST={{ redis_host | trim }}
+    --volume=django_static:/opt/omnileads/static
+    {{ APP_IMG }}
+    bash -c 'python3 /opt/omnileads/ominicontacto/manage.py collectstatic_js_reverse
+    && python3 /opt/omnileads/ominicontacto/manage.py collectstatic --noinput
+    && python3 /opt/omnileads/ominicontacto/manage.py compress'
+  tags:
+    - install
+    - upgrade
+    - update
 
 - name: DJANGO reset admin pass
   ansible.builtin.shell: "podman run --rm --network=host --env-file /etc/default/django.env -e PGHOST={{ postgres_host | trim }} -e REDIS_HOST={{ redis_host | trim }} {{ APP_IMG }} python /opt/omnileads/ominicontacto/manage.py cambiar_admin_password"
@@ -141,6 +184,15 @@
     - omlapp_bootstrap_required | bool
     # El rol omlapp hereda tags upgrade/update; limitar reset solo a --action=install.
     - "'install' in ansible_run_tags"
+    - inventory_hostname == omlapp_db_bootstrap_host
+
+# Reiniciar solo después de migrate + runtime bootstrap (handlers notificados por env/Quadlet).
+- name: DJANGO Apply pending omlapp service restarts after migrations
+  meta: flush_handlers
+  tags:
+    - install
+    - upgrade
+    - update
 
 - name: DJANGO Enable and start systemd services
   systemd:
@@ -153,3 +205,4 @@
   tags:
     - install
     - upgrade
+    - update

@@ -9,6 +9,25 @@
 # Cualquier extensión nueva debería seguir este orden y mantener tags: [always] para que
 # corra incluso con --tags acotados.
 
+- name: CHECKS Validate container registry credentials are paired
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          (container_registry_user | default('') | string | length) == 0
+          and (container_registry_password | default('') | string | length) == 0
+        )
+        or (
+          (container_registry_user | default('') | string | length) > 0
+          and (container_registry_password | default('') | string | length) > 0
+        )
+    fail_msg: >-
+      container_registry_user y container_registry_password deben declararse juntos
+      (vía vault_container_registry_user / vault_container_registry_password).
+    success_msg: "Credenciales de container registry: OK (ambas vacías o ambas definidas)"
+  tags:
+    - always
+
 - name: CHECKS Validate required global variables
   ansible.builtin.assert:
     that:
@@ -48,7 +67,6 @@
       - REDIS_IMG is defined
       - POSTGRES_IMG is defined
       - MINIO_IMG is defined
-      - MINIO_MC_IMG is defined
       - GEARMAN_IMG is defined
       - HAPROXY_IMG is defined
       # Vault (kamailio_webrtc_auth_eph_key se referencia desde runtime.yml -> vault_kamailio_webrtc_auth_eph_key)
@@ -69,8 +87,9 @@
       - ansible_host is defined and (ansible_host | string | length) > 0
       - omni_ip_lan is defined and (omni_ip_lan | string | length) > 0
     fail_msg: >-
-      El host '{{ inventory_hostname }}' no declara ansible_host y/o omni_ip_lan.
-      Cada host del inventario debe definir ambos (ver instances/test_3.0/inventory.yml).
+      El host '{{ inventory_hostname }}' no tiene ansible_host (obligatorio) o
+      omni_ip_lan quedó vacío tras el default a ansible_host. Declará ansible_host
+      y, si la LAN difiere de la IP SSH, omni_ip_lan.
   tags:
     - always
 
@@ -121,6 +140,23 @@
       El componente ACD está habilitado (acd / omnileads_aio) pero faltan ami_user,
       ami_password y/o los rangos RTP/log de Asterisk en el inventario.
   when: component_acd_enabled | default(false) | bool
+  tags:
+    - always
+
+- name: CHECKS Validate AudioSocket when enabled
+  ansible.builtin.assert:
+    that:
+      - AUDIOSOCKET_IMG is defined
+      - (AUDIOSOCKET_IMG | string | length) > 0
+      - (voicebot_vendor | default('ces') | lower) != 'ces' or (audiosocket_gcp_app_id | default('') | string | trim | length) > 0
+      - (prerequisitos_tenant_instances_dir ~ '/google_credentials.json') is file
+    fail_msg: >-
+      audiosocket_enabled requiere AUDIOSOCKET_IMG (tag CI en images.yml),
+      audiosocket_gcp_app_id si voicebot_vendor=ces, y
+      {{ prerequisitos_tenant_instances_dir }}/google_credentials.json
+  when:
+    - audiosocket_enabled | default(false) | bool
+    - component_acd_enabled | default(false) | bool
   tags:
     - always
 

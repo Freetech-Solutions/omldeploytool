@@ -43,7 +43,7 @@ para no contaminar el sistema. La carpeta `ansible/venv/` está incluida en
 [`.gitignore`](../.gitignore).
 
 ```bash
-cd ansible
+cd omldeploytool/ansible
 
 # Crear el venv (la convención del repo es ansible/venv)
 python3 -m venv venv
@@ -157,6 +157,11 @@ vault_haproxy_prom_allowed_src: ["10.0.0.0/8", "192.168.0.0/16"]
 # --- Backups en S3
 vault_backup_bucket_access_key: "..."
 vault_backup_bucket_secret_key: "..."
+
+# --- Container registry privado (opcional; p. ej. Vultr CR)
+# Requerido si oml_container_registry apunta a un registry autenticado.
+# vault_container_registry_user: "..."
+# vault_container_registry_password: "..."
 ```
 
 > El listado completo y las referencias `{{ vault_* }}` en el inventario están
@@ -299,6 +304,25 @@ bucket_region: us-east-1
 Si el tenant utiliza el MinIO desplegado por OMniLeads, no declares
 `bucket_url`: `topology_normalize` deriva el endpoint desde el host del grupo
 `data_statefull`.
+
+Para pull de imágenes OMniLeads desde un registry propio (p. ej. Vultr Container
+Registry), definí el prefijo y las credenciales en Vault:
+
+```yaml
+# instances/<tenant>/vars.yml  (o tenants_global.yml / runtime.yml)
+oml_container_registry: "lax.vultrcr.com/omnileads"
+```
+
+```yaml
+# group_vars/all/vault.yml
+vault_container_registry_user: "..."
+vault_container_registry_password: "..."
+```
+
+`topology_normalize` reescribe los prefijos `docker.io/freetechsolutions|omnileads`
+de las imágenes propias conservando los tags de `images.yml`. El rol
+`prerequisitos` hace `podman login` persistente en `/etc/containers/auth.json`
+para que Quadlet pueda hacer pull tras reinicios.
 
 > [!IMPORTANT]
 > No guardes passwords, tokens ni claves directamente en `vars.yml`. Declaralos

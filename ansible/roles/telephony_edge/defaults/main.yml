@@ -2,3 +2,11 @@
 component_telephony_edge_enabled: false
 kamailio_pstn_metrics_port: 9273
 kamailio_webrtc_metrics_port: 9274
+
+# Google Telephony Platform (CX Agent Studio voicebot). Off by default.
+gtp_enable: false
+gtp_sip_host: sa.telephony.goog
+gtp_sip_port: 5672
+gtp_project_id: ""
+gtp_dest_e164: ""
+gtp_refer_campaign_id: ""

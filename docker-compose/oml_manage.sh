@@ -267,41 +267,72 @@ restore_database() {
 # Init Environment data example
 # -----------------------------------------------------------------------------
 generate_data() {
+    local agents="${1:-199}"
+    if ! [[ "$agents" =~ ^[0-9]+$ ]] || (( agents < 1 )); then
+        error "data-generate espera un entero positivo (cantidad de agentes ag1..agN)"
+        exit 1
+    fi
     docker_compose exec -T omlapp \
-        python3 manage.py inicializar_entorno || {
+        python3 manage.py inicializar_entorno --qa-agents "$agents" || {
         error "Failed to generate example data"
         exit 1
     }
 }
 
 # -----------------------------------------------------------------------------
+# Ensure deps for django-commands / runtime bootstrap (incl. ACD for regenerar)
+# -----------------------------------------------------------------------------
+ensure_django_commands_deps() {
+    local deps=(postgresql redis minio gearman acd-server)
+    log "Levantando dependencias para django-commands (${deps[*]})..."
+    docker_compose up -d "${deps[@]}"
+    wait_for_services_healthy 180 "${deps[@]}" || exit 1
+}
+
+# -----------------------------------------------------------------------------
 # Run Django Commands (on-demand)
 # -----------------------------------------------------------------------------
 run_django_commands() {
-    log "Ejecutando django-commands (on-demand)..."
-    
-    # Verificar que los servicios dependientes estén corriendo
-    local required_services=(postgresql redis minio)
-    local missing_services=()
-    
-    for svc in "${required_services[@]}"; do
-        if ! docker_compose ps -q "$svc" &>/dev/null; then
-            missing_services+=("$svc")
-        fi
-    done
-    
-    if (( ${#missing_services[@]} )); then
-        error "Los siguientes servicios requeridos no están corriendo: ${missing_services[*]}"
-        info "Por favor, inicia los servicios primero con: ./oml_manage.sh up -d"
-        exit 1
-    fi
-    
-    # Ejecutar django-commands con el perfil activado
+    log "Ejecutando django-commands + django_runtime_bootstrap (on-demand)..."
+    ensure_django_commands_deps
     docker_compose --profile django-commands run --rm django-commands || {
         error "Failed to execute django-commands"
         exit 1
     }
-    success "django-commands ejecutado exitosamente"
+    success "django-commands + runtime bootstrap OK"
+}
+
+# -----------------------------------------------------------------------------
+# Run only HA-safe runtime bootstrap (static, permisos, regenerar_asterisk)
+# -----------------------------------------------------------------------------
+run_django_runtime_bootstrap() {
+    log "Ejecutando django_runtime_bootstrap.sh (on-demand)..."
+    ensure_django_commands_deps
+    docker_compose --profile django-commands run --rm django-commands \
+        /opt/omnileads/bin/django_runtime_bootstrap.sh || {
+        error "Failed to execute django_runtime_bootstrap"
+        exit 1
+    }
+    success "django_runtime_bootstrap OK"
+}
+
+# -----------------------------------------------------------------------------
+# Full First-Time Django Bootstrap
+# -----------------------------------------------------------------------------
+run_bootstrap() {
+    log "Iniciando bootstrap completo de Django (migraciones, comandos iniciales, estáticos, permisos, Asterisk y password admin)..."
+    ensure_django_commands_deps
+    docker_compose --profile django-commands run --rm django-commands \
+        /bin/bash -c '
+            /opt/omnileads/bin/django_migrations.sh &&
+            /opt/omnileads/bin/django_commands.sh &&
+            /opt/omnileads/bin/django_runtime_bootstrap.sh &&
+            python3 /opt/omnileads/ominicontacto/manage.py cambiar_admin_password
+        ' || {
+        error "Failed to execute bootstrap"
+        exit 1
+    }
+    success "Bootstrap inicial de Django completado exitosamente"
 }
 
 # -----------------------------------------------------------------------------
@@ -397,19 +428,62 @@ clean_all() {
 
 send_call() {
     local telephone="${1:-}"
+    local count="${2:-1}"
+    local interval="${3:-}"
+    local duration="${4:-full}"
+    local usage="Usage: ./oml_manage.sh inbound-call <telephone> [count] [interval_seconds] [duration]"
+    local example="Example: ./oml_manage.sh inbound-call 01177660010 2 5 27"
     if [[ -z "$telephone" ]]; then
         error "Missing telephone argument."
-        info "Usage: ./manage.sh inbound-call <telephone>"
-        info "Example: ./manage.sh inbound-call 999"
+        info "$usage"
+        info "duration: 15 | 27 | full (default: full)"
+        info "$example"
         exit 1
     fi
-    
+    if ! [[ "$count" =~ ^[1-9][0-9]*$ ]]; then
+        error "Call count must be a positive integer (got: ${count})."
+        info "$usage"
+        info "$example"
+        exit 1
+    fi
+    if [[ -n "$interval" ]] && ! [[ "$interval" =~ ^[0-9]+$ ]]; then
+        error "Interval must be a non-negative integer in seconds (got: ${interval})."
+        info "$usage"
+        info "$example"
+        exit 1
+    fi
+    case "$duration" in
+        15|27|full) ;;
+        *)
+            error "Duration must be 15, 27, or full (got: ${duration})."
+            info "$usage"
+            info "$example"
+            exit 1
+            ;;
+    esac
+
     if ! docker_compose ps -q pbxemulator &>/dev/null; then
         error "PBX Emulator service is not running. Please start it first."
         exit 1
     fi
-    # Nota: Asegurarse de que el argumento se pasa como texto
-    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "999$telephone" -m 1 -r 1 -d 60000 -l 1 || {
+
+    local sipp_exten
+    case "$duration" in
+        15) sipp_exten="99915${telephone}" ;;
+        27) sipp_exten="99927${telephone}" ;;
+        *)  sipp_exten="999${telephone}" ;;
+    esac
+
+    # Sin intervalo (o 0): todas en el mismo segundo. Con intervalo: 1 llamada por periodo.
+    local -a sipp_rate=(-r "$count")
+    if [[ -n "$interval" && "$interval" -gt 0 ]]; then
+        sipp_rate=(-r 1 -rp "$((interval * 1000))")
+        log "Sending ${count} call(s) to ${telephone} (duration=${duration}), one every ${interval}s..."
+    else
+        log "Sending ${count} call(s) to ${telephone} (duration=${duration})..."
+    fi
+    # -m total, -r llamadas por periodo, -rp periodo en ms, -l simultáneas, -d duración ms
+    docker_compose exec -T pbxemulator sipp -sn uac pbxemulator:5070 -s "$sipp_exten" -m "$count" "${sipp_rate[@]}" -d 60000 -l "$count" || {
         error "Failed to send call"
         exit 1
     }
@@ -496,6 +570,18 @@ open_psql() {
 }
 
 # -----------------------------------------------------------------------------
+# Open Redis CLI (interactive)
+# -----------------------------------------------------------------------------
+run_redis_cli() {
+    if ! docker_compose ps -q redis &>/dev/null; then
+        error "Service 'redis' is not running or does not exist."
+        exit 1
+    fi
+    log "Opening redis-cli in 'redis'..."
+    docker_compose exec -it redis redis-cli
+}
+
+# -----------------------------------------------------------------------------
 # Trigger Manual Test
 # -----------------------------------------------------------------------------
 trigger_manual_test() {
@@ -538,6 +624,35 @@ trigger_manual_test() {
 }
 
 # -----------------------------------------------------------------------------
+# Persist DOCKER_PLATFORM
+# -----------------------------------------------------------------------------
+# Compose interpola ${DOCKER_PLATFORM:-linux/amd64}. El export del rebuild
+# muere con el proceso; si no queda en .env, el `up` siguiente pide amd64
+# y hace pull aunque la imagen local sea arm64.
+persist_docker_platform() {
+    local platform="$1"
+    [[ -n "$platform" ]] || return 0
+
+    if [[ ! -f "$ENV_FILE" ]]; then
+        printf 'DOCKER_PLATFORM=%s\n' "$platform" > "$ENV_FILE"
+        log "DOCKER_PLATFORM=$platform escrito en $ENV_FILE"
+        return 0
+    fi
+
+    if grep -q '^DOCKER_PLATFORM=' "$ENV_FILE"; then
+        local current
+        current="$(grep '^DOCKER_PLATFORM=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+        [[ "$current" == "$platform" ]] && return 0
+        sed -i.bak "s|^DOCKER_PLATFORM=.*|DOCKER_PLATFORM=${platform}|" "$ENV_FILE"
+        rm -f "${ENV_FILE}.bak"
+        log "DOCKER_PLATFORM actualizado a $platform en $ENV_FILE"
+    else
+        printf '\nDOCKER_PLATFORM=%s\n' "$platform" >> "$ENV_FILE"
+        log "DOCKER_PLATFORM=$platform agregado a $ENV_FILE"
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # Rebuild Services
 # -----------------------------------------------------------------------------
 rebuild_services() {
@@ -550,33 +665,31 @@ rebuild_services() {
         if [[ "$arg" =~ ^--platform=(.+)$ ]]; then
             platform="${BASH_REMATCH[1]}"
         elif [[ "$arg" != --platform=* ]]; then
-            build_args+=("$arg")
             if [[ -z "$service_name" ]]; then
                 service_name="$arg"
+            else
+                build_args+=("$arg")
             fi
         fi
     done
     
-    # Set DOCKER_PLATFORM environment variable if platform flag was provided
+    # Set DOCKER_PLATFORM (compose service.platform). No pasar --platform a
+    # `docker compose build`: versiones de Compose lo rechazan ("unknown flag").
     if [[ -n "$platform" ]]; then
         export DOCKER_PLATFORM="$platform"
+        persist_docker_platform "$platform"
         log "Building for platform: $platform"
     fi
     
     if [[ -n "$service_name" ]]; then
         log "Rebuilding image for $service_name..."
-        docker_compose build "${build_args[@]}"
+        docker_compose build "${build_args[@]}" "$service_name"
         docker_compose up -d "$service_name"
         success "Service '$service_name' rebuilt and restarted"
     else
         log "Rebuilding all images cache..."
         docker_compose build "${build_args[@]}"
         success "All images rebuilt"
-    fi
-    
-    # Unset DOCKER_PLATFORM if it was set
-    if [[ -n "$platform" ]]; then
-        unset DOCKER_PLATFORM
     fi
 }
 
@@ -619,6 +732,145 @@ compose_version() {
 }
 
 # -----------------------------------------------------------------------------
+# Agents status (Kamailio Redis DB1 + OML:AGENT Redis DB0)
+# -----------------------------------------------------------------------------
+# Cruzar usrloc Kamailio (DB1 location:entry::*) con OML:AGENT:* (DB0).
+# Salida: USERNAME | STATUS KAM | STATUS AGCONSOLE
+agents_status() {
+    if ! docker_compose ps -q redis &>/dev/null; then
+        error "Service 'redis' is not running or does not exist."
+        exit 1
+    fi
+
+    local now_fmt
+    now_fmt=$(docker_compose exec -T redis date '+%Y-%m-%d %H:%M:%S')
+
+    local lua_script
+    # ARGV[1] = now as 'YYYY-MM-DD HH:MM:SS' (same format as Kamailio expires)
+    lua_script='
+local now = ARGV[1]
+redis.call("SELECT", 1)
+local sip_state = {}
+local cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "location:entry::*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local username = redis.call("HGET", key, "username")
+    local expires = redis.call("HGET", key, "expires")
+    if username and username ~= "" then
+      local st = "EXPIRED"
+      if expires and expires ~= "" and expires >= now then
+        st = "REGISTERED"
+      end
+      local prev = sip_state[username]
+      if prev ~= "REGISTERED" then
+        sip_state[username] = st
+      end
+    end
+  end
+until cursor == "0"
+
+redis.call("SELECT", 0)
+local agents = {}
+cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "OML:AGENT:*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local id = redis.call("HGET", key, "id")
+    if not id or id == "" then
+      id = string.match(key, "OML:AGENT:(%d+)$") or ""
+    end
+    local name = redis.call("HGET", key, "NAME") or ""
+    local sip = redis.call("HGET", key, "SIP") or ""
+    local status = redis.call("HGET", key, "STATUS") or ""
+    local voicebot = redis.call("HGET", key, "VOICEBOT") or ""
+    if status == "" then status = "OFFLINE" end
+    local kam = "UNREGISTERED"
+    if voicebot == "1" then
+      kam = "VOICEBOT"
+    elseif sip ~= "" and sip_state[sip] then
+      kam = sip_state[sip]
+    end
+    local username = name
+    if username == "" then username = "agent-" .. id end
+    username = username .. " (id:" .. id .. " sip:" .. sip .. ")"
+    table.insert(agents, {tonumber(id) or 0, username, kam, status})
+  end
+until cursor == "0"
+
+table.sort(agents, function(a, b) return a[1] < b[1] end)
+
+local out = {}
+for _, row in ipairs(agents) do
+  table.insert(out, row[2] .. "\t" .. row[3] .. "\t" .. row[4])
+end
+return out
+'
+
+    local rows
+    rows=$(docker_compose exec -T redis redis-cli --raw EVAL "$lua_script" 0 "$now_fmt") || {
+        error "Failed to query Redis for agents status"
+        exit 1
+    }
+
+    if [[ -z "${rows//[$'\t\r\n ']/}" ]]; then
+        warning "No OML:AGENT:* keys found in Redis DB0"
+        return 0
+    fi
+
+    local color_kam color_ag
+    color_kam() {
+        case "$1" in
+            REGISTERED) printf '%s' "${GREEN}$1${NC}" ;;
+            EXPIRED)    printf '%s' "${YELLOW}$1${NC}" ;;
+            VOICEBOT)   printf '%s' "${CYAN}$1${NC}" ;;
+            *)          printf '%s' "${RED}$1${NC}" ;;
+        esac
+    }
+    color_ag() {
+        case "$1" in
+            READY)                          printf '%s' "${GREEN}$1${NC}" ;;
+            ONCALL|RINGING|DIALING)         printf '%s' "${CYAN}$1${NC}" ;;
+            PAUSED*|PAUSE*|ACW|POSTCALL)    printf '%s' "${YELLOW}$1${NC}" ;;
+            OFFLINE|"")                     printf '%s' "${RED}${1:-OFFLINE}${NC}" ;;
+            *)                              printf '%s' "$1" ;;
+        esac
+    }
+
+    printf '\n'
+    printf "%-42s %-14s %s\n" "USERNAME" "STATUS KAM" "STATUS AGCONSOLE"
+    printf '%s\n' "----------------------------------------------------------------------"
+    while IFS=$'\t' read -r username kam_status ag_status; do
+        [[ -z "$username" ]] && continue
+        # Detect mismatch: console online but SIP not registered
+        local kam_col ag_col
+        if [[ "$ag_status" != "OFFLINE" && -n "$ag_status" && "$kam_status" == "UNREGISTERED" ]]; then
+            kam_col="${RED}${kam_status}${NC}"
+            ag_col="${YELLOW}${ag_status}${NC}"
+        else
+            kam_col=$(color_kam "$kam_status")
+            ag_col=$(color_ag "$ag_status")
+        fi
+        printf "%-42s %-24s %s\n" "$username" "$kam_col" "$ag_col"
+    done <<< "$rows"
+    printf '\n'
+}
+
+agents_cmd() {
+    local sub="${1:-status}"
+    case "$sub" in
+        status|"") agents_status ;;
+        *)
+            error "Unknown agents subcommand: $sub"
+            info "Usage: ./oml_manage.sh agents status"
+            exit 1
+            ;;
+    esac
+}
+
+# -----------------------------------------------------------------------------
 # Display Help
 # -----------------------------------------------------------------------------
 show_help() {
@@ -630,7 +882,8 @@ show_help() {
 
     Commands:
       up [ -d ] [ commands ]  Start all services (use -d for detached). If 'commands'
-                              is given, runs django-commands before bringing up the stack.
+                              is given, runs django-commands + runtime bootstrap
+                              (needs pg/redis/minio/gearman/acd) before full up.
       down [ -v ]        Stop and remove containers (use -v to remove volumes)
       pull [svc]         Pull images (all or specific service)
       restart [svc]      Restart all or a specific service
@@ -638,22 +891,27 @@ show_help() {
       start   [svc]      Start all or a specific service
       logs    [-f] [svc] Show or follow logs
       status             Show container status + averages + raw stats
+      agents [status]    List agents: SIP (Kamailio Redis DB1) vs console (OML:AGENT DB0)
       health             Perform health check of critical services
       build-vuejs        Build VueJS assets
       clean              Prune stopped containers, unused images/volumes/networks
       clean-all          Full system prune (including volumes and images)
       reset-pass         Reset admin password as admin admin
       force-recreate     Force-recreate services without cache
-      data-generate      Generate example data in the database
-      django-commands    Execute django-commands container (on-demand)
+      data-generate [n]  Generate example data (agents ag1..agN; default 199)
+      bootstrap          First-time Django bootstrap (migrations, django_commands,
+                         runtime_bootstrap, and admin password reset)
+      django-commands    One-shot: django_commands.sh + django_runtime_bootstrap.sh
+      django-runtime-bootstrap  One-shot: only django_runtime_bootstrap.sh
       rebuild [svc]      Rebuild one or all service images
       psql <db_user>   Open interactive psql in postgresql container (psql -U <db_user>)
+      redis-cli          Open interactive redis-cli in the redis container
       sngrep            Open sngrep in acd-server container (SIP debugging)
       asterisk_cli      Open Asterisk CLI in acd-server (asterisk -rvvvvv)
       backup             Backup PostgreSQL database
       restore            Restore PostgreSQL database from backup
       env                Display first 20 env vars from .env
-      inbound-call       Send a test call using the PBX-Emulator
+      inbound-call <tel> [n] [interval_s] [duration]  Send n test calls; duration: 15|27|full (default full)
       dialer-call        Trigger 'call_test_dialer.py' (Usage: tel id_camp id_cust)
       manual-call        Trigger 'call_test_manual.py' (Usage: tel id_camp id_cust)
       hangup-pstn        Hangup all PSTN calls using the PBX-Emulator
@@ -675,18 +933,22 @@ main() {
         up)
             shift
             run_commands_first=0
+            run_bootstrap_first=0
             UP_ARGS=()
             for arg in "$@"; do
                 if [[ "$arg" == "commands" ]]; then
                     run_commands_first=1
+                elif [[ "$arg" == "bootstrap" ]]; then
+                    run_bootstrap_first=1
                 else
                     UP_ARGS+=("$arg")
                 fi
             done
-            if (( run_commands_first )); then
-                log "Levantando dependencias (postgresql, redis, minio)..."
-                docker_compose up -d postgresql redis minio
-                wait_for_services_healthy 120 postgresql redis minio || exit 1
+            if (( run_bootstrap_first )); then
+                run_bootstrap
+                log "Levantando el resto del stack..."
+                docker_compose up -d "${UP_ARGS[@]}"
+            elif (( run_commands_first )); then
                 run_django_commands
                 log "Levantando el resto del stack..."
                 docker_compose up -d "${UP_ARGS[@]}"
@@ -702,22 +964,26 @@ main() {
         force-recreate) shift; log "Force-recreating..."; docker_compose up -d --force-recreate "$@" ;;
         logs)           shift; docker_compose logs "$@" ;;
         status)         show_status ;;
+        agents)         shift; agents_cmd "${1:-status}" ;;
         reset-pass)     reset_admin_password ;;
-        data-generate)  generate_data ;;
+        data-generate)  shift; generate_data "${1:-}" ;;
+        bootstrap)      run_bootstrap ;;
         django-commands) run_django_commands ;;
+        django-runtime-bootstrap) run_django_runtime_bootstrap ;;
         build-vuejs)    build_vuejs ;;
         health)         check_health ;;
         clean)          clean_system ;;
         clean-all)      clean_all ;;
-        inbound-call)   shift; send_call "${1:-}" ;;
+        inbound-call)   shift; send_call "${1:-}" "${2:-1}" "${3:-}" "${4:-full}" ;;
         dialer-call)    shift; trigger_dialer_test "$@" ;;
         manual-call)    shift; trigger_manual_test "$@" ;;
         hangup-pstn)    hangup_all_pstn_emulator_calls ;;
         backup)         backup_database ;;
         restore)        restore_database ;;
         terminal)       shift; open_terminal "${1:-}" ;;
-        rebuild)        shift; rebuild_services "${1:-}" ;;
+        rebuild)        shift; rebuild_services "$@" ;;
         psql)           shift; open_psql "${1:-}" ;;
+        redis-cli)      run_redis_cli ;;
         sngrep)         run_sngrep ;;
         asterisk_cli)   run_asterisk_cli ;;
         env)            if [[ -f "$ENV_FILE" ]]; then grep -h '^[A-Z_]\+=' "$ENV_FILE" | head -20; else warning ".env not found"; fi ;;

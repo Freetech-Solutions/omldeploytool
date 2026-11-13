@@ -11,6 +11,21 @@ certs_location: /etc/omnileads/certs
 swap_file: /swapfile
 # Container image registry
 container_image_registry: docker.io
+# Prefijo de registry para imágenes propias de OMniLeads (APP_IMG, ACD_IMG, …).
+# Vacío = mantiene los prefijos de images.yml (docker.io/freetechsolutions|omnileads).
+# Ejemplo Vultr: "lax.vultrcr.com/omnileads"
+oml_container_registry: ""
+# Servidor de login Podman (host sin path). Si oml_container_registry está set,
+# se deriva el host (lax.vultrcr.com); si no, usa container_image_registry.
+container_registry_url: >-
+  {{
+    (oml_container_registry | regex_replace('^https?://', '') | regex_replace('/.*$', ''))
+    if (oml_container_registry | default('') | string | trim | length > 0)
+    else container_image_registry
+  }}
+# Credenciales opcionales (Vault) para registries privados (p. ej. Vultr CR).
+container_registry_user: "{{ vault_container_registry_user | default('', true) }}"
+container_registry_password: "{{ vault_container_registry_password | default('', true) }}"
 # Container orchestrator
 container_orchest: systemd
 # Force image pull
@@ -34,10 +49,14 @@ postgres_port: 5432
 kamailio_wss_port: 10060
 kamailio_webrtc_udp_port: 10060
 kamailio_pstn_port: 5060
+# Optional WAN advertise port if DNAT uses a non-5060 public port (defaults to kamailio_pstn_port)
+# kamailio_pstn_public_port: 25060
 # Asterisk PJSIP listen ports (Kamailio PSTN stays on kamailio_pstn_port)
 acd_agent_sip_port: 5160
 acd_trunk_sip_port: 5070
 acd_ari_port: 7088
+# AudioSocket bridge (loopback del pod ACD; no se publica)
+audiosocket_port: 9092
 
 # Django OML vars
 INSTALL_PREFIX: /opt/omnileads/
@@ -60,6 +79,7 @@ data_stateless_pod_systemd_unit: data_stateless-pod.service
 data_statefull_pod: data-statefull-server
 data_statefull_pod_systemd_unit: data_statefull-pod.service
 telephony_edge_pod_systemd_unit: telephony_edge-pod.service
+observability_pod_systemd_unit: observability-pod.service
 qa_pod_systemd_unit: qa-pod.service
 acd_pod: acd
 dialer_api_pod: dialer
@@ -88,7 +108,8 @@ kamailio_pstn_container_name: kamailio-pstn-server
 nginx_container_name: oml-nginx-server
 omlapp_daphne_container_name: omlapp-daphne
 omlapp_uwsgi_container_name: omlapp-uwsgi
-omlapp_whatsapp_container_name: omlapp-whatsapp
+omlapp_msgs_orchestrator_container_name: omlapp-msgs-orchestrator
+omlapp_email_fetch_container_name: omlapp-email-fetch
 websocket_container_name: websocket-server
 rtpengine_container_name: rtpengine-server
 pstn_qa_container_name: oml-pstn-server
@@ -106,6 +127,7 @@ prometheus_redis_exporter_port: 9121
 prometheus_gearman_exporter_port: 9418
 prometheus_uwsgi_exporter_port: 9117
 acd_app_metrics_port: 7098
+dialer_pacing_exporter_port: 7099
 kamailio_pstn_metrics_port: 9273
 kamailio_webrtc_metrics_port: 9274
 haproxy_metrics_port: 8404

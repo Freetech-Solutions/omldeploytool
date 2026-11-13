@@ -24,41 +24,55 @@ ACD_HOST_IP=10.22.72.100
 KAMAILIO_PSTN_IP=10.22.72.101
 PSTN_EMULATOR_IP=10.22.72.99
 
-#############7#####################################################################################
+###################################################################################################
 #                                  Components image version                                       #
 #                              versions of each image to deploy                                   #
 ###################################################################################################
+---
 # --- OMniLeads images WEB
-APP_IMG=docker.io/freetechsolutions/omlapp:20260901-f462915c
-NGINX_IMG=docker.io/freetechsolutions/nginx:20260716-bf4395be
-WS_IMG=docker.io/freetechsolutions/websockets:20260306-13838d19
+APP_IMG=docker.io/freetechsolutions/omlapp:20261111-e8a55a17
+NGINX_IMG=docker.io/omnileads/nginx:20261111-5a2d2f4d
+WS_IMG=docker.io/omnileads/websockets:20261111-f1c83db4
 
 # --- OMniLeads images TEL
-ACD_IMG=docker.io/freetechsolutions/acd:20260901-47c8189d
-KAMAILIO_IMG=docker.io/freetechsolutions/kamailio:20260824-805399ea
-RTPENGINE_IMG=docker.io/freetechsolutions/rtpengine:20260713-c32419a6
-CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20260306-c644e9d3
-CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20260306-c644e9d3
-FASTAGI_IMG=docker.io/freetechsolutions/fastagi:20260211-0d7a1c9b
+ACD_IMG=docker.io/omnileads/acd:20261111-2c73a6b5
+KAMAILIO_IMG=docker.io/omnileads/kamailio:20261111-b8eac91c
+RTPENGINE_IMG=docker.io/omnileads/rtpengine:20261111-2d151aef
+CALLREC_COMPRESSOR_IMG=docker.io/freetechsolutions/callrec_compressor:20260930-1ada2b56
+CALLREC_TRANSCRIBER_IMG=docker.io/freetechsolutions/callrec_transcriber:20260930-1ada2b56
+FASTAGI_IMG=docker.io/omnileads/fastagi:20261111-7e0ee29f
+AUDIOSOCKET_IMG=docker.io/omnileads/audiosocket:20261111-9b4ed267
 
 # --- OMniLeads images DIALER
-DIALER_API_IMG=docker.io/freetechsolutions/dialer_api:20260818-cae334c6
-DIALER_WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20260818-cae334c6
+DIALER_API_IMG=docker.io/freetechsolutions/dialer_worker:20261113-deefd7cc
+DIALER_WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20261113-deefd7cc
+
+# --- OMniLeads utilities images
+BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20261111-1cb48093
 
 # --- Backend services common images
-REDIS_IMG=docker.io/redislabs/redisgears:1.0.9
+MINIO_IMG=docker.io/freetechsolutions/minio:20260930-83526c54
+REDIS_IMG=docker.io/redis:7.2.16-alpine3.21
 POSTGRES_IMG=docker.io/library/postgres:18-trixie
-MINIO_IMG=docker.io/minio/minio:RELEASE.2025-05-24T17-08-30Z
-MINIO_MC_IMG=docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
 GEARMAN_IMG=docker.io/artefactual/gearmand:1.1.21.2-alpine
 
-BACKUP_RESTORE_IMG=docker.io/freetechsolutions/backup_restore:20260422-16161cf0
+# --- Edge HTTP(S) load balancer (Quadlet en hosts del grupo edge)
+HAPROXY_IMG=docker.io/library/haproxy:3.3
+
+# --- Observability (Prometheus stack; alineado con docker-compose/observability/.env)
+PROMETHEUS_IMG=docker.io/prom/prometheus:v3.0.1
+PROMETHEUS_NODE_EXPORTER_IMG=docker.io/prom/node-exporter:v1.7.0
+REDIS_EXPORTER_IMG=docker.io/oliver006/redis_exporter:latest
+POSTGRES_EXPORTER_IMG=docker.io/prometheuscommunity/postgres-exporter:latest
+GEARMAN_EXPORTER_IMG=docker.io/gearmanexporter/gearman-exporter:v0.5.0
+UWSGI_EXPORTER_IMG=docker.io/timonwong/uwsgi-exporter:v1.3.0
+PROMETHEUS_PODMAN_EXPORTER_IMG=quay.io/navidys/prometheus-podman-exporter:v1.21.0
+PROMETHEUS_PODMAN_IMG=quay.io/navidys/prometheus-podman-exporter:latest
+PROMTAIL_IMG=docker.io/grafana/promtail:main-9f5f159
 
 # QA images
-PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260317-4a8510d1
+PSTN_EMULATOR_IMG=docker.io/omnileads/pstn_emulator:20260827-8f8a14b9
 NGINX_QA_IMG=docker.io/omnileads/omlqa_nginx:20260317-4a8510d1
-
-
 ###################################################################################################
 #                                       DJANGO APP                                                #
 ###################################################################################################
@@ -99,6 +113,8 @@ DJANGO_CSRF_TRUSTED_ORIGINS=https://${FQDN}
 
 # Django logs (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 DJANGO_LOG_LEVEL=INFO
+# Max filas de contactos por CSV de importacion (default 2M)
+OL_MAX_CANTIDAD_CONTACTOS=2000000
 
 UWSGI_PORT=8099
 DAPHNE_PORT=8098
@@ -124,7 +140,13 @@ PYTHONPATH=/opt/omnileads/ominicontacto
 # --- Django settings module: production or develop
 DJANGO_SETTINGS_MODULE=ominicontacto.settings.production
 # --- Django entrypoint: init_uwsgi.sh or init_devenv.sh
+# Shared-state (collectstatic / permisos / regenerar_asterisk) NO va aquí:
+# usar ./oml_manage.sh django-commands (django_runtime_bootstrap.sh).
 DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_uwsgi.sh
+# Identidad del plano web (omlapp/daphne). Workers Django/dialer escalables
+# NO reciben esta var: usan hostname del contenedor (consumer groups / lease).
+# En Ansible: OML_NODE_ID=inventory_hostname en django.env y dialer.env.
+OML_NODE_ID=omlapp
 
 #####################################################################################################
 #                                       STT & TTS                                                   #
@@ -162,7 +184,31 @@ ACD_API_LISTEN_IP=${ACD_HOSTNAME}
 
 ACD_WEBHOOK_TRANSFER_TTL=10
 SHORTCALL_DURATION_THRESHOLD_SEC=5
+# Failover cola → destinos no-campaña (IVR/TC/…) vía dialplan. false = solo campaña→campaña.
+FAILOVER_DIALPLAN_ENABLED=false
 ACD_REC_PATH=/var/spool/asterisk/recording
+# AMDREC=True: MixMonitor + upload async de samples AMD a recordings/amd/ (dataset ML). Default off.
+# Debe estar en acd-server y acd-app (mismo valor).
+AMDREC=True
+
+# Voicebot AudioSocket (ARI externalMedia). Host:port visto desde acd-app / Asterisk.
+AUDIOSOCKET_ADDR=audiosocket:9092
+AUDIOSOCKET_SESSION_TTL_SEC=3600
+AUDIOSOCKET_REDIS_DB=0
+# Vendor del bridge AudioSocket (solo ces por ahora).
+VOICEBOT_VENDOR=ces
+
+CES_PROJECT_ID=your-project-id
+CES_LOCATION=us
+CES_APP_ID=your-app-id
+CES_GCP_JSON_PATH=your-gcp-json-path
+
+# Handoff CES: login automático + lookup GESTION_BOT + POST VoicebotWebhook.
+# User/pass = VOICEBOT_USERNAME / VOICEBOT_PASSWORD (más abajo en este archivo).
+OML_API_BASE_URL=http://omlapp:8099
+
+VOICEBOT_USERNAME=your-agent-voicebot-username
+VOICEBOT_PASSWORD=your-agent-voicebot-password
 
 #####################################################################################################
 #                                       FASTAGI                                                     #
@@ -197,7 +243,7 @@ WEBSOCKET_HOSTNAME=websockets
 WEBSOCKET_PORT=8000
 
 # *** Activete verbose ---> DEBUG:fts.oml.services.websockets,websockets.server
-WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets ;INFO:websockets.server
+WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets;INFO:websockets.server
 
 # --- IP or hostname that each instance will invoke when locating the other    
 WEBSOCKET_REDIS_HOSTNAME=redis://redis:6379
@@ -222,6 +268,8 @@ KAMAILIO_ACD_SERVER_NET=10.22.72.0/24
 # of the external hostname of the OMniLeads Edge Server.
 KAMAILIO_PSTN_HOSTNAME=kamailio-pstn
 KAMAILIO_PSTN_UDP_PORT=5060
+# WAN SIP port in Contact/RR when edge DNAT maps PUBLIC -> KAMAILIO_PSTN_UDP_PORT (default: same as UDP)
+# KAMAILIO_PSTN_PUBLIC_UDP_PORT=25060
 
 # Variables for Kamailio memory. SHM is the maximum memory ammount.
 # PKG is the minimum memory ammount
@@ -239,6 +287,9 @@ KAMAILIO_ACD_NODES=${ACD_HOST_IP}:5070
 KAMAILIO_ITSP_NODES=${PSTN_EMULATOR_IP}:5070
 
 KAMAILIO_PSTN_QA=true
+
+# Google Telephony Platform (CX Agent Studio voicebot). Off by default.
+
 #########################################################################################################
 #                                       NGINX - RTPENGINE - REDIS - GEARMAN                             #
 #########################################################################################################
@@ -348,37 +399,49 @@ DIALER_GEARMAN_JOBS_MANAGE_INCIDENCE_RULES=add-incidence-rule-disposition|create
 DIALER_PYTHON_LOGLEVEL=debug
 
 # --- Call attempts per second
-DIALER_CAPS=1
+DIALER_CAPS=10
 # --- Time between the iterations when there are no contacts to call (in seconds)
-DIALER_TIME_BETWEEN_CALLS=1
+DIALER_TIME_BETWEEN_CALLS=0.5
 
-# --- Workers replicas
-DIALER_PROCESS_CAMPAIGN_REPLICAS=2
+# --- Workers replicas (defaults 1 = single-host; subir para lab HA Compose)
+DIALER_PROCESS_CAMPAIGN_REPLICAS=3
 DIALER_PROCESS_CONTACT_REPLICAS=1
 DIALER_PROCESS_EVENT_REPLICAS=1
+DIALER_SCHEDULER_REPLICAS=1
+# Django HA listeners / orquestador / background (consumer groups / Channels)
+SUPERVISION_EVENTS_LISTENER_REPLICAS=1
+OMNIDIALER_EVENTS_LISTENER_REPLICAS=1
+MSGS_ORCHESTRATOR_REPLICAS=1
+BACKGROUND_TASKS_REPLICAS=1
 
 DIALER_CHANNEL_AUDIT_INTERVAL_SEC=65
 DIALER_CHANNEL_AUDIT_LOCK_TTL_SEC=50
 DIALER_RESERVE_GRACE_SEC=30
 
 # --- Predictive pacing (globals; campaign gate = initial_predictive_model)
-DIALER_MAX_ABANDON_RATE=0.03
-DIALER_WARM_UP_SAMPLE_SIZE=15
+# Deploy defaults aligned with ansible tenants_global (code defaults differ for unit tests).
+DIALER_MAX_ABANDON_RATE=0.08
+DIALER_WARM_UP_SAMPLE_SIZE=50
 DIALER_PREDICTIVE_TICK_MS=1000
-DIALER_HIT_RATE_FLOOR=0.05
-DIALER_DROP_RATE_ALPHA=0.1
+DIALER_HIT_RATE_FLOOR=0.02
+DIALER_DROP_RATE_ALPHA=0.05
 DIALER_DEFAULT_ART_SEC=15
 DIALER_P_LIB_REMAINING_EPS=1.0
 DIALER_PREDICTIVE_ENABLED=true
-DIALER_GAMMA_THROTTLE_FLOOR=0.2
+DIALER_GAMMA_THROTTLE_FLOOR=0.4
+DIALER_THROTTLE_STREAK_K=45
+DIALER_THROTTLE_STREAK_SEC=45
+DIALER_THROTTLE_MIN_HITS=20
+DIALER_MAX_DIAL_RATIO=3
+DIALER_ATTEMPT_ID_ENABLED=true
 
 #########################################################################################################
 #                                          Monitoring                                                   #
 #########################################################################################################
 
-HOMER_ENABLE=True
+HOMER_ENABLE=False
 # --- IP or hostname that each instance will invoke when locating the other    
-HOMER_HOSTNAME=homer.sephir.tech
+HOMER_HOSTNAME=homer.deomain.com
 HOMER_PORT=9060
 
 #########################################################################################################
@@ -425,8 +488,13 @@ GOOGLE_CLOUD_PROJECTID=your_project_id
 #      25%  -> music on hold, no greeting
 #      50%  -> "hola" greeting + music on hold (simulates a human answer, for AMD)
 #    Music length is random as well: 1/3 15s, 1/3 27s, 1/3 full track.
+# ---prod_dialer: mix outbound típico en el PBX (BUSY SIP → prefijos 08x/09x Kamailio).
+#    Entre números limpios (extensions.conf):
+#      ~20% music-only (AMD), ~35% NOANSWER, ~3% CONGESTION, ~7% SHORTCALL,
+#      ~35% humano (15/27/full MOH + hola).
+#    Tip: base con ~40-50% prefijos 08x/09x + resto limpios → hit-rate global realista.
 
-PSTN_EMULATOR_MODE=test_dialer
+PSTN_EMULATOR_MODE=prod_dialer
 
 # --- dial2softphone: 100% of the calls are sent to the softphone.
 # ---mode_1: 100% answered, play music and transfer with SIP REFER.

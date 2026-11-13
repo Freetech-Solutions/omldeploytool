@@ -90,7 +90,7 @@
   tags:
     - install
 
-- name: OS_CONF Copy google speech credentials json
+- name: OS_CONF Copy Google credentials json
   ansible.builtin.copy:
     src: "{{ prerequisitos_tenant_instances_dir }}/google_credentials.json"
     dest: /etc/omnileads/google_credential.json
@@ -98,9 +98,10 @@
   tags:
     - install
     - upgrade
-  when:
-    - callrec_transcriptions_engine is defined 
-    - callrec_transcriptions_engine == "gcp"
+    - update
+  when: >-
+    (callrec_transcriptions_engine | default('') == 'gcp')
+    or (audiosocket_enabled | default(false) | bool)
 
 - name: OS_CONF Ensure TLS certs directory exists
   ansible.builtin.file:
@@ -216,10 +217,19 @@
   when: certs == "certbot"
 
 - name: OS_CONF Copy oml_manage script
-  ansible.builtin.template:
-    src: "templates/oml_manage.sh"
+  ansible.builtin.copy:
+    src: oml_manage.sh
     dest: /usr/local/bin/oml_manage
     mode: '0755'
+  tags:
+    - install
+    - upgrade
+
+- name: OS_CONF Deploy oml_manage env (BACKUP_RESTORE_IMG)
+  ansible.builtin.template:
+    src: oml_manage.env
+    dest: /etc/default/oml_manage.env
+    mode: '0644'
   tags:
     - install
     - upgrade

@@ -77,8 +77,10 @@ update is the recommended action for repeated deploys after the first install.
 Removed in 3.X (use oml_manage on the host or a future deploy action when available):
   restore, recycle, sentinel, restart
 
-Ansible log (ansible.cfg log_path): directory ANSIBLE_LOG_DIR (default /tmp/oml_install_logs)
-is created before each run; log file ansible.log inside that directory.
+Ansible log: directory ANSIBLE_LOG_DIR (default /tmp/oml_install_logs) is created before each
+run. deploy.sh sets ANSIBLE_LOG_PATH to ansible_<tenant>.log in that directory, where
+<tenant> is the inventory folder (instances/<tenant>/inventory.yml). Without a tenant name
+the file is ansible.log. ansible.cfg log_path remains the fallback for raw ansible-playbook.
 EOF
 }
 
@@ -227,6 +229,17 @@ release_value() {
   git -C "$ANSIBLE_DIR" describe --tags --exact-match 2>/dev/null || git -C "$ANSIBLE_DIR" rev-parse --short HEAD
 }
 
+ansible_log_file() {
+  local log_dir tenant_name
+  log_dir="${ANSIBLE_LOG_DIR:-/tmp/oml_install_logs}"
+  if [ -n "${oml_tenant:-}" ]; then
+    tenant_name="$(basename "$oml_tenant")"
+    printf '%s/ansible_%s.log\n' "$log_dir" "$tenant_name"
+  else
+    printf '%s/ansible.log\n' "$log_dir"
+  fi
+}
+
 confirm_action() {
   if [ "$skip_confirm" = true ]; then
     return 0
@@ -243,6 +256,7 @@ confirm_action() {
   fi
   echo "  Inventory: $inventory_path"
   echo "  Release:   $(release_value)"
+  echo "  Log:       $(ansible_log_file)"
   echo
   read -r -p "Continue with this deploy? [yes/no]: " reply
   reply="$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')"
@@ -271,8 +285,12 @@ run_playbook() {
   # Controllers: local tmp under /tmp. Remotes: per-user ~/.ansible/tmp (default).
   # Do NOT use a shared /tmp/ansible-remote on targets: with become, root creates it
   # mode 0700 and later tasks as ansible_user fail with UNREACHABLE (mkdir tmp).
-  mkdir -p /tmp/ansible-local "${ANSIBLE_LOG_DIR:-/tmp/oml_install_logs}"
+  local log_dir log_file
+  log_file="$(ansible_log_file)"
+  log_dir="$(dirname "$log_file")"
+  mkdir -p /tmp/ansible-local "$log_dir"
 
+  ANSIBLE_LOG_PATH="$log_file" \
   ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" \
   ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}" \
   ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}" \

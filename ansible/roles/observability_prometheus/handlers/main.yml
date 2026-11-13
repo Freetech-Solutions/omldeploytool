@@ -1,9 +1,30 @@
-- name: Restart observability services
+# Los exporters (salvo node exporter) declaran Pod=observability.pod, así que
+# Quadlet inyecta BindsTo=observability-pod.service. Reiniciar los .service uno
+# por uno tira la infra del pod y el siguiente start falla con
+# "Job for <svc> canceled." Reiniciar el .pod.service rearma la infra y Quadlet
+# vuelve a levantar los contenedores del pod. node exporter no pertenece al pod.
+- name: Restart observability pod
   ansible.builtin.systemd:
-    name: "{{ item }}"
+    name: "{{ observability_pod_systemd_unit | default('observability-pod.service') }}"
     state: restarted
-  loop: "{{ observability_changed_services | default([]) }}"
-  when: (observability_changed_services | default([]) | length) > 0
+    daemon_reload: true
+  listen: Restart observability services
+  when: >-
+    (observability_changed_services | default([])
+    | difference(['prometheus_node_exporter.service'])
+    | length) > 0
+  tags:
+    - install
+    - upgrade
+    - update
+    - observability
+
+- name: Restart observability node exporter
+  ansible.builtin.systemd:
+    name: prometheus_node_exporter.service
+    state: restarted
+  listen: Restart observability services
+  when: "'prometheus_node_exporter.service' in (observability_changed_services | default([]))"
   tags:
     - install
     - upgrade

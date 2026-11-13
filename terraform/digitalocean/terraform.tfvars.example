@@ -1,0 +1,36 @@
+# Copiar a ansible/instances/<tenant>/terraform.tfvars y completar.
+# El token no va acá: export DIGITALOCEAN_TOKEN=...
+#
+# nodes sigue al inventario Ansible de ese tenant. Una droplet puede tener
+# varios roles (data_statefull y data_stateless en la misma máquina, o
+# omlapp_web y omlapp_workers juntos). keep = true no se apaga de noche.
+
+region = "sfo3"
+image  = "debian-13-x64"
+tenant = "do_cluster"
+
+compute_enabled = true
+vpc_name        = "sfo3-vpc-curso"
+
+ssh_key_names     = ["oml-ansible"]
+ssh_allowed_cidrs = ["203.0.113.10/32"]
+# 203.0.113.10/32 es documentacion (TEST-NET). El CIDR real queda en el tfvars del tenant.
+sip_allowed_cidrs = ["203.0.113.10/32"]
+
+nodes = {
+  do_data = {
+    size  = "s-2vcpu-4gb"
+    roles = ["data_statefull", "data_stateless"]
+    keep  = true
+  }
+  do_edge = {
+    size  = "s-1vcpu-2gb"
+    roles = ["edge"]
+    keep  = true
+  }
+  do_omlapp_1 = {
+    size  = "s-2vcpu-4gb"
+    roles = ["omlapp_web"]
+    keep  = false
+  }
+}

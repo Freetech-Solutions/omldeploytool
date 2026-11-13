@@ -46,6 +46,14 @@
           + (['prometheus.container', 'prometheus_uwsgi.container'] if (oml_runs_omlapp_web | default(false) | bool) else [])
           + (['prometheus_postgres.container'] if (oml_runs_data_statefull | default(false) | bool) else [])
           + (['prometheus_redis.container', 'prometheus_gearman.container'] if (oml_runs_data_stateless | default(false) | bool) else [])
+          + (
+              ['prometheus_dialer_pacing.container']
+              if (
+                (oml_runs_data_stateless | default(false) | bool)
+                and (dialer_engine | default('omnidialer') == 'omnidialer')
+              )
+              else []
+            )
         )
       }}
     observability_envs: >-
@@ -53,6 +61,14 @@
         (
           (['prometheus_postgres.env'] if (oml_runs_data_statefull | default(false) | bool) else [])
           + (['prometheus_redis.env'] if (oml_runs_data_stateless | default(false) | bool) else [])
+          + (
+              ['prometheus_dialer_pacing.env']
+              if (
+                (oml_runs_data_stateless | default(false) | bool)
+                and (dialer_engine | default('omnidialer') == 'omnidialer')
+              )
+              else []
+            )
         )
       }}
   changed_when: false
@@ -162,12 +178,73 @@
     - upgrade
     - observability
 
+# Workaround para race con podman 5.x (Debian Trixie): el primer container del pod
+# dispara observability-pod.service, el pod queda inestable y los starts siguientes
+# (postgres / redis / gearman exporter) fallan con "Job for <svc> canceled." porque
+# el .pod.service se desactiva. Reiniciar el pod una vez, ya con los Quadlets
+# generados, deja la infra estable antes de los starts secuenciales.
+- name: OBSERVABILITY Check observability pod active state
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - "{{ observability_pod_systemd_unit | default('observability-pod.service') }}"
+  register: observability_pod_state
+  changed_when: false
+  failed_when: false
+  when: observability_quadlets | length > 0
+  tags:
+    - install
+    - upgrade
+    - observability
+
+- name: OBSERVABILITY Clear observability pod start-limit
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - reset-failed
+      - "{{ observability_pod_systemd_unit | default('observability-pod.service') }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - observability_quadlets | length > 0
+    - observability_pod_state.stdout | default('') != 'active'
+  tags:
+    - install
+    - upgrade
+    - observability
+
+- name: OBSERVABILITY Reinit observability pod (workaround podman 5.x)
+  ansible.builtin.systemd:
+    name: "{{ observability_pod_systemd_unit | default('observability-pod.service') }}"
+    state: restarted
+  when:
+    - observability_quadlets | length > 0
+    - >-
+      (observability_quadlet_units is changed)
+      or (observability_exporter_envs is changed)
+      or (observability_pod_state.stdout | default('') != 'active')
+  tags:
+    - install
+    - upgrade
+    - observability
+
+- name: OBSERVABILITY Ensure observability pod is active
+  ansible.builtin.systemd:
+    name: "{{ observability_pod_systemd_unit | default('observability-pod.service') }}"
+    state: started
+    enabled: true
+  when: observability_quadlets | length > 0
+  tags:
+    - install
+    - upgrade
+    - observability
+
 - name: OBSERVABILITY Enable and start Prometheus services
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: started
     enabled: true
-    daemon_reload: true
   loop: >-
     {{
       observability_quadlets

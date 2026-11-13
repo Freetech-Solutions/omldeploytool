@@ -78,7 +78,7 @@
     - install
     - upgrade
     - update
-  when: scale_redis is defined and scale_redis  
+  when: scale_redis is defined and (scale_redis | bool)
 
 - name: REDIS Enable and start service
   systemd:

@@ -58,3 +58,7 @@ devenv_build_images:
     context: omlqa/nginx
     dockerfile: Dockerfile
     target: ""
+  - image: "{{ AUDIOSOCKET_IMG if (AUDIOSOCKET_IMG | default('') | length) > 0 else 'localhost/audiosocket:devenv' }}"
+    context: audiosocket
+    dockerfile: Dockerfile
+    target: ""

@@ -2,6 +2,21 @@
 # Modelo de inventario: cada grupo pod (data_statefull, edge, omlapp_web, …) declara
 # qué Quadlet corre en ese host; co-localización = mismo host en varios grupos pod.
 # omnileads_aio implica todos los pods en ese host (equivalente al AIO clásico).
+
+# Sembrar omni_ip_lan en todos los hosts antes de resolver peers: site.yml corre plays
+# separados (data → edge → compute) y el play de data ya lee hostvars[<peer>].omni_ip_lan
+# de hosts que aún no ejecutaron tareas. connection: local evita SSH a cada peer.
+- name: TOPOLOGY Default omni_ip_lan from ansible_host when unset
+  ansible.builtin.set_fact:
+    omni_ip_lan: "{{ hostvars[item].omni_ip_lan | default(hostvars[item].ansible_host, true) }}"
+  loop: "{{ groups['all'] | default([]) }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  connection: local
+  run_once: true
+  tags:
+    - always
+
 - name: TOPOLOGY Derive pod membership and layout
   ansible.builtin.set_fact:
     oml_is_aio: "{{ 'omnileads_aio' in group_names }}"
@@ -37,11 +52,14 @@
   tags:
     - always
 
+# Los flags se fijan en el primer play. Después topology asigna postgres_host y
+# rtpengine_host para el stack propio; si se reevalúa "is defined" en site_restore,
+# un Postgres/RTPengine local queda marcado como externo.
 - name: TOPOLOGY Detect external services
   ansible.builtin.set_fact:
-    postgres_out: "{{ postgres_host is defined }}"
-    rtpengine_out: "{{ rtpengine_host is defined }}"
-    bucket_out: "{{ bucket_url is defined }}"
+    postgres_out: "{{ postgres_out | default(postgres_host is defined) }}"
+    rtpengine_out: "{{ rtpengine_out | default(rtpengine_host is defined) }}"
+    bucket_out: "{{ bucket_out | default(bucket_url is defined) }}"
   tags:
     - always
 
@@ -174,23 +192,34 @@
           else aio_host
         )
       }}
-    # ACD_NODES (kamailio_pstn.env): 127.0.0.1:<acd_trunk_sip_port> solo si Kamailio PSTN
-    # y ACD comparten host (AIO puro o edge+acd co-localizados); en cluster con ACD remoto, acd_peers.
+    # ACD_NODES (kamailio_pstn.env): ip:puerto de cada host del grupo acd del tenant.
+    # En AIO no hay grupo acd: Kamailio y Asterisk comparten el host (omni_ip_lan).
+    # Si el edge también corre un ACD, ese host entra en acd_peers y no reemplaza al resto.
     acd_nodes: >-
       {{
-        ('127.0.0.1:' ~ (acd_trunk_sip_port | default(5070) | string)) if (
-          oml_is_aio_only
-          or (
-            (oml_runs_edge | default(false) | bool)
-            and (oml_runs_acd | default(false) | bool)
-          )
-        )
+        ((omni_ip_lan | trim) ~ ':' ~ (acd_trunk_sip_port | default(5070) | string))
+        if (oml_is_aio_only | bool)
         else (
           (acd_peers | map('extract', hostvars, 'omni_ip_lan')
+                     | map('trim')
                      | map('regex_replace', '$', ':' ~ (acd_trunk_sip_port | default(5070) | string))
                      | list | join(','))
           if (acd_peers | default([]) | length > 0)
           else (aio_host ~ ':' ~ (acd_trunk_sip_port | default(5070) | string))
+        )
+      }}
+    # ACD_NET_ADDR (kamailio_webrtc.env): IPs de origen de cada ACD, sin puerto.
+    # Kamailio deja pasar SIP de esas IPs sin auth efímera (route IS_FROM_ACD).
+    acd_net_addrs: >-
+      {{
+        (omni_ip_lan | trim)
+        if (oml_is_aio_only | bool)
+        else (
+          (acd_peers | map('extract', hostvars, 'omni_ip_lan')
+                     | map('trim')
+                     | list | join(','))
+          if (acd_peers | default([]) | length > 0)
+          else (aio_host | trim)
         )
       }}
     rtpengine_host: "{{ rtpengine_host | default(omni_ip_lan if oml_is_aio_only else edge_host) }}"
@@ -223,6 +252,21 @@
   tags:
     - always
 
+# Hostname para callbacks ACD → app (WSS /consumers, HTTPS API).
+# Con edge: LAN del HAProxy (edge_host). No usar fqdn/DNS público — en cloud
+# (p.ej. DO) droplet→IP pública del edge suele dar timeout; la VPC sí llega.
+# Sin edge: nginx_host (LAN del web / AIO).
+- name: TOPOLOGY Normalize OMniLeads hostname for ACD callbacks (LAN)
+  ansible.builtin.set_fact:
+    oml_omnileads_hostname: >-
+      {{
+        (edge_host | trim)
+        if ((oml_tenant_hosts | intersect(groups['edge'] | default([]))) | length > 0)
+        else (nginx_host | trim)
+      }}
+  tags:
+    - always
+
 # Bucket endpoints (S3/MinIO): si el inventario no define bucket_url, inferimos
 # los endpoints público e interno desde bucket_host (computado arriba). Esto evita
 # que las plantillas (acd, omlapp, nginx, interaction_processor, etc.) fallen con
@@ -237,7 +281,7 @@
 # Si no hay bucket de backup dedicado, reutilizar el bucket de aplicación (callrec, etc.).
 - name: TOPOLOGY Normalize backup bucket configuration
   ansible.builtin.set_fact:
-    backup_bucket_url: "{{ backup_bucket_url | default(bucket_url, true) }}"
+    backup_bucket_url: "{{ backup_bucket_url | default(bucket_endpoint, true) }}"
     backup_bucket_name: "{{ backup_bucket_name | default(bucket_name, true) }}"
     backup_bucket_access_key: "{{ backup_bucket_access_key | default(bucket_access_key, true) }}"
     backup_bucket_secret_key: "{{ backup_bucket_secret_key | default(bucket_secret_key, true) }}"
@@ -247,7 +291,17 @@
 # ACD (acd.env SIP_PROXY): en cómputo apunta al Kamailio del edge; en edge/AIO es local.
 - name: TOPOLOGY Default kamailio_pstn_host when not set in inventory
   ansible.builtin.set_fact:
-    kamailio_pstn_host: "{{ edge_host if (oml_runs_omlapp_web or oml_runs_omlapp_workers or oml_runs_dialer_workers or oml_runs_acd or oml_runs_callrec_processor) and not ('edge' in group_names) else omni_ip_lan }}"
+    kamailio_pstn_host: >-
+      {{
+        edge_host
+        if (
+          (oml_runs_omlapp_web or oml_runs_omlapp_workers
+           or oml_runs_dialer_workers or oml_runs_acd
+           or oml_runs_callrec_processor)
+          and not ('edge' in group_names)
+        )
+        else omni_ip_lan
+      }}
   when:
     - kamailio_pstn_host is not defined
     - oml_runs_edge or oml_is_aio or oml_runs_omlapp_web or oml_runs_omlapp_workers or oml_runs_dialer_workers or oml_runs_acd or oml_runs_callrec_processor
@@ -279,6 +333,43 @@
   tags:
     - always
 
+# Reescribir prefijo docker.io/(freetechsolutions|omnileads)/ → oml_container_registry/
+# cuando el tenant apunta a un registry propio (p. ej. Vultr CR). No aplica a devenv
+# (localhost/*:devenv) ni a imágenes de terceros (postgres, redis, prometheus, …).
+- name: TOPOLOGY Rewrite OMniLeads image prefixes for custom registry
+  when:
+    - (oml_container_registry | default('') | string | trim | length) > 0
+    - not (oml_devenv | default(false) | bool)
+    - vars[item] is defined
+    - (vars[item] | default('') | string | length) > 0
+    - (vars[item] | string) is match(_oml_img_re)
+  tags:
+    - always
+  vars:
+    _oml_reg: >-
+      {{ oml_container_registry
+         | regex_replace('^https?://', '')
+         | regex_replace('/+$', '') }}
+    _oml_img_re: "^docker\\.io/(freetechsolutions|omnileads)/"
+  ansible.builtin.set_fact:
+    "{{ item }}": "{{ vars[item] | regex_replace(_oml_img_re, _oml_reg ~ '/') }}"
+  loop:
+    - APP_IMG
+    - NGINX_IMG
+    - WS_IMG
+    - ACD_IMG
+    - KAMAILIO_IMG
+    - RTPENGINE_IMG
+    - CALLREC_COMPRESSOR_IMG
+    - CALLREC_TRANSCRIBER_IMG
+    - FASTAGI_IMG
+    - AUDIOSOCKET_IMG
+    - DIALER_API_IMG
+    - DIALER_WORKER_IMG
+    - BACKUP_RESTORE_IMG
+    - PSTN_EMULATOR_IMG
+    - NGINX_QA_IMG
+
 - name: TOPOLOGY Compute component switches
   ansible.builtin.set_fact:
     component_minio_enabled: "{{ oml_runs_data_statefull and not bucket_out }}"
@@ -293,8 +384,21 @@
     component_websockets_enabled: "{{ oml_runs_omlapp_web }}"
     component_omlapp_enabled: "{{ oml_runs_omlapp_web }}"
     component_omlapp_workers_enabled: "{{ oml_runs_omlapp_workers }}"
-    component_interaction_processor_enabled: "{{ oml_runs_omlapp_workers }}"
-    component_dialer_enabled: "{{ oml_runs_dialer_workers and dialer_engine is defined and dialer_engine == 'omnidialer' }}"
+    component_interaction_processor_enabled: "{{ oml_runs_callrec_processor }}"
+    # La API (flask.container, Pod=omlapp_web.pod) vive en omlapp_web / omnileads_aio.
+    # En cluster el rol tiene que entrar también en el web node; si no, solo corre
+    # en dialer_workers y esa tarea se salta.
+    component_dialer_enabled: >-
+      {{
+        (
+          (oml_runs_dialer_workers | bool)
+          or (
+            (oml_runs_omlapp_web | bool)
+            and ((groups['dialer_workers'] | default([])) | length > 0)
+          )
+        )
+        and (dialer_engine | default('') == 'omnidialer')
+      }}
     component_nginx_enabled: "{{ oml_runs_omlapp_web }}"
     component_call_logger_enabled: "{{ oml_runs_callrec_processor }}"
     component_observability_prometheus_enabled: >-

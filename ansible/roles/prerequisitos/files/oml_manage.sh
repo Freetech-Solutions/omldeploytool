@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-{% raw %}
 # =============================================================================
 # OMniLeads — gestión Podman + systemd (Quadlet)
 # Basado en docker-compose/oml_manage.sh; nombres alineados con ContainerName=
@@ -8,10 +7,12 @@
 # =============================================================================
 set -euo pipefail
 
-# Imagen backup/restore (misma variable que backup.sh del rol prerequisitos)
-{% endraw %}
-BACKUP_RESTORE_IMG="{{ backup_restore_img | default('') }}"
-{% raw %}
+# Imagen backup/restore (Ansible escribe /etc/default/oml_manage.env)
+OML_MANAGE_ENV=/etc/default/oml_manage.env
+BACKUP_RESTORE_IMG="${BACKUP_RESTORE_IMG:-}"
+if [[ -z "$BACKUP_RESTORE_IMG" && -f "$OML_MANAGE_ENV" ]]; then
+    BACKUP_RESTORE_IMG=$(grep -E '^BACKUP_RESTORE_IMG=' "$OML_MANAGE_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+fi
 
 # --- Nombres de contenedor (Quadlet ContainerName=) ---
 CN_POSTGRES=postgresql-server
@@ -20,11 +21,13 @@ CN_MINIO=minio-server
 CN_GEARMAN=gearman-server
 CN_OMLAPP=omlapp-uwsgi
 CN_DAPHNE=omlapp-daphne
-CN_WHATSAPP=omlapp-whatsapp
+CN_MSGS_ORCHESTRATOR=omlapp-msgs-orchestrator
+CN_EMAIL_FETCH=omlapp-email-fetch
 CN_WEBSOCKET=websocket-server
 CN_NGINX=nginx-server
 CN_ACD_SERVER=acd-server
 CN_ACD_APP=acd-app
+CN_ACD_CHANNEL_AUDIT=acd-channel-audit
 CN_ACD_CONF=acd-conf
 CN_FASTAGI=acd-fastagi
 CN_KAMAILIO_WEBRTC=kamailio-webrtc
@@ -46,8 +49,8 @@ declare -A CRITICAL_CN=(
 # Contenedores conocidos para stats / status ampliado (orden arbitrario)
 KNOWN_CONTAINERS=(
   "$CN_POSTGRES" "$CN_REDIS" "$CN_MINIO" "$CN_GEARMAN"
-  "$CN_OMLAPP" "$CN_DAPHNE" "$CN_WHATSAPP" "$CN_WEBSOCKET" "$CN_NGINX"
-  "$CN_ACD_CONF" "$CN_ACD_SERVER" "$CN_ACD_APP" "$CN_FASTAGI"
+  "$CN_OMLAPP" "$CN_DAPHNE" "$CN_MSGS_ORCHESTRATOR" "$CN_EMAIL_FETCH" "$CN_WEBSOCKET" "$CN_NGINX"
+  "$CN_ACD_CONF" "$CN_ACD_SERVER" "$CN_ACD_APP" "$CN_ACD_CHANNEL_AUDIT" "$CN_FASTAGI"
   "$CN_KAMAILIO_WEBRTC" "$CN_KAMAILIO_PSTN" "$CN_RTPENGINE" "$CN_DIALER_API"
   omlapp-callrec-worker omlapp-dialer-worker omlapp-supervision-agentes-scheduler
   omlapp-daily-redis-cleanup omlapp-presence-heartbeat-scheduler oml-call-logger
@@ -76,13 +79,13 @@ KNOWN_PODS=(
 STACK_UNITS_ORDER=(
   omnileads-network.service
   postgresql.service redis.service minio.service gearman.service
-  omnileads.service daphne.service whatsapp.service websockets.service
+  omnileads.service daphne.service msgs_orchestrator.service email_fetch.service websockets.service
   call_logger.service daily_redis_cleanup.service background_dialer_tasks.service
   background_callrec_tasks.service dashboard_agent_scheduler.service
   supervision_agentes_scheduler.service supervision_events_listener.service
   presence_heartbeat_scheduler.service
   nginx.service
-  acd-config.service acd-server.service acd-app.service acd-fastagi.service
+  acd-config.service acd-server.service acd-app.service acd-channel-audit.service acd-fastagi.service
   kamailio_webrtc.service kamailio_pstn.service rtpengine.service
   dialer_api.service dialer_incidence_rules.service dialer_manage_campaign.service
   dialer_render_template.service dialer_scheduler.service
@@ -362,7 +365,7 @@ dialer_sync() {
 
 backup_database() {
     [[ -f "$BACKUP_ENV" ]] || { error "Falta $BACKUP_ENV (backup no configurado en este nodo)"; exit 1; }
-    [[ -n "$BACKUP_RESTORE_IMG" ]] || { error "BACKUP_RESTORE_IMG vacío (definir backup_restore_img en Ansible)"; exit 1; }
+    [[ -n "$BACKUP_RESTORE_IMG" ]] || { error "BACKUP_RESTORE_IMG vacío (definir en $OML_MANAGE_ENV o images.yml)"; exit 1; }
     local fn="pgsql-backup-$(date +%Y%m%d_%H%M).sql"
     podman run --rm --network=host --env-file "$BACKUP_ENV" -e "BACKUP_FILENAME=$fn" \
         "$BACKUP_RESTORE_IMG" python backup.py || {
@@ -388,7 +391,11 @@ run_django_commands() {
         exit 1
     fi
     wait_for_services_healthy 120 "$CN_POSTGRES" "$CN_REDIS" "$CN_MINIO" || exit 1
-    podman run --rm --network=host --env-file "$DJANGO_ENV" "$img" /opt/omnileads/bin/django_commands.sh || {
+    podman run --rm --network=host --env-file "$DJANGO_ENV" \
+        --volume=django_static:/opt/omnileads/static \
+        --volume=django_media:/opt/omnileads/media_root \
+        "$img" /bin/bash -c \
+        '/opt/omnileads/bin/django_commands.sh && /opt/omnileads/bin/django_runtime_bootstrap.sh' || {
         error "django-commands falló"; exit 1
     }
     success "django-commands OK"
@@ -400,7 +407,7 @@ send_inbound_call() {
     local target="${OML_SIPP_TARGET:-127.0.0.1:5060}"
     if container_running "$CN_PSTN_QA"; then
         require_container_running "$CN_PSTN_QA" || exit 1
-        podman exec -T "$CN_PSTN_QA" sipp -sn uac "$target" -s "999$telephone" -m 1 -r 1 -d 60000 -l 1 || {
+        podman exec "$CN_PSTN_QA" sipp -sn uac "$target" -s "999$telephone" -m 1 -r 1 -d 60000 -l 1 || {
             error "Fallo sipp"; exit 1
         }
     else
@@ -411,7 +418,7 @@ send_inbound_call() {
 
 hangup_pstn() {
     if container_running "$CN_PSTN_QA"; then
-        podman exec -T "$CN_PSTN_QA" asterisk -rx "channel request hangup all" || {
+        podman exec "$CN_PSTN_QA" asterisk -rx "channel request hangup all" || {
             error "Fallo hangup"; exit 1
         }
     else
@@ -426,7 +433,7 @@ dialer_call_test() {
     local inst="${DIALER_PC_INSTANCE:-1}"
     local cname="dialer-process-campaign-${inst}"
     require_container_running "$cname" || exit 1
-    podman exec -T "$cname" python3 call_test_dialer.py "$id_camp" || {
+    podman exec "$cname" python3 call_test_dialer.py "$id_camp" || {
         error "call_test_dialer.py falló"; exit 1
     }
 }
@@ -443,7 +450,7 @@ manual_call_test() {
         exit 1
     fi
     require_container_running "$mc" || exit 1
-    podman exec -T "$mc" python3 call_test_dialer.py "$telephone" "$id_camp" "$id_customer" "$id_agent" 1 1 15 15 || {
+    podman exec "$mc" python3 call_test_dialer.py "$telephone" "$id_camp" "$id_customer" "$id_agent" 1 1 15 15 || {
         error "manual-call falló"; exit 1
     }
 }
@@ -553,10 +560,12 @@ systemctl_restart_one() {
         gearman) unit=gearman.service ;;
         omnileads|omlapp|uwsgi) unit=omnileads.service ;;
         daphne) unit=daphne.service ;;
-        whatsapp) unit=whatsapp.service ;;
+        msgs-orchestrator|msgs_orchestrator|whatsapp) unit=msgs_orchestrator.service ;;
+        email-fetch|email_fetch) unit=email_fetch.service ;;
         websockets|websocket) unit=websockets.service ;;
         acd-server|asterisk) unit=acd-server.service ;;
         acd-app) unit=acd-app.service ;;
+        acd-channel-audit) unit=acd-channel-audit.service ;;
         acd-config|acd-conf) unit=acd-config.service ;;
         fastagi) unit=acd-fastagi.service ;;
         kamailio-webrtc) unit=kamailio_webrtc.service ;;
@@ -593,7 +602,7 @@ clean_all() {
 
 show_bucket() {
     require_container_running "$CN_OMLAPP" || exit 1
-    podman exec -T "$CN_OMLAPP" bash -c 'aws --endpoint-url "$S3_ENDPOINT" s3 ls --recursive "s3://${S3_BUCKET_NAME}"' || {
+    podman exec "$CN_OMLAPP" bash -c 'aws --endpoint-url "$S3_ENDPOINT" s3 ls --recursive "s3://${S3_BUCKET_NAME}"' || {
         error "show-bucket falló (¿variables S3 en django.env?)"; exit 1
     }
 }
@@ -609,7 +618,7 @@ redis_clean_cache() {
     read -rp "¿Flushall en Redis? (y/N): " ans
     [[ "$ans" =~ ^[Yy]$ ]] || { info "Cancelado"; return 0; }
     require_container_running "$CN_REDIS" || exit 1
-    podman exec -T "$CN_REDIS" redis-cli flushall
+    podman exec "$CN_REDIS" redis-cli flushall
     success "Redis flushall OK"
 }
 
@@ -668,6 +677,160 @@ up_with_commands() {
     stack_start
 }
 
+# -----------------------------------------------------------------------------
+# Agents status (Kamailio Redis DB1 + OML:AGENT Redis DB0)
+# -----------------------------------------------------------------------------
+# Preferir redis-server local; si no corre aquí, REDIS_HOSTNAME de django.env
+# (despliegues clusterizados).
+redis_cli_eval() {
+    local lua_script=$1
+    local now_fmt=$2
+    if container_running "$CN_REDIS"; then
+        podman exec "$CN_REDIS" redis-cli --raw EVAL "$lua_script" 0 "$now_fmt"
+        return
+    fi
+    local host
+    host=$(grep -E '^REDIS_HOSTNAME=' "$DJANGO_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    if [[ -z "$host" ]]; then
+        host=$(grep -E '^REDIS' "$DJANGO_ENV" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    fi
+    [[ -n "$host" ]] || {
+        error "Redis local no corre y no hay REDIS_HOSTNAME en $DJANGO_ENV"
+        return 1
+    }
+    podman run --rm --network=host docker.io/library/redis redis-cli -h "$host" --raw EVAL "$lua_script" 0 "$now_fmt"
+}
+
+agents_status() {
+    local now_fmt
+    if container_running "$CN_REDIS"; then
+        now_fmt=$(podman exec "$CN_REDIS" date '+%Y-%m-%d %H:%M:%S')
+    else
+        now_fmt=$(date '+%Y-%m-%d %H:%M:%S')
+    fi
+
+    local lua_script
+    lua_script='
+local now = ARGV[1]
+redis.call("SELECT", 1)
+local sip_state = {}
+local cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "location:entry::*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local username = redis.call("HGET", key, "username")
+    local expires = redis.call("HGET", key, "expires")
+    if username and username ~= "" then
+      local st = "EXPIRED"
+      if expires and expires ~= "" and expires >= now then
+        st = "REGISTERED"
+      end
+      local prev = sip_state[username]
+      if prev ~= "REGISTERED" then
+        sip_state[username] = st
+      end
+    end
+  end
+until cursor == "0"
+
+redis.call("SELECT", 0)
+local agents = {}
+cursor = "0"
+repeat
+  local res = redis.call("SCAN", cursor, "MATCH", "OML:AGENT:*", "COUNT", 200)
+  cursor = res[1]
+  for _, key in ipairs(res[2]) do
+    local id = redis.call("HGET", key, "id")
+    if not id or id == "" then
+      id = string.match(key, "OML:AGENT:(%d+)$") or ""
+    end
+    local name = redis.call("HGET", key, "NAME") or ""
+    local sip = redis.call("HGET", key, "SIP") or ""
+    local status = redis.call("HGET", key, "STATUS") or ""
+    local voicebot = redis.call("HGET", key, "VOICEBOT") or ""
+    if status == "" then status = "OFFLINE" end
+    local kam = "UNREGISTERED"
+    if voicebot == "1" then
+      kam = "VOICEBOT"
+    elseif sip ~= "" and sip_state[sip] then
+      kam = sip_state[sip]
+    end
+    local username = name
+    if username == "" then username = "agent-" .. id end
+    username = username .. " (id:" .. id .. " sip:" .. sip .. ")"
+    table.insert(agents, {tonumber(id) or 0, username, kam, status})
+  end
+until cursor == "0"
+
+table.sort(agents, function(a, b) return a[1] < b[1] end)
+
+local out = {}
+for _, row in ipairs(agents) do
+  table.insert(out, row[2] .. "\t" .. row[3] .. "\t" .. row[4])
+end
+return out
+'
+
+    local rows
+    rows=$(redis_cli_eval "$lua_script" "$now_fmt") || {
+        error "No se pudo consultar Redis para agents status"
+        exit 1
+    }
+
+    if [[ -z "${rows//[$'\t\r\n ']/}" ]]; then
+        warning "No hay claves OML:AGENT:* en Redis DB0"
+        return 0
+    fi
+
+    color_kam() {
+        case "$1" in
+            REGISTERED) printf '%s' "${GREEN}$1${NC}" ;;
+            EXPIRED)    printf '%s' "${YELLOW}$1${NC}" ;;
+            VOICEBOT)   printf '%s' "${CYAN}$1${NC}" ;;
+            *)          printf '%s' "${RED}$1${NC}" ;;
+        esac
+    }
+    color_ag() {
+        case "$1" in
+            READY)                          printf '%s' "${GREEN}$1${NC}" ;;
+            ONCALL|RINGING|DIALING)         printf '%s' "${CYAN}$1${NC}" ;;
+            PAUSED*|PAUSE*|ACW|POSTCALL)    printf '%s' "${YELLOW}$1${NC}" ;;
+            OFFLINE|"")                     printf '%s' "${RED}${1:-OFFLINE}${NC}" ;;
+            *)                              printf '%s' "$1" ;;
+        esac
+    }
+
+    printf '\n'
+    printf "%-42s %-14s %s\n" "USERNAME" "STATUS KAM" "STATUS AGCONSOLE"
+    printf '%s\n' "----------------------------------------------------------------------"
+    while IFS=$'\t' read -r username kam_status ag_status; do
+        [[ -z "$username" ]] && continue
+        local kam_col ag_col
+        if [[ "$ag_status" != "OFFLINE" && -n "$ag_status" && "$kam_status" == "UNREGISTERED" ]]; then
+            kam_col="${RED}${kam_status}${NC}"
+            ag_col="${YELLOW}${ag_status}${NC}"
+        else
+            kam_col=$(color_kam "$kam_status")
+            ag_col=$(color_ag "$ag_status")
+        fi
+        printf "%-42s %-24s %s\n" "$username" "$kam_col" "$ag_col"
+    done <<< "$rows"
+    printf '\n'
+}
+
+agents_cmd() {
+    local sub="${1:-status}"
+    case "$sub" in
+        status|"") agents_status ;;
+        *)
+            error "Subcomando agents desconocido: $sub"
+            info "Uso: oml_manage agents status"
+            exit 1
+            ;;
+    esac
+}
+
 show_help() {
     cat <<'EOF'
 
@@ -678,6 +841,7 @@ Uso principal:
 
 Comandos (también alias legacy --comando):
   status              Estado, stats y validación de contenedores conocidos
+  agents [status]     Agentes: SIP (Kamailio Redis DB1) vs consola (OML:AGENT DB0)
   health              Salud de servicios críticos
   stack-up            systemctl start de unidades Quadlet conocidas (orden)
   stack-down          systemctl stop en orden inverso
@@ -695,7 +859,7 @@ Comandos (también alias legacy --comando):
   redis-sync          regenerar_asterisk
   dialer-sync         sincronizar_wombat
   redis-clean         flushall en redis-server (confirmación)
-  django-commands <img>  podman run one-shot django_commands.sh
+  django-commands <img>  one-shot django_commands.sh + django_runtime_bootstrap.sh
   backup / restore    Podman + /etc/default/backup.env + BACKUP_RESTORE_IMG
   psql <usuario>      psql en postgresql-server
   psql-reindex        reindex vía omlapp + django.env
@@ -737,6 +901,7 @@ main() {
     case "$cmd" in
         help|--help|-h|"") show_help ;;
         status)            show_status ;;
+        agents)            agents_cmd "${1:-status}" ;;
         health)            check_health ;;
 
         stack-up)          stack_start ;;
@@ -838,4 +1003,3 @@ main() {
 }
 
 main "$@"
-{% endraw %}

@@ -1,4 +1,4 @@
-# Managed by Ansible — OMniLeads fail2ban (SSH + optional Kamailio PSTN).
+# Managed by Ansible — OMniLeads fail2ban (SSH + optional Kamailio PSTN + HTTPS).
 # Drop-in: no modifica jail.conf de la distro.
 # banaction=nftables: prerequisitos desactiva ufw/firewalld.
 # backend=systemd: journald (Storage=volatile); no depender de /var/log/auth.log.
@@ -16,7 +16,7 @@ port = {{ ansible_ssh_port | default(22) }}
 backend = systemd
 filter = sshd
 
-{% if (oml_runs_edge | default(false) | bool) and (fail2ban_kamailio_pike | default(true) | bool) %}
+{% if fail2ban_deploy_kamailio_pike | default(false) | bool %}
 # Kamailio PSTN PIKE / unauthorized origin bans (edge / AIO hosts).
 # nftables-allports: drop SIP (UDP/TCP) and all other traffic from banned IPs.
 [kamailio-pstn]
@@ -26,4 +26,32 @@ backend = systemd
 journalmatch = _SYSTEMD_UNIT=kamailio_pstn.service
 banaction = nftables-allports
 protocol = all
+{% endif %}
+
+{% if fail2ban_deploy_nginx_https | default(false) | bool %}
+# HTTPS probes against nginx (AIO / hosts that terminate TLS without HAProxy).
+[nginx-https]
+enabled = true
+filter = nginx-https
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=nginx.service
+port = http,https
+banaction = {{ fail2ban_https_banaction }}
+maxretry = {{ fail2ban_https_maxretry }}
+findtime = {{ fail2ban_https_findtime }}
+bantime = {{ fail2ban_https_bantime }}
+{% endif %}
+
+{% if fail2ban_deploy_haproxy_https | default(false) | bool %}
+# HTTPS probes against HAProxy (cluster edge — public TLS terminator).
+[haproxy-https]
+enabled = true
+filter = haproxy-https
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=haproxy.service
+port = {{ haproxy_http_port | default(80) }},{{ haproxy_https_port | default(443) }}
+banaction = {{ fail2ban_https_banaction }}
+maxretry = {{ fail2ban_https_maxretry }}
+findtime = {{ fail2ban_https_findtime }}
+bantime = {{ fail2ban_https_bantime }}
 {% endif %}

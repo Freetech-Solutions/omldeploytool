@@ -1,0 +1,10 @@
+# Managed by Ansible — OMniLeads fail2ban filter for HAProxy HTTPS probes.
+# Matches journald lines from haproxy.service (LogDriver=journald, option httplog).
+# Typical: <client_ip>:<port> [<date>] <fe> <be>/<srv> <timers> <status> ... "METHOD path HTTP/x.x"
+#
+# Patterns / status / methods: mismos fail2ban_https_* que nginx-https (tenants_global.yml).
+
+[Definition]
+failregex = ^<HOST>:\d+ \[.*?\] \S+ \S+/\S+ \S+ (?:{{ fail2ban_https_status_alt }}) \d+ .*"(?:{{ fail2ban_https_method_alt }}) [^"]*(?:{{ fail2ban_https_probe_alt }})[^"]*"
+ignoreregex =
+datepattern = {^LN-BEG}

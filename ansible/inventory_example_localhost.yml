@@ -43,4 +43,4 @@ all:
 ##########################################################
 omnileads_aio:
   hosts:
-    devenv:
+    localhost:

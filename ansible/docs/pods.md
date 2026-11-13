@@ -263,7 +263,8 @@ Varios servicios declaran `Requires=omlapp_web-pod.service`.
 
 | Unidad systemd | Contenedor | Imagen | Función |
 |----------------|------------|--------|---------|
-| `whatsapp.service` | `omlapp-whatsapp` | `APP_IMG` | Integración WhatsApp (si está habilitada). |
+| `msgs_orchestrator.service` | `omlapp-msgs-orchestrator` | `APP_IMG` | Orquestador de canales digitales (`msgs-orchestrator`: WhatsApp, Facebook, Instagram). |
+| `email_fetch.service` | `omlapp-email-fetch` | `APP_IMG` | Canalidad email: IMAP inbound (`run-email-fetch-service`). Una sola réplica. |
 | `call_logger.service` | `oml-call-logger` | `APP_IMG` | Registro de llamadas en background. |
 | `background_dialer_tasks.service` | `omlapp-dialer-worker` | `APP_IMG` | Listener de eventos Omnidialer (`omnidialer_events_listener`). |
 | `background_callrec_tasks.service` | `omlapp-callrec-worker` | `APP_IMG` | Tareas background de grabaciones. |
@@ -293,7 +294,7 @@ Todos usan `EnvironmentFile=/etc/default/django.env` salvo casos específicos de
 | `dialer_incidence_rules.service` | `dialer-incidence-rules` | `DIALER_WORKER_IMG` | Reglas de incidencias del dialer. |
 | `dialer_render_template.service` | `dialer-render-template` | `DIALER_WORKER_IMG` | Renderizado de plantillas de campaña. |
 | `dialer_scheduler.service` | `dialer-scheduler` | `DIALER_WORKER_IMG` | Job Gearman `schedule-agenda` + encola auditoría periódica. |
-| `dialer_channel_audit.service` | `dialer-channel-audit` | `DIALER_WORKER_IMG` | Job Gearman `audit-active-channels` (reconcilia `OML:CALLS`). |
+| `dialer_channel_audit.service` | `dialer-channel-audit` | `DIALER_WORKER_IMG` | Job Gearman `audit-active-channels`: suma fotos `OML:ACD:*` y corrige `OML:CALLS` con histéresis asimétrica. |
 | `dialer_send_reports.service` | `dialer-send-reports` | `DIALER_WORKER_IMG` | Envío de reportes de campaña. |
 | `dialer_process_campaign@N.service` | `dialer-process-campaign-N` | `DIALER_WORKER_IMG` | Workers de procesamiento de campaña (réplicas). |
 | `dialer_process_contact@N.service` | `dialer-process-contact-N` | `DIALER_WORKER_IMG` | Workers de contactos (plantilla `@`, réplicas vía inventario). |
@@ -320,9 +321,11 @@ La API (`dialer-api`) vive en el pod **`omlapp_web`**, no aquí.
 | `acd-config.service` | `acd-conf` | `ACD_IMG` | Generación/sincronización de configuración Asterisk (`retrieve_conf`). |
 | `acd-server.service` | `acd-server` | `ACD_IMG` | Daemon Asterisk (colas, dialplan, RTP PSTN). |
 | `acd-app.service` | `acd-app` | `ACD_IMG` | ARI Stasis app (lógica de colas OMniLeads). |
+| `acd-channel-audit.service` | `acd-channel-audit` | `ACD_IMG` | Publica foto de canales dialer PSTN del Asterisk local en Redis DB 3 (`OML:ACD:{node}:*`). Sin Gearman; no escribe `OML:CALLS`. |
 | `acd-fastagi.service` | `acd-fastagi` | `FASTAGI_IMG` | FastAGI para scripts de dialplan (`:4573` hacia el pod). |
+| `audiosocket.service` | `audiosocket` | `AUDIOSOCKET_IMG` | Bridge AudioSocket hacia CES (opcional, `audiosocket_enabled`). Escucha en `127.0.0.1:9092` del namespace del pod; no se publica. |
 
-Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-fastagi`.
+Orden típico: `acd-config` → `acd-server` → `acd-app` / `acd-channel-audit` / `acd-fastagi` / `audiosocket` (si `audiosocket_enabled`).
 
 **Upgrade (`--action=upgrade`):** si cambia `acd.pod` (p. ej. migración bridge → `Network=host`), el rol `pods` hace tear-down y recrea la infra Podman antes de que el rol `acd` aplique env vars y reinicie `acd-pod.service`. Coordinar con `telephony_edge` en el mismo upgrade: `kamailio_pstn.env` (`acd_nodes` con `:5070`) y `kamailio_webrtc.env` (`ACD_NET_ADDR`) deben desplegarse en el mismo ciclo. Requiere imagen `ACD_IMG` con trunk PJSIP en `acd_trunk_sip_port` (default `:5070`).
 
@@ -384,6 +387,7 @@ Rol Ansible: [`roles/addons`](../roles/addons/). Sin tag `-enterprise` en `APP_I
 | `:9187` | `obs-prometheus-postgres` / `prometheus_postgres.service` | `data_statefull`, AIO |
 | `:9121` | `obs-prometheus-redis` / `prometheus_redis.service` | `data_stateless`, AIO |
 | `:9418` | `obs-prometheus-gearman` / `prometheus_gearman.service` | `data_stateless`, AIO |
+| `:7099` | `obs-prometheus-dialer-pacing` / `prometheus_dialer_pacing.service` | `data_stateless`, AIO (`dialer_engine=omnidialer`) |
 
 Documentación ampliada de scrape, Loki y Homer: [`observability.md`](observability.md).
 

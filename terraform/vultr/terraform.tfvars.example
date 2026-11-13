@@ -1,0 +1,45 @@
+# Copiar a ansible/instances/<tenant>/terraform.tfvars y completar.
+# La API key no va aca: export VULTR_API_KEY=...
+# 203.0.113.10/32 es documentacion (TEST-NET). Los CIDR reales quedan en el
+# tfvars del tenant, que no se commitea.
+#
+# nodes sigue al inventario Ansible de ese tenant. size es el plan de Vultr.
+# Una instancia puede tener varios roles. keep = true no se apaga de noche.
+
+region          = "ewr"
+os_name         = "Debian 13 x64"
+tenant          = "do_cluster"
+compute_enabled = true
+# extra_tags    = ["cliente", "3X"]
+
+vpc_description = "vpc-del-tenant"
+
+ssh_key_names     = ["oml-ansible"]
+ssh_allowed_cidrs = ["203.0.113.10/32"]
+
+edge_inbound = [
+  { protocol = "tcp", port_range = "80", sources = ["203.0.113.10/32"] },
+  { protocol = "tcp", port_range = "443", sources = ["203.0.113.10/32"] },
+  { protocol = "udp", port_range = "5060", sources = ["203.0.113.10/32"] },
+  # Google Telephony Platform: SIP TLS return (REFER/BYE) to Kamailio :5061
+  { protocol = "tcp", port_range = "5061", sources = ["74.125.88.128/25"] },
+  { protocol = "udp", port_range = "20000-30000", sources = ["203.0.113.10/32"] },
+]
+
+nodes = {
+  do_data = {
+    size  = "vc2-2c-4gb"
+    roles = ["data_statefull", "data_stateless"]
+    keep  = true
+  }
+  do_edge = {
+    size  = "vc2-1c-2gb"
+    roles = ["edge"]
+    keep  = true
+  }
+  do_omlapp_1 = {
+    size  = "vc2-2c-4gb"
+    roles = ["omlapp_web"]
+    keep  = false
+  }
+}

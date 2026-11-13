@@ -64,7 +64,8 @@
       ansible.builtin.assert:
         that:
           - "'nginx' in _smoke_job_names"
-          - "'whatsapp' in _smoke_job_names"
+          - "'msgs_orchestrator' in _smoke_job_names"
+          - "'email_fetch' in _smoke_job_names"
           - "'dialer_api' in _smoke_job_names"
           - "'dialer_scheduler' in _smoke_job_names"
           - "'dialer_channel_audit' in _smoke_job_names"
@@ -79,6 +80,7 @@
           - "'dialer_flask' not in _smoke_job_names"
           - "'dialer_postgresql' not in _smoke_job_names"
           - "'acd-conf' not in _smoke_job_names"
+          - "'whatsapp' not in _smoke_job_names"
         fail_msg: "Jobs obsoletos aún presentes: {{ _smoke_job_names }}"
       changed_when: false
 

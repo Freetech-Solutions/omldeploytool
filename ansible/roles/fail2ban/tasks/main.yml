@@ -8,10 +8,11 @@
 # (at your option) any later version.
 #
 # ISO/IEC 27001 — Control 8.9 (Gestión de la configuración):
-# Instalación idempotente de fail2ban (jail SSH + Kamailio PSTN) vía Ansible.
+# Instalación idempotente de fail2ban (SSH + Kamailio PSTN + HTTPS) vía Ansible.
 #
 # ISO/IEC 27001 — Control 8.16 (Monitoreo de actividades):
-# Ban automático de IPs con fuerza bruta SSH / flood SIP (nftables; ufw/firewalld off).
+# Ban automático de IPs con fuerza bruta SSH / flood SIP / probes HTTPS
+# (nftables; ufw/firewalld off).
 ---
 - name: FAIL2BAN Ensure EPEL on Rocky or Alma Linux
   ansible.builtin.dnf:
@@ -86,6 +87,58 @@
         | list
       }}
 
+- name: FAIL2BAN Decide optional jails for this host
+  ansible.builtin.set_fact:
+    # Kamailio PSTN: edge / AIO with PIKE enabled.
+    fail2ban_deploy_kamailio_pike: >-
+      {{
+        (oml_runs_edge | default(false) | bool)
+        and (fail2ban_kamailio_pike | default(true) | bool)
+      }}
+    # nginx HTTPS: AIO / inventories without HAProxy edge (nginx terminates public TLS).
+    # With group `edge` present, public TLS is HAProxy — ban there instead.
+    fail2ban_deploy_nginx_https: >-
+      {{
+        (fail2ban_nginx_https | default(true) | bool)
+        and (oml_runs_omlapp_web | default(false) | bool)
+        and ((groups['edge'] | default([]) | length) == 0)
+      }}
+    # HAProxy HTTPS: cluster edge hosts that terminate public TLS.
+    fail2ban_deploy_haproxy_https: >-
+      {{
+        (fail2ban_haproxy_https | default(true) | bool)
+        and (component_haproxy_enabled | default(false) | bool)
+      }}
+
+- name: FAIL2BAN Build HTTPS filter regex fragments from tenants_global
+  ansible.builtin.set_fact:
+    fail2ban_https_probe_alt: >-
+      {{
+        fail2ban_https_probe_patterns
+        | map('trim')
+        | reject('equalto', '')
+        | list
+        | join('|')
+      }}
+    fail2ban_https_status_alt: >-
+      {{
+        fail2ban_https_status
+        | map('string')
+        | list
+        | join('|')
+      }}
+    fail2ban_https_method_alt: >-
+      {{
+        fail2ban_https_methods
+        | map('trim')
+        | reject('equalto', '')
+        | list
+        | join('|')
+      }}
+  when: >-
+    fail2ban_deploy_nginx_https | bool
+    or fail2ban_deploy_haproxy_https | bool
+
 - name: FAIL2BAN Ensure jail.d directory exists
   ansible.builtin.file:
     path: /etc/fail2ban/jail.d
@@ -101,9 +154,10 @@
     owner: root
     group: root
     mode: '0755'
-  when:
-    - oml_runs_edge | default(false) | bool
-    - fail2ban_kamailio_pike | default(true) | bool
+  when: >-
+    fail2ban_deploy_kamailio_pike | bool
+    or fail2ban_deploy_nginx_https | bool
+    or fail2ban_deploy_haproxy_https | bool
 
 - name: FAIL2BAN Deploy Kamailio PIKE filter
   ansible.builtin.template:
@@ -113,11 +167,29 @@
     group: root
     mode: '0644'
   notify: restart fail2ban
-  when:
-    - oml_runs_edge | default(false) | bool
-    - fail2ban_kamailio_pike | default(true) | bool
+  when: fail2ban_deploy_kamailio_pike | bool
 
-- name: FAIL2BAN Deploy jail drop-in (SSH + optional Kamailio PSTN)
+- name: FAIL2BAN Deploy nginx HTTPS filter
+  ansible.builtin.template:
+    src: nginx-https.conf.j2
+    dest: "{{ fail2ban_filter_nginx_https }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart fail2ban
+  when: fail2ban_deploy_nginx_https | bool
+
+- name: FAIL2BAN Deploy HAProxy HTTPS filter
+  ansible.builtin.template:
+    src: haproxy-https.conf.j2
+    dest: "{{ fail2ban_filter_haproxy_https }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart fail2ban
+  when: fail2ban_deploy_haproxy_https | bool
+
+- name: FAIL2BAN Deploy jail drop-in (SSH + optional Kamailio / HTTPS)
   ansible.builtin.template:
     src: 99-omnileads.conf.j2
     dest: "{{ fail2ban_jail_d_conf }}"
