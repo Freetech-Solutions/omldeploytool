@@ -1,8 +1,8 @@
-# Despliegue del entorno de desarrollo (dev-env)
+# Despliegue del stack (Docker Compose)
 
-Este documento describe cómo usar [`deploy.sh`](./deploy.sh) para preparar el entorno de desarrollo local de OMniLeads (`dev-env`): clonar o actualizar el repositorio principal, inicializar submódulos, generar el `.env` y construir las imágenes Docker.
+Este documento describe cómo usar [`deploy.sh`](./deploy.sh) para preparar el stack único de OMniLeads: clonar o actualizar el repositorio principal, inicializar submódulos, generar `docker-compose.yml` y `.env` desde las plantillas, y construir las imágenes Docker.
 
-Para levantar GitLab CE local y probar pipelines CI, ver [README-GITLAB.md](./README-GITLAB.md). Para detalles del stack Docker Compose, ver [../deploy.md](../deploy.md) y [../README.md](../README.md).
+Para detalles del stack, ver [deploy.md](./deploy.md) y [README.md](./README.md).
 
 ## Requisitos
 
@@ -14,7 +14,7 @@ Para levantar GitLab CE local y probar pipelines CI, ver [README-GITLAB.md](./RE
 
 ## Uso básico
 
-Desde este directorio (`docker-compose/dev-env`):
+Desde este directorio (`docker-compose/`):
 
 ```bash
 ./deploy.sh
@@ -156,11 +156,13 @@ git submodule update --init --recursive
 3. **Reescritura de `.gitmodules`** (solo con `--repo`).
 4. **Inicialización de submódulos** (`submodule sync` + `submodule update --init --recursive`).
 5. **Verificación** con `./git_sanity.sh --list-submodules`.
-6. **Preparación de dev-env:**
-   - Copia `docker-compose/oml_manage.sh` → `dev-env/oml_manage.sh`
-   - Copia `docker-compose/env` → `dev-env/.env`
-   - Ejecuta [`set_dev_env.sh`](./set_dev_env.sh) (ajusta variables para desarrollo).
-7. **`docker compose build`** en `dev-env/` (omitido con `--no-build`).
+6. **Preparación del stack** en `docker-compose/`:
+   - Copia `docker-compose-template.yml` → `docker-compose.yml`
+   - Copia `env` → `.env`
+   - Deja `oml_manage.sh` ejecutable
+7. **`docker compose build`** en `docker-compose/` (omitido con `--no-build`).
+
+El script no levanta contenedores.
 
 ### Detección del directorio de trabajo
 
@@ -169,19 +171,26 @@ git submodule update --init --recursive
 
 ## Después del deploy
 
-Con build incluido (comportamiento por defecto):
+`deploy.sh` solo prepara el directorio. El primer levante corre el bootstrap (migraciones, datos, estáticos, Asterisk y clave `admin` / `admin`):
 
 ```bash
-cd <repo_root>/docker-compose/dev-env
-./oml_manage.sh up -d
+cd <repo_root>/docker-compose
+./oml_manage.sh up -d bootstrap
 ```
 
-Si usaste `--no-build`:
+Arranques siguientes:
 
 ```bash
-cd <repo_root>/docker-compose/dev-env
-docker compose build
 ./oml_manage.sh up -d
+./oml_manage.sh down
+```
+
+Si usaste `--no-build`, construí antes del primer `bootstrap`:
+
+```bash
+cd <repo_root>/docker-compose
+docker compose build
+./oml_manage.sh up -d bootstrap
 ```
 
 Reemplazá `<repo_root>` por la ruta real (por ejemplo `./omldeploytool` o `/tmp/omldeploytool`).
@@ -193,7 +202,7 @@ Reemplazá `<repo_root>` por la ruta real (por ejemplo `./omldeploytool` o `/tmp
 | `GitLab no está disponible` | GitLab caído o sin acceso de red | `./deploy.sh --repo=github.com/Freetech-Solutions` |
 | Fallo al inicializar submódulos | Repo faltante en el mirror o sin permisos | Verificar que existan todos los repos listados en `.gitmodules` bajo `HOST/ORG` |
 | `Dependencias faltantes: docker` | Docker no instalado o no en PATH | Instalar Docker o usar `--no-build` |
-| `No se encontró docker-compose.yml` | Rama incorrecta o clone incompleto | Confirmar rama y que el clone terminó bien |
+| `No se encontró docker-compose-template.yml` o `env` | Rama incorrecta o clone incompleto | Confirmar rama y que el clone terminó bien |
 | Submódulos apuntan a GitLab tras usar `--repo` | Clone previo sin `--repo` | Volver a ejecutar `./deploy.sh --repo=...` sobre el mismo directorio; el script reescribe `.gitmodules` al actualizar |
 
 ## Ejemplos de referencia
@@ -217,8 +226,9 @@ export OMLDEPLOYTOOL_REPO_URL=https://gitlab.com/mi-org/omldeploytool.git
 
 | Archivo | Rol |
 |---------|-----|
-| [`deploy.sh`](./deploy.sh) | Script de despliegue |
-| [`set_dev_env.sh`](./set_dev_env.sh) | Ajustes del `.env` para dev-env |
-| [`docker-compose.yml`](./docker-compose.yml) | Definición del stack dev-env |
+| [`deploy.sh`](./deploy.sh) | Script de preparación del clone, las plantillas y el build |
+| [`docker-compose-template.yml`](./docker-compose-template.yml) | Plantilla del stack (se copia a `docker-compose.yml`) |
+| [`env`](./env) | Plantilla de variables (se copia a `.env`) |
+| [`oml_manage.sh`](./oml_manage.sh) | Primer deploy: `up -d bootstrap`. Después: `up -d` o `down` |
 | [`../../.gitmodules`](../../.gitmodules) | URLs originales de submódulos |
 | [`../../git_sanity.sh`](../../git_sanity.sh) | Comprobación de estado de submódulos |

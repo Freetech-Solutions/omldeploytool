@@ -35,8 +35,14 @@ Al finalizar, el stack queda listo en `./omldeploytool/docker-compose/`:
 
 ```bash
 cd omldeploytool/docker-compose
-./oml_manage.sh up -d commands  # bootstrap Django + start
-./oml_manage.sh reset-pass      # admin / admin
+./oml_manage.sh up -d bootstrap   # solo el primer deploy
+```
+
+En los arranques siguientes:
+
+```bash
+./oml_manage.sh up -d
+./oml_manage.sh down
 ```
 
 > Requiere que `deploy.sh` esté pusheado en la rama elegida. Opciones útiles: `./deploy.sh --no-build` (sin build de imágenes), `--path=/srv/` (directorio destino del clone). Ver `./deploy.sh --help`.
@@ -57,12 +63,20 @@ cd docker-compose
 cp docker-compose-template.yml docker-compose.yml
 cp env .env
 # editar .env según el escenario (ver "Modos de despliegue")
-./oml_manage.sh up -d commands  # django_commands + django_runtime_bootstrap, luego up
-./oml_manage.sh reset-pass      # admin / admin
-./oml_manage.sh data-generate   # datos de demo (opcional)
+
+# Solo el primer deploy
+./oml_manage.sh up -d bootstrap
+
+# Arranques siguientes
+./oml_manage.sh up -d
+./oml_manage.sh down
 ```
 
-> **Bootstrap:** `omlapp` ya no ejecuta collectstatic/permisos/`regenerar_asterisk` al arrancar. En el primer levante (o tras cambiar `APP_IMG`) usá `up -d commands` o, con el stack ya up, `./oml_manage.sh django-commands`. Detalle en [README.md § Bootstrap](./README.md#bootstrap).
+> **Primer deploy:** `./oml_manage.sh up -d bootstrap` corre una sola vez las migraciones, `django_commands.sh`, `django_runtime_bootstrap.sh` (`collectstatic`, permisos, `regenerar_asterisk`) y deja la clave de `admin` en `admin`. Ese trabajo vive en el servicio one-shot `django-commands` (profile `django-commands`); `omlapp` arranca con `DJANGO_ENTRYPOINT` y no lo repite.
+>
+> **Después del primer deploy:** `./oml_manage.sh up -d` levanta el stack y `./oml_manage.sh down` lo baja. `bootstrap` no forma parte del arranque habitual.
+>
+> Tras cambiar `APP_IMG` o las plantillas de estáticos/telefonía, con el stack ya creado: `./oml_manage.sh django-runtime-bootstrap`. Si también hacen falta los comandos iniciales de datos: `./oml_manage.sh django-commands`. Datos de demo: `./oml_manage.sh data-generate`. Para volver a dejar `admin` / `admin`: `./oml_manage.sh reset-pass`.
 
 ---
 
@@ -74,7 +88,7 @@ Servicios de datos e infraestructura compartida: bases de datos, caché, almacen
 |----------|---------|
 | **postgresql** | Instancia única de PostgreSQL (puerto 5432). Contiene la DB `omnileads` (OML) y la DB `omnidialer` (dialer), creada al init con `omnidialer.sql` — el mismo patrón que el rol Ansible `postgresql`. |
 | **redis** | Cache, sesiones, pub/sub y colas en tiempo real. Usado por la web, los workers, los websockets y el ACD. |
-| **minio** | Almacenamiento de objetos compatible con S3 para grabaciones y archivos media. API en `:9000` y consola en `:9001`. Con límites de recursos (`1G` / `0.5 CPU`). |
+| **minio** | Almacenamiento de objetos compatible con S3 para grabaciones y archivos media. API interna en el puerto `9000` y consola en `9001` (sin publicación al host). Límites de recursos: `1G` / `0.5 CPU`. |
 | **createbuckets** | Tarea one-shot (`restart: "no"`) que, al levantar el stack, crea el bucket `omnileads`, el usuario `omlminio` y asigna la política `readwrite`. |
 | **gearman** | Cola de trabajos distribuidos. La usan el ACD (registro de llamadas), el dialer (campañas/contactos/eventos) y los procesos post-llamada. |
 
@@ -89,7 +103,8 @@ Componentes del *Automatic Call Distribution*: Asterisk como PBX/ACD, generació
 | **fastagi** | Servicio FastAGI consultado por Asterisk para variables de canal desde Redis (`omni-retrieve-conf`) y persistencia de encuestas (`omni-survey-answer`). Conecta con PostgreSQL y Redis. |
 | **acd-conf-generator** | Genera la configuración de Asterisk (`astconf.py`) a partir de los datos de OMniLeads y la escribe en el volumen compartido `asterisk_conf`. |
 | **acd-server** | Asterisk como PBX/ACD. Gestiona llamadas, colas y grabaciones (volúmenes `asterisk_callrec`, `asterisk_conf`, `asterisk_sounds`). Recibe una IP fija (`ACD_HOST_IP`) dentro de la red `omnileads`. |
-| **acd-app** | Aplicación ARI (Asterisk REST Interface) que orquesta llamadas en Asterisk vía Stasis: transferencias, grabación, integración con el dialer y con la API REST de OMniLeads. |
+| **acd-app** | Aplicación ARI (Asterisk REST Interface) que orquesta llamadas en Asterisk vía Stasis: transferencias, grabación, integración con el dialer y con la API REST de OMniLeads. El volumen de código `${REPO_PATH}/acd/source/ari-app/` está comentado: corre la imagen `ACD_IMG`. |
+| **audiosocket** | Servidor AudioSocket en el puerto `9092` para voicebots (`VOICEBOT_VENDOR`, por defecto `ces`). Lee la sesión en Redis y hace el handoff HTTP hacia `omlapp` (`OML_API_BASE_URL`, `VOICEBOT_USERNAME` / `VOICEBOT_PASSWORD`). `acd-app` lo alcanza por `AUDIOSOCKET_ADDR` (por defecto `audiosocket:9092`). El montaje de credenciales GCP está comentado. |
 | **acd-channel-audit** | Publica en Redis DB 3 la foto de canales dialer PSTN del Asterisk local (`OML:ACD:{node}:CHANNELS` / `RINGING` + heartbeat). Sin Gearman ni dependencia del dialer; no escribe `OML:CALLS:{camp}:DIALER`. |
 
 ---
@@ -111,10 +126,10 @@ Servidor web, aplicación Django (uWSGI/ASGI), WebSockets y proxy SIP WebRTC. Pu
 
 | Servicio | Función |
 |----------|---------|
-| **omlapp** | Aplicación web principal (uWSGI). Expone la UI y las APIs REST de OMniLeads. Healthcheck contra `:8099/`. El entrypoint lo define `DJANGO_ENTRYPOINT` (`init_devenv.sh` para desarrollo, `init_uwsgi.sh` para producción) y monta el código fuente desde `${REPO_PATH}/django/`. |
-| **daphne** | Servidor ASGI para peticiones asíncronas y WebSockets de Django Channels. Atiende canales y conexiones en tiempo real. |
-| **websockets** | Servidor WebSocket dedicado (puerto interno 8000) para presencia, notificaciones y actualizaciones en vivo. |
-| **nginx** | Reverse proxy HTTPS (puerto 443). Sirve estáticos, reparte tráfico a `omlapp` (WSGI), `daphne` (ASGI), `websockets` y `kamailio-webrtc`. Punto de entrada único desde el exterior. Monta los certificados TLS desde `.custom_conf/certs/`. |
+| **omlapp** | Aplicación web principal (uWSGI), imagen `APP_IMG`. Expone la UI y las APIs REST de OMniLeads. Healthcheck contra `:8099/`. El proceso lo define `DJANGO_ENTRYPOINT` (en `env`, `/opt/omnileads/bin/init_uwsgi.sh`). Espera `postgresql`, `redis`, `minio` y `acd-server` healthy. El montaje de `${REPO_PATH}/django/` está comentado en la plantilla. |
+| **daphne** | Servidor ASGI (`init_daphne.sh`, puerto `DAPHNE_PORT`, por defecto `8098`) para peticiones asíncronas y WebSockets de Django Channels. |
+| **websockets** | Servidor WebSocket dedicado (`0.0.0.0:8000`) para presencia, notificaciones y actualizaciones en vivo. Depende de `redis`. |
+| **nginx** | Reverse proxy HTTPS publicado en el host (`443:443`). Sirve estáticos, reparte tráfico a `omlapp` (WSGI), `daphne` (ASGI), `websockets` y `kamailio-webrtc`. Arranca cuando `omlapp` está healthy y `daphne` / `websockets` ya iniciaron. El modo de la SPA lo define `NGINX_WEBUI_MODE` (en `env`, `static`). El montaje de `.custom_conf/certs/` está comentado en la plantilla. |
 | **kamailio-webrtc** | Proxy SIP para clientes WebRTC: registro de extensiones, autenticación efímera (`AUTHEPH_SK`) y enrutamiento hacia Asterisk. |
 
 ---
@@ -148,12 +163,13 @@ Pila del OMniDialer: API y workers Gearman que procesan campañas, contactos y e
 | **dialer-process-contact** | Worker Gearman: procesamiento de contactos (marcado, resultado, reagenda). Escala con `DIALER_PROCESS_CONTACT_REPLICAS`. |
 | **dialer-process-camp** | Worker Gearman: procesamiento de campañas (estado, progreso). Escala con `DIALER_PROCESS_CAMPAIGN_REPLICAS`. |
 | **dialer-process-event** | Worker Gearman: procesamiento de eventos del dialer. Escala con `DIALER_PROCESS_EVENT_REPLICAS`. |
-| **dialer-scheduler** | Worker Gearman: programación de la agenda (`schedule-agenda`) + enqueue de `audit-active-channels`. Escala con `DIALER_SCHEDULER_REPLICAS` (leader lease Redis). |
-| **dialer-channel-audit** | Worker Gearman `audit-active-channels`: suma fotos Redis de `acd-channel-audit` (`OML:ACD:*`) y corrige `OML:CALLS` con histéresis asimétrica (no Gearman sync a Asterisk). |
+| **dialer-scheduler** | Worker Gearman `schedule-agenda`. Escala con `DIALER_SCHEDULER_REPLICAS` (por defecto `1`). |
+| **dialer-channel-audit** | Worker Gearman `audit-active-channels`: suma fotos Redis de `acd-channel-audit` (`OML:ACD:*`) y corrige `OML:CALLS` con histéresis asimétrica (no Gearman sync a Asterisk). Una sola instancia (sin `replicas`). |
 | **dialer-manage-campaign** | Worker Gearman: ciclo de vida de campañas (`create/start/pause/resume/stop/edit/delete-campaign`, `change-database`). |
 | **dialer-send-reports** | Worker Gearman: envío de reportes del dialer. |
 | **dialer-incidence-rules** | Worker Gearman: reglas de incidencia (`add/create/update/delete`). |
-| **dialer-render-template** | Worker Gearman: renderizado de plantillas (por ejemplo, reportes). |
+| **dialer-render-template** | Worker Gearman `render-template`. |
+| **dialer-metrics** | Exporta métricas Prometheus del dialer (`omnidialer_metrics.py`) en el puerto `7099`, publicado al host como `DIALER_METRICS_HOST_PORT` (por defecto `7099`). Lee Redis DB 3. Una réplica. |
 
 ---
 
@@ -170,17 +186,16 @@ Procesamiento de las grabaciones generadas por Asterisk: compresión y subida a 
 
 ## Herramientas QA y de desarrollo
 
-Utilidades auxiliares para administración, QA y desarrollo front-end. Forman parte de la plantilla; en un despliegue de producción pueden omitirse (comentándolas en la copia de trabajo o levantando la lista de servicios explícita con `docker compose up -d <servicios>`).
+`pbxemulator`, `redisinsight` y `pgadmin` forman parte del stack que levanta `up`. `django-commands` solo corre con el profile `django-commands` (`up -d bootstrap`, `django-commands` o `django-runtime-bootstrap`).
+
+En la plantilla están comentados y no arrancan: `vue-cli`, `vue-build`, `nginxcgi` y `voice-ai`. Para usarlos hay que descomentar el servicio en la copia de trabajo `docker-compose.yml`.
 
 | Servicio | Función |
 |----------|---------|
-| **django-commands** | Contenedor one-shot (profile `django-commands`): `django_commands.sh` + `django_runtime_bootstrap.sh` (`collectstatic`, permisos, `regenerar_asterisk`). Requiere `postgresql`/`redis`/`minio`/`gearman`/`acd-server` healthy. No corre en `omlapp` (`init_uwsgi.sh` / `init_devenv.sh` solo arrancan el server). |
-| **pbxemulator** | Emulador PSTN para QA. Simula escenarios de llamadas salientes/entrantes según `PSTN_EMULATOR_MODE` (ver comentarios en `.env`). Expone `4569/udp` y recibe IP fija (`PSTN_EMULATOR_IP`). |
-| **nginxcgi** | Nginx auxiliar de QA que expone scripts CGI internos. Puerto host `8888`. |
+| **django-commands** | Contenedor one-shot (profile `django-commands`, `restart: "no"`). El comando de la plantilla es `django_commands.sh` y después `django_runtime_bootstrap.sh` (`collectstatic`, permisos, `regenerar_asterisk`). `./oml_manage.sh up -d bootstrap` lo ejecuta una vez, en el primer deploy, y además corre migraciones y `cambiar_admin_password`. Requiere `postgresql`, `redis`, `minio`, `gearman` y `acd-server` healthy. |
+| **pbxemulator** | Emulador PSTN para QA. Simula escenarios de llamadas salientes/entrantes según `PSTN_EMULATOR_MODE` (ver comentarios en `.env`). Publica `4569/udp` y usa la IP fija `PSTN_EMULATOR_IP`. El dialplan custom está comentado. |
 | **redisinsight** | Interfaz web para inspeccionar Redis. Publicado en `127.0.0.1:7963 → 5540`. |
-| **pgadmin** | Interfaz web para administrar PostgreSQL (bases `omnileads` y `omnidialer` en el mismo servidor). Publicado en `127.0.0.1:5050 → 80`. Credenciales por defecto: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (`admin@omnileads.com` / `admin`). |
-| **vue-cli** | Front-end Vue (modo dev server con hot reload) montado sobre `${REPO_PATH}/django/omnileads_ui/`. Publicado en `localhost:8081`. |
-| **vue-build** | Job one-shot (`restart: "no"`) que ejecuta `npm ci` / `npm run build` para generar el `dist/` que consume `omlapp`. |
+| **pgadmin** | Interfaz web para administrar PostgreSQL (bases `omnileads` y `omnidialer` en el mismo servidor). Publicado en `127.0.0.1:5050 → 80`. Credenciales: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (`admin@omnileads.com` / `admin`). Espera a que `postgresql` esté healthy. |
 
 ---
 
@@ -188,7 +203,11 @@ Utilidades auxiliares para administración, QA y desarrollo front-end. Forman pa
 
 El mismo `docker-compose.yml` cubre todos los escenarios; lo único que cambia es el `.env`.
 
+La plantilla y el archivo `env` salen en modo producción: `DJANGO_SETTINGS_MODULE=ominicontacto.settings.production`, `DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_uwsgi.sh` y `NGINX_WEBUI_MODE=static`. El código de Django, los certificados y las herramientas Vue quedan comentados.
+
 ### Desarrollo
+
+En `.env`:
 
 ```bash
 DJANGO_SETTINGS_MODULE=ominicontacto.settings.develop
@@ -196,9 +215,13 @@ DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh
 NGINX_WEBUI_MODE=rproxy
 ```
 
-- `omlapp` monta el código desde `${REPO_PATH}/django/`: los cambios se reflejan sin rebuild.
-- `vue-cli` expone el dev server de Vue en `http://localhost:8081` (hot reload); con `NGINX_WEBUI_MODE=rproxy` nginx proxya la SPA hacia él.
-- Herramientas QA (`pbxemulator`, `nginxcgi`, `redisinsight`, `pgadmin`) disponibles.
+En la copia de trabajo `docker-compose.yml`, descomentar el volumen de `omlapp`:
+
+```yaml
+- ${REPO_PATH}/django/:/opt/omnileads/ominicontacto/
+```
+
+Con ese montaje, los cambios de Django se ven sin rebuild. `pbxemulator`, `redisinsight` y `pgadmin` ya forman parte del `up`. `vue-cli` y `vue-build` siguen comentados: hay que descomentarlos para el dev server de Vue (`localhost:8081`) y para que `NGINX_WEBUI_MODE=rproxy` tenga a quién proxyar la SPA.
 
 ### Producción
 
@@ -213,10 +236,10 @@ DJANGO_ALLOWED_HOSTS=${FQDN},${OML_HOSTNAME}
 DJANGO_CSRF_TRUSTED_ORIGINS=https://${FQDN}
 ```
 
-- Certificados TLS en `.custom_conf/certs/` (se montan en nginx).
+- Para certificados propios, descomentar en `nginx` el volumen `.custom_conf/certs/:/etc/omnileads/certs:ro` y dejar los archivos en `.custom_conf/certs/`.
 - Revisar y cambiar todos los secretos del `.env` (passwords de Postgres, AMI, dialer, `DJANGO_SECRET_KEY`, etc.).
 - Detrás de NAT: `RTPENGINE_NAT=true` y `PUBLIC_IP` con la IP pública.
-- Las herramientas QA/dev pueden omitirse del despliegue.
+- En producción se puede levantar una lista explícita de servicios y dejar afuera `pbxemulator`, `redisinsight` y `pgadmin`.
 
 ### Edge server externo
 
@@ -266,6 +289,7 @@ flowchart TB
     acd_conf[acd-conf-generator]
     acd_server[acd-server]
     acd_app[acd-app]
+    audiosocket[audiosocket]
   end
 
   subgraph tel_bridges [Tel-bridges]
@@ -289,6 +313,7 @@ flowchart TB
   subgraph dialer_stack [Dialer-stack]
     dialer_api[dialer-api]
     dialer_workers[Workers Dialer]
+    dialer_metrics[dialer-metrics]
   end
 
   subgraph processing [Processing-services]
@@ -315,15 +340,18 @@ flowchart TB
 El helper `oml_manage.sh` envuelve a `docker compose` sobre la copia de trabajo (`docker-compose.yml` + `.env`):
 
 ```bash
-./oml_manage.sh up -d            # levantar todo
-./oml_manage.sh down             # bajar
-./oml_manage.sh logs -f <svc>    # logs de un servicio
-./oml_manage.sh status           # estado y salud de contenedores
-./oml_manage.sh reset-pass       # reset admin/admin
-./oml_manage.sh rebuild omlapp            # incluye django_runtime_bootstrap.sh en la imagen
-./oml_manage.sh up -d commands            # first boot: datos + bootstrap (static/permisos/regen)
-./oml_manage.sh django-commands           # mismos one-shots on-demand
-./oml_manage.sh django-runtime-bootstrap  # solo collectstatic/permisos/regenerar_asterisk
+# Solo el primer deploy (migraciones, datos, estáticos, Asterisk, admin/admin)
+./oml_manage.sh up -d bootstrap
+
+# Operación habitual
+./oml_manage.sh up -d
+./oml_manage.sh down
+
+./oml_manage.sh logs -f <svc>             # logs de un servicio
+./oml_manage.sh status                    # estado y salud de contenedores
+./oml_manage.sh reset-pass                # volver a dejar admin/admin
+./oml_manage.sh django-runtime-bootstrap  # tras cambiar APP_IMG o plantillas: collectstatic, permisos, regenerar_asterisk
+./oml_manage.sh django-commands           # django_commands.sh + django_runtime_bootstrap.sh, con el stack ya creado
 ```
 
 Equivalente directo sin el helper:
