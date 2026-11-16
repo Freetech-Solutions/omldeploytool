@@ -44,7 +44,7 @@ FASTAGI_IMG=docker.io/omnileads/fastagi:20261111-7e0ee29f
 AUDIOSOCKET_IMG=docker.io/omnileads/audiosocket:20261111-9b4ed267
 
 # --- OMniLeads images DIALER
-DIALER_API_IMG=docker.io/freetechsolutions/dialer_worker:20261113-deefd7cc
+DIALER_API_IMG=docker.io/freetechsolutions/dialer_api:20261113-deefd7cc
 DIALER_WORKER_IMG=docker.io/freetechsolutions/dialer_worker:20261113-deefd7cc
 
 # --- OMniLeads utilities images
