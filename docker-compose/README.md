@@ -61,29 +61,36 @@ Also: `docker_install_linux.sh`, `deploy.sh`, `custom_conf_examples/`, `.custom_
 
 ## Bootstrap (required on first bring-up) <a name="bootstrap"></a>
 
-`omlapp` / Daphne **no longer** run shared-state setup on every start (`init_uwsgi.sh` / `init_devenv.sh` only start the app). After the stack is up you must run a **one-shot bootstrap** so static assets, media permissions, and Asterisk dialplan regen are applied once (HA-safe: one runner, not every web replica).
+`omlapp` starts with `DJANGO_ENTRYPOINT` and does not run shared-state setup. On the **first deploy only**, `./oml_manage.sh up -d bootstrap` runs migrations, initial data, static files, media permissions and Asterisk dialplan regen once (one runner, not every web replica), then starts the stack. Later, use `./oml_manage.sh up -d` or `./oml_manage.sh down`.
 
-| Command | What it runs |
-|---------|----------------|
-| `./oml_manage.sh django-commands` | `django_commands.sh` (initial data / migrations helpers) **+** `django_runtime_bootstrap.sh` |
-| `./oml_manage.sh django-runtime-bootstrap` | Only `django_runtime_bootstrap.sh` (`collectstatic`, permisos, `regenerar_asterisk`) |
-| `./oml_manage.sh up -d commands` | Same as `django-commands`, then `up -d` |
+| Command | When |
+|---------|------|
+| `./oml_manage.sh up -d bootstrap` | **First deploy only.** Migrations, `django_commands.sh`, `django_runtime_bootstrap.sh`, and admin password `admin`. Then starts the stack. |
+| `./oml_manage.sh up -d` | Later starts. |
+| `./oml_manage.sh down` | Stop the stack. |
+| `./oml_manage.sh django-runtime-bootstrap` | After an `APP_IMG` change or telephony/static template change: `collectstatic`, permisos, `regenerar_asterisk`. |
+| `./oml_manage.sh django-commands` | On demand, stack already created: `django_commands.sh` + `django_runtime_bootstrap.sh`. |
 
 `django_runtime_bootstrap.sh` needs Postgres, Redis, MinIO, Gearman, and a **healthy** `acd-server` (AMI). `oml_manage.sh` brings those deps up before running the profile `django-commands`.
 
-**Typical first bring-up:**
+**First bring-up:**
 
 ```bash
 cd docker-compose
 cp docker-compose-template.yml docker-compose.yml   # if needed
 cp env .env                                         # then edit .env
-./oml_manage.sh up -d commands    # bootstrap + start stack
-# or: ./oml_manage.sh up -d && ./oml_manage.sh django-commands
-./oml_manage.sh reset-pass
-./oml_manage.sh data-generate     # optional demo data
+./oml_manage.sh up -d bootstrap    # first deploy only
+./oml_manage.sh data-generate      # optional demo data
 ```
 
-Re-run `django-runtime-bootstrap` after image upgrades that change static files or telephony templates. The image **must** include `/opt/omnileads/bin/django_runtime_bootstrap.sh` (rebuild/`APP_IMG` digest with that script).
+**Later:**
+
+```bash
+./oml_manage.sh up -d
+./oml_manage.sh down
+```
+
+Re-run `django-runtime-bootstrap` after image upgrades that change static files or telephony templates. The image **must** include `/opt/omnileads/bin/django_runtime_bootstrap.sh` (rebuild/`APP_IMG` digest with that script). Do not pass `bootstrap` on every start.
 
 ## Quick Localhost Test Environment <a name="test-env"></a>
 
@@ -94,10 +101,11 @@ cd docker-compose
 cp docker-compose-template.yml docker-compose.yml
 cp env .env
 # adjust .env for localhost if needed (see deploy.md)
-./oml_manage.sh up -d commands
-./oml_manage.sh reset-pass
+./oml_manage.sh up -d bootstrap   # first deploy only
 ./oml_manage.sh data-generate
 ```
+
+Later: `./oml_manage.sh up -d` or `./oml_manage.sh down`.
 
 Open https://localhost — `admin` / `admin`.
 
@@ -124,7 +132,7 @@ The SRTP and RTP port ranges, as well as the Kamailio SIP ports, can be customiz
 - `ACD_RTP_PORT_MIN` / `ACD_RTP_PORT_MAX`
 - `KAMAILIO_WEBRTC_SIP_PORT`, `KAMAILIO_PSTN_UDP_PORT`
 
-> In `prod-env`, the services `kamailio-pstn` and `rtpengine` use `network_mode: host`, so their ports are published directly on the Docker host interfaces. In `test-env` and `dev-env` those services run on the `omnileads` bridge network.
+`kamailio-pstn` and `rtpengine` run on the `omnileads` bridge (`kamailio-pstn` with static IP `KAMAILIO_PSTN_IP`). The template does not set `network_mode: host`.
 
 ## On‑Premise / Cloud VPS Deployment <a name="vps-vm"></a>
 
@@ -146,9 +154,10 @@ FQDN=<optional-FQDN>
 Then:
 
 ```bash
-./oml_manage.sh up -d commands   # includes django bootstrap (see Bootstrap)
-./oml_manage.sh reset-pass
+./oml_manage.sh up -d bootstrap   # first deploy only (see Bootstrap)
 ```
+
+Later: `./oml_manage.sh up -d` or `./oml_manage.sh down`.
 
 Log in at `https://<OML_HOSTNAME>` with `admin` / `admin`.
 
@@ -282,7 +291,8 @@ The most useful commands are:
 
 | Command                        | Description                                                        |
 |--------------------------------|--------------------------------------------------------------------|
-| `up [-d] [commands]`           | Start the stack. With `commands`, runs bootstrap first (see [Bootstrap](#bootstrap)) |
+| `up -d bootstrap`              | **First deploy only:** migrations, initial data, runtime bootstrap, admin password, then start (see [Bootstrap](#bootstrap)) |
+| `up -d` / `down`               | Start or stop the stack after the first deploy                    |
 | `down [-v]`                    | Stop & remove containers (use `-v` to drop volumes)                |
 | `pull [svc]`                   | Pull images                                                        |
 | `restart` / `stop` / `start`   | Lifecycle helpers, all services or a specific one                  |
@@ -290,7 +300,7 @@ The most useful commands are:
 | `status` / `health`            | Show container status & health of critical services                |
 | `reset-pass`                   | Reset admin password to `admin / admin`                            |
 | `data-generate`                | Generate example data in the database                              |
-| `django-commands`              | **Required on first bring-up / after app image upgrades:** `django_commands.sh` + `django_runtime_bootstrap.sh` |
+| `django-commands`              | On demand, stack already created: `django_commands.sh` + `django_runtime_bootstrap.sh` |
 | `django-runtime-bootstrap`     | One-shot: collectstatic / permisos / `regenerar_asterisk` only     |
 | `build-vuejs`                  | Build the Vue.js front‑end assets                                  |
 | `rebuild [svc]`                | Rebuild one or all service images                                  |
@@ -316,12 +326,7 @@ Default users (password `098098ZZZ`):
 
 ## Development Environment <a name="dev-env"></a>
 
-In `dev-env` the Django and Vue.js code is mounted as Docker volumes so changes are reflected without rebuilding:
-
-- `omlapp` mounts `${REPO_PATH}/django/` and runs `init_devenv.sh`.
-- `vue-build` performs `npm ci`/`npm run build` against `${REPO_PATH}/django/omnileads_ui/` and `omlapp` waits for it (`service_completed_successfully`).
-- `vue-cli` exposes the Vue dev server on `http://localhost:8081` for hot reload work.
-- `nginx` mounts the custom TLS certs from `../.custom_conf/certs/`.
+The template ships in production mode. The Django source mount, TLS cert mount, `vue-cli`, `vue-build` and `nginxcgi` are commented out in `docker-compose-template.yml`. To work on Django source, uncomment the `omlapp` volume and set `DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh` (see [deploy.md](./deploy.md)). Uncomment `vue-cli` / `vue-build` only if you need the Vue dev server on `http://localhost:8081`.
 
 Initialize the source submodules first:
 
@@ -335,22 +340,23 @@ On Linux, install Docker prerequisites:
 ./docker_install_linux.sh
 ```
 
-Then set up and start the stack (from `docker-compose/`, with source mounts enabled in `.env` — see [deploy.md](./deploy.md)):
+Then set up and start the stack (from `docker-compose/` — see [deploy.md](./deploy.md)):
 
 ```bash
 cp docker-compose-template.yml docker-compose.yml
 cp env .env
 # set DJANGO_ENTRYPOINT=/opt/omnileads/bin/init_devenv.sh and mount paths as needed
-./oml_manage.sh up -d commands
-./oml_manage.sh reset-pass
+./oml_manage.sh up -d bootstrap   # first deploy only
 ./oml_manage.sh data-generate
 ```
+
+Later: `./oml_manage.sh up -d` or `./oml_manage.sh down`.
 
 Log in at https://localhost with `admin` / `admin`.
 
 ## PSTN Emulator (test-env & dev-env) <a name="pstn-emulator"></a>
 
-The `pbxemulator` service simulates an ITSP/PSTN provider so you can place inbound and outbound test calls without a real carrier. It is **only** shipped with `test-env` and `dev-env`.
+The `pbxemulator` service is part of the compose template. It simulates an ITSP/PSTN provider so you can place inbound and outbound test calls without a real carrier.
 
 Its behavior is controlled by `PSTN_EMULATOR_MODE` in `.env`:
 
@@ -410,19 +416,18 @@ VOICEBOT_USERNAME=voicebot
 VOICEBOT_PASSWORD=098098ZZZ
 ```
 
-## Optional Admin Tools (test-env & dev-env) <a name="admin-tools"></a>
+## Optional Admin Tools <a name="admin-tools"></a>
 
-Both `test-env` and `dev-env` ship with three optional administration UIs (not present in `prod-env`):
+These UIs are part of the single compose template (`up` starts them):
 
 | Service        | URL                              | Credentials (defaults)                                     |
 |----------------|----------------------------------|------------------------------------------------------------|
 | RedisInsight   | http://127.0.0.1:7963            | —                                                          |
 | pgAdmin 4      | http://127.0.0.1:5050            | `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD`       |
-| nginxcgi (QA)  | http://localhost:8888            | —                                                          |
-| MinIO Console  | https://<OML_HOSTNAME>/minio     | `MINIO_HTTP_ADMIN_USER` / `MINIO_HTTP_ADMIN_PASS`          |
-| Vue CLI (dev)  | http://localhost:8081            | — (dev-env only)                                           |
 
-All admin ports are bound to `127.0.0.1` and should never be exposed publicly.
+`nginxcgi` and `vue-cli` are commented out in the template. MinIO listens on the compose network (`:9000` API, `:9001` console) and is not published on the host.
+
+RedisInsight and pgAdmin are bound to `127.0.0.1`.
 
 ---
 

@@ -4,7 +4,7 @@
 #
 # El modelo es de stack único: docker-compose/docker-compose-template.yml define
 # todos los componentes y docker-compose/env las variables. Este script deja
-# docker-compose/ listo para `./oml_manage.sh up -d`.
+# docker-compose/ listo para el primer `./oml_manage.sh up -d bootstrap`.
 #
 # Uso:
 #   ./deploy.sh [rama]
@@ -74,6 +74,13 @@ Pasos:
   4. Ejecuta git_sanity.sh --list-submodules
   5. Genera docker-compose/docker-compose.yml y .env desde las plantillas
   6. Ejecuta docker compose build (omitido con --no-build)
+
+Este script no levanta contenedores. Al terminar, el primer deploy es:
+  cd <docker-compose> && ./oml_manage.sh up -d bootstrap
+
+Ese comando deja admin/admin. Arranques siguientes:
+  ./oml_manage.sh up -d
+  ./oml_manage.sh down
 EOF
 }
 
@@ -359,8 +366,8 @@ main() {
   fi
 
   log_info "Despliegue preparado en $compose_dir"
-  log_info "Para levantar el stack: cd $compose_dir && ./oml_manage.sh up -d"
-  log_info "Luego: ./oml_manage.sh reset-pass (admin/admin)"
+  log_info "Primer deploy: cd $compose_dir && ./oml_manage.sh up -d bootstrap"
+  log_info "Ese comando deja admin/admin. Después: ./oml_manage.sh up -d  o  ./oml_manage.sh down"
   if [[ "$NO_BUILD" -ne 0 ]]; then
     log_info "Recordá construir antes: docker compose build"
   fi
