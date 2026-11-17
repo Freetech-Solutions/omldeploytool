@@ -221,6 +221,9 @@ kamailio_shm_size: 1024
 kamailio_pkg_size: 256
 
 kamailio_certs_location: /etc/kamailio/certs
+# Enable SIP TLS listener :5061 (same cert.pem/key.pem as Nginx/HAProxy).
+# Per-call TLS toward the ITSP still needs X-OML-Transport: tls on the ACD trunk.
+kamailio_tls_enable: false
 
 # --- Kamailio log level
 # --- 0: Error, 1: Warning, 2: Debug
