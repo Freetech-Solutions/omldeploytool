@@ -267,13 +267,14 @@
   tags:
     - always
 
-# Bucket endpoints (S3/MinIO): si el inventario no define bucket_url, inferimos
-# los endpoints público e interno desde bucket_host (computado arriba). Esto evita
-# que las plantillas (acd, omlapp, nginx, interaction_processor, etc.) fallen con
-# 'bucket_url is undefined' cuando el host usa MinIO self-hosted.
+# Bucket endpoints (S3/MinIO).
+# Interno: http://<data>:9000, lo usan Django (firma), nginx y los workers.
+# Público: https://<fqdn>/minio para que el browser baje por el mismo TLS
+# de la UI. Apuntar el browser a :9000 rompe la reproducción (MinIO es HTTP).
+# Con bucket_url externo, público e interno son ese endpoint.
 - name: TOPOLOGY Normalize bucket endpoints (S3/MinIO)
   ansible.builtin.set_fact:
-    bucket_endpoint: "{{ bucket_url | default(bucket_host) }}"
+    bucket_endpoint: "{{ bucket_url | default('https://' ~ ((fqdn | default(omni_ip_lan)) | trim) ~ '/minio') }}"
     bucket_endpoint_internal: "{{ bucket_url | default(bucket_host) }}"
   tags:
     - always
@@ -281,7 +282,7 @@
 # Si no hay bucket de backup dedicado, reutilizar el bucket de aplicación (callrec, etc.).
 - name: TOPOLOGY Normalize backup bucket configuration
   ansible.builtin.set_fact:
-    backup_bucket_url: "{{ backup_bucket_url | default(bucket_endpoint, true) }}"
+    backup_bucket_url: "{{ backup_bucket_url | default(bucket_endpoint_internal, true) }}"
     backup_bucket_name: "{{ backup_bucket_name | default(bucket_name, true) }}"
     backup_bucket_access_key: "{{ backup_bucket_access_key | default(bucket_access_key, true) }}"
     backup_bucket_secret_key: "{{ backup_bucket_secret_key | default(bucket_secret_key, true) }}"

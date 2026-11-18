@@ -831,6 +831,107 @@ agents_cmd() {
     esac
 }
 
+# gearadmin --status → JSON (función, en cola, en ejecución, workers capaces)
+format_gearman_status() {
+    local filter="${1:-}"
+    local raw="${2:-}"
+
+    local tsv
+    tsv=$(printf '%s\n' "$raw" | FILTER="$filter" awk '
+        function lower(s) { return tolower(s) }
+        {
+            gsub(/\r/, "")
+            if ($0 ~ /^[[:space:]]*$/) next
+            if ($1 == ".") next
+            if (NF < 4) next
+            workers = $NF
+            running = $(NF - 1)
+            queued = $(NF - 2)
+            if (queued !~ /^[0-9]+$/ || running !~ /^[0-9]+$/ || workers !~ /^[0-9]+$/) next
+            name = $1
+            for (i = 2; i <= NF - 3; i++) name = name " " $i
+            filt = ENVIRON["FILTER"]
+            if (filt != "" && index(lower(name), lower(filt)) == 0) next
+            printf "%s\t%s\t%s\t%s\n", name, queued, running, workers
+        }
+    ')
+
+    if [[ -z "$tsv" && -n "$filter" ]]; then
+        error "Ninguna cola coincide con: $filter"
+        return 1
+    fi
+
+    local jq_program='
+        def rows:
+          split("\n")
+          | map(select(length > 0) | split("\t") | {
+              name: .[0],
+              queued: (.[1] | tonumber),
+              running: (.[2] | tonumber),
+              workers: (.[3] | tonumber)
+            });
+        (rows) as $q
+        | {
+            summary: {
+              functions: ($q | length),
+              queued: ($q | map(.queued) | add // 0),
+              running: ($q | map(.running) | add // 0),
+              without_workers: ($q | map(select(.workers == 0)) | length)
+            },
+            queues: ($q | sort_by([-.queued, -.running, .name]))
+          }
+    '
+
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s\n' "$tsv" | jq -R -s "$jq_program"
+        return
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s\n' "$tsv" | python3 -c '
+import json, sys
+rows = []
+for line in sys.stdin.read().splitlines():
+    if not line.strip():
+        continue
+    name, queued, running, workers = line.split("\t")
+    rows.append({
+        "name": name,
+        "queued": int(queued),
+        "running": int(running),
+        "workers": int(workers),
+    })
+rows.sort(key=lambda r: (-r["queued"], -r["running"], r["name"]))
+doc = {
+    "summary": {
+        "functions": len(rows),
+        "queued": sum(r["queued"] for r in rows),
+        "running": sum(r["running"] for r in rows),
+        "without_workers": sum(1 for r in rows if r["workers"] == 0),
+    },
+    "queues": rows,
+}
+json.dump(doc, sys.stdout, indent=2, ensure_ascii=False)
+sys.stdout.write("\n")
+'
+        return
+    fi
+
+    error "Se necesita jq o python3 para formatear las colas de Gearman"
+    return 1
+}
+
+gearman_status() {
+    local filter="${1:-}"
+    require_container_running "$CN_GEARMAN" || exit 1
+    local raw
+    raw=$(podman exec "$CN_GEARMAN" gearadmin --status) || {
+        error "gearadmin --status falló"
+        exit 1
+    }
+    format_gearman_status "$filter" "$raw"
+}
+
 show_help() {
     cat <<'EOF'
 
@@ -842,6 +943,7 @@ Uso principal:
 Comandos (también alias legacy --comando):
   status              Estado, stats y validación de contenedores conocidos
   agents [status]     Agentes: SIP (Kamailio Redis DB1) vs consola (OML:AGENT DB0)
+  gearman-status [filtro]  Colas Gearman en JSON (en cola, en ejecución, workers)
   health              Salud de servicios críticos
   stack-up            systemctl start de unidades Quadlet conocidas (orden)
   stack-down          systemctl stop en orden inverso
@@ -902,6 +1004,7 @@ main() {
         help|--help|-h|"") show_help ;;
         status)            show_status ;;
         agents)            agents_cmd "${1:-status}" ;;
+        gearman-status)    gearman_status "${1:-}" ;;
         health)            check_health ;;
 
         stack-up)          stack_start ;;
