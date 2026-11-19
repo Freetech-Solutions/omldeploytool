@@ -392,8 +392,10 @@ all:
     dialer_log_level: 1
     # --- Dialer API user & password
     dialer_password: demo
-    # --- Secret shared by the websockets server and asterisk_retrieve_conf (change it!)
-    ws_acd_secret: CHANGE_ME_WS_ACD_SECRET
+    # --- Secret shared by OML internal components: django, websockets, asterisk_retrieve_conf, fastagi, dialer (change it! alphanumeric only)
+    oml_internal_secret: CHANGE_ME_OML_INTERNAL_SECRET
+    # --- Optional extra origins for /consumers, comma separated (pages served from the same host are always allowed)
+    #ws_allowed_origins: https://oml.example.com
     
     # --- dialer_user (only if you have your Wombat dialer)
     dialer_user: demoadmin

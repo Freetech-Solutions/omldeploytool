@@ -171,10 +171,10 @@ deploy_omnileads() {
     fi
   fi
 
-  # Secret compartido entre websockets y acd-config-generator
-  if grep -qE '^WS_ACD_SECRET=CHANGE_ME' .env; then
-    ws_acd_secret=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)
-    sed -i "s|^WS_ACD_SECRET=.*$|WS_ACD_SECRET=${ws_acd_secret}|" .env
+  # Secret compartido entre componentes internos de OML (alfanumérico: viaja en el path del WS del dialer)
+  if grep -qE '^OML_INTERNAL_SECRET=CHANGE_ME' .env; then
+    oml_internal_secret=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)
+    sed -i "s|^OML_INTERNAL_SECRET=.*$|OML_INTERNAL_SECRET=${oml_internal_secret}|" .env
   fi
 
   # NAT opcional (fuerza valor, comente o no la línea original)

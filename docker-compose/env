@@ -208,8 +208,9 @@ WEBSOCKET_LOGGER=DEBUG:fts.oml.services.websockets ;INFO:websockets.server
 # --- Authentication of /consumers
 # Origins users reach the web UI from, comma separated (add :port if it isn't 443)
 WS_ALLOWED_ORIGINS=https://${OML_HOSTNAME},https://${PUBLIC_IP},https://${FQDN}
-# Secret shared by websockets and acd-config-generator (deploy.sh replaces the placeholder)
-WS_ACD_SECRET=CHANGE_ME_WS_ACD_SECRET
+# Secret shared by OML internal components: django, websockets, acd-config-generator, fastagi, dialer-api
+# (deploy.sh replaces the placeholder)
+OML_INTERNAL_SECRET=CHANGE_ME_OML_INTERNAL_SECRET
 
 # ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
 # ******** HIGH AVAILABILITY ******* # # ******** HIGH AVAILABILITY ******* #
@@ -345,7 +346,7 @@ DIALER_REDIS_PORT=${REDIS_PORT}
 DIALER_REDIS_DB=3
 
 # --- OML Websocket channel path (adjust if OML is running in other host)
-DIALER_DCHANNELS_URL=wss://${NGINX_HOSTNAME}/channels/omnidialer/${DIALER_PASSWORD}
+DIALER_DCHANNELS_URL=wss://${NGINX_HOSTNAME}/channels/omnidialer
 
 # --- Postgres dialer conn params
 DIALER_POSTGRES_USER=omnidialer
