@@ -1,2 +1,6 @@
 ---
 component_postgresql_enabled: false
+postgres_nftables: false
+postgres_nftables_extra_src: []
+postgres_nftables_rules_path: /etc/omnileads/oml-postgres.nft
+postgres_nftables_unit: oml-postgres-nft.service

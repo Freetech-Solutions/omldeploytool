@@ -1,2 +1,6 @@
 ---
 component_gearman_enabled: false
+gearman_nftables: false
+gearman_nftables_extra_src: []
+gearman_nftables_rules_path: /etc/omnileads/oml-gearman.nft
+gearman_nftables_unit: oml-gearman-nft.service

@@ -1,2 +1,6 @@
 ---
 component_redis_enabled: false
+redis_nftables: false
+redis_nftables_extra_src: []
+redis_nftables_rules_path: /etc/omnileads/oml-redis.nft
+redis_nftables_unit: oml-redis-nft.service

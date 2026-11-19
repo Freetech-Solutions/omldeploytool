@@ -1,0 +1,24 @@
+# Managed by Ansible (role observability_prometheus). Do not edit by hand.
+# Allowlist scrape / Prometheus ports on this host.
+# Uses a dedicated table so netavark and fail2ban rulesets stay intact.
+destroy table inet oml_observability
+
+table inet oml_observability {
+  set observability_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in observability_nftables_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  chain observability {
+    type filter hook prerouting priority -150; policy accept;
+    tcp dport { {{ observability_nftables_ports | join(', ') }} } ip saddr @observability_clients accept
+    tcp dport { {{ observability_nftables_ports | join(', ') }} } drop
+    meta nfproto ipv6 tcp dport { {{ observability_nftables_ports | join(', ') }} } drop
+  }
+}

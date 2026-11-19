@@ -10,3 +10,9 @@ minio_mc_podman_network: "{{ oml_network | default('omnileads') }}"
 # Endpoint interno para bootstrap con mc.
 minio_mc_alias_endpoint: >-
   {{ 'http://' ~ (bucket_endpoint_internal | default('data-statefull-server')) ~ ':9000' }}
+minio_api_port: 9000
+minio_console_port: 9001
+minio_nftables: false
+minio_nftables_extra_src: []
+minio_nftables_rules_path: /etc/omnileads/oml-minio.nft
+minio_nftables_unit: oml-minio-nft.service

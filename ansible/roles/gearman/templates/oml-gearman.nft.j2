@@ -1,0 +1,24 @@
+# Managed by Ansible (role gearman). Do not edit by hand.
+# Allowlist TCP/{{ gearman_port | default(4730) }} on the Gearman host.
+# Uses a dedicated table so netavark and fail2ban rulesets stay intact.
+destroy table inet oml_gearman
+
+table inet oml_gearman {
+  set gearman_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in gearman_nftables_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  chain gearman {
+    type filter hook prerouting priority -150; policy accept;
+    tcp dport {{ gearman_port | default(4730) }} ip saddr @gearman_clients accept
+    tcp dport {{ gearman_port | default(4730) }} drop
+    meta nfproto ipv6 tcp dport {{ gearman_port | default(4730) }} drop
+  }
+}

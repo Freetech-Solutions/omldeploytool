@@ -1,3 +1,9 @@
 ---
 - name: REDIS Load generated tasks
   ansible.builtin.import_tasks: generated.yml
+
+- name: REDIS Apply nftables allowlist for TCP redis_port
+  ansible.builtin.import_tasks: nftables.yml
+  when:
+    - redis_nftables | default(false) | bool
+    - not (oml_devenv | default(false) | bool)

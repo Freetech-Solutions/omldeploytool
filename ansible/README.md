@@ -723,6 +723,8 @@ Production tenants exposed to the Internet should keep:
 
 HAProxy TLS baseline (TLS 1.2+, modern ciphers, HSTS, backend re-encrypt): `[docs/haproxy_tls_iso27001.md](docs/haproxy_tls_iso27001.md)`.
 
+**nftables service allowlists** (Postgres, Redis, MinIO, Gearman, exporters/Prometheus, ACD; **off by default**, enable per tenant): `[docs/security.md](docs/security.md)`.
+
 ![Diagrama security](./png/security.png)
 
 The diagram is the AIO + Edge posture: the **Tenant Edge Server** holds the public IP (users, WebRTC media, ITSP SIP). The **Tenant OML Server** (data / `omlapp_web` / ACD / workers) only needs a private IP plus SSH from your admin network. Prometheus is **not** a public port — scrape on LAN or via `https://<fqdn>/prom` on the Edge.
@@ -768,7 +770,8 @@ HAProxy (`Network=host`, outside the pod) + `telephony_edge.pod` (Kamailio WebRT
 | 9273                                                                    | TCP      | Kamailio PSTN metrics                                               | LAN-only                       |
 | 9274                                                                    | TCP      | Kamailio WebRTC metrics                                             | LAN-only                       |
 | 22223                                                                   | TCP      | RTPengine metrics                                                   | LAN-only                       |
-| 9100 / 9882                                                             | TCP      | Node / Podman exporters                                             | LAN-only inter-node            |
+| 9100 / 9882                                                             | TCP      | Node / Podman exporters                                             | Inventory `omni_ip_lan` only (nftables allowlist) |
+
 
 
 Do **not** publish `:9090` on the Edge. Prometheus lives on `omlapp_web` / AIO; HAProxy fronts it at `/prom` (see below).
@@ -782,17 +785,20 @@ In AIO + Edge, AIT and fully split layouts these hosts should have **no** user/I
 | ----------------------------------------------------------- | -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 22                                                          | TCP      | SSH                                                           | Admin / bastion only                                                            |
 | 443                                                         | TCP      | Nginx on `omlapp_web` (HAProxy backend, TLS re-encrypt)       | **From Edge** `omni_ip_lan` **only**                                            |
-| `acd_trunk_sip_port` (default **5070**)                     | UDP      | Asterisk PJSIP trunk (Kamailio PSTN → ACD)                    | **From Edge → ACD** (`acd_nodes`). On co-located AIO/edge+ACD: `127.0.0.1:5070` |
-| `acd_rtp_port_min`–`acd_rtp_port_max` (default 40000–50000) | UDP      | Asterisk RTP (internal leg toward RTPengine)                  | **Between Edge and ACD** — not from the Internet                                |
-| `acd_agent_sip_port` (default 5160)                         | UDP      | Asterisk agent SIP                                            | LAN / localhost                                                                 |
-| 7088 / 7098                                                 | TCP      | Asterisk ARI / ACD app metrics                                | LAN-only                                                                        |
-| 5432 / 9000 / 9001                                          | TCP      | PostgreSQL / MinIO (`data_statefull`)                         | LAN-only inter-node                                                             |
-| 6379 / 4730                                                 | TCP      | Redis / Gearman (`data_stateless`)                            | LAN-only inter-node                                                             |
-| 9090                                                        | TCP      | Prometheus (`omlapp_web` / AIO)                               | LAN-only, or via Edge `/prom`                                                   |
-| 9100 / 9882                                                 | TCP      | Node / Podman exporters (every host with `observability.pod`) | LAN-only inter-node                                                             |
-| 9187                                                        | TCP      | Postgres exporter (`data_statefull`)                          | LAN-only inter-node                                                             |
-| 9121 / 9418                                                 | TCP      | Redis / Gearman exporters (`data_stateless`)                  | LAN-only inter-node                                                             |
-| 9117                                                        | TCP      | uWSGI exporter (`omlapp_web`)                                 | LAN-only inter-node                                                             |
+| `acd_trunk_sip_port` (default **5070**)                     | UDP      | Asterisk PJSIP trunk (Kamailio PSTN → ACD)                    | Edge `omni_ip_lan` + localhost only (nftables allowlist on ACD host, hook `input`; co-located AIO: `127.0.0.1`) |
+| `acd_rtp_port_min`–`acd_rtp_port_max` (default 40000–50000) | UDP      | Asterisk RTP (internal leg toward RTPengine)                  | Edge `omni_ip_lan` + localhost only (nftables allowlist on ACD host)            |
+| `acd_agent_sip_port` (default 5160)                         | UDP      | Asterisk agent SIP                                            | Inventory `omni_ip_lan` + localhost (nftables allowlist on ACD host; optional `acd_nftables_extra_src`) |
+| 7088 / 7098                                                 | TCP      | Asterisk ARI / ACD app metrics                                | Inventory `omni_ip_lan` + localhost (nftables allowlist on ACD host)             |
+| 5432                                                        | TCP      | PostgreSQL (`data_statefull` / AIO)                           | Inventory `omni_ip_lan` only (nftables allowlist on the Postgres host; + local Podman bridge `omnileads`; optional `postgres_nftables_extra_src`) |
+| 9000 / 9001                                                 | TCP      | MinIO API / console (`data_statefull` / AIO)                  | Inventory `omni_ip_lan` only (nftables allowlist on the MinIO host; + local Podman bridge `omnileads`; optional `minio_nftables_extra_src`) |
+| 6379                                                        | TCP      | Redis (`data_stateless` / AIO)                                | Inventory `omni_ip_lan` only (nftables allowlist on the Redis host; + local Podman bridge `omnileads`; optional `redis_nftables_extra_src`) |
+| 4730                                                        | TCP      | Gearman (`data_stateless` / AIO)                              | Inventory `omni_ip_lan` only (nftables allowlist on the Gearman host; + local Podman bridge `omnileads`; optional `gearman_nftables_extra_src`) |
+| 9090                                                        | TCP      | Prometheus (`omlapp_web` / AIO)                               | Inventory `omni_ip_lan` only (nftables allowlist via `observability_prometheus`; human access via Edge `/prom`; optional `observability_nftables_extra_src`) |
+| 9100 / 9882                                                 | TCP      | Node / Podman exporters (every host with observability)       | Inventory `omni_ip_lan` only (nftables allowlist; + local Podman bridge `omnileads`) |
+| 9187                                                        | TCP      | Postgres exporter (`data_statefull`)                          | Inventory `omni_ip_lan` only (nftables allowlist)                               |
+| 9121 / 9418                                                 | TCP      | Redis / Gearman exporters (`data_stateless`)                  | Inventory `omni_ip_lan` only (nftables allowlist)                               |
+| 7099                                                        | TCP      | Dialer pacing exporter (`data_stateless`, omnidialer)         | Inventory `omni_ip_lan` only (nftables allowlist)                               |
+| 9117                                                        | TCP      | uWSGI exporter (`omlapp_web`)                                 | Inventory `omni_ip_lan` only (nftables allowlist)                               |
 
 
 Media path in 3.X: browsers and the ITSP send RTP/SRTP to **RTPengine on the Edge**. Asterisk RTP (`40000–50000`) is the private hairpin between Edge and ACD, not a second Internet range.

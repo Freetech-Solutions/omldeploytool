@@ -1,3 +1,9 @@
 ---
 - name: MINIO Load standard generated tasks
   ansible.builtin.import_tasks: generated.yml
+
+- name: MINIO Apply nftables allowlist for TCP API and console ports
+  ansible.builtin.import_tasks: nftables.yml
+  when:
+    - minio_nftables | default(false) | bool
+    - not (oml_devenv | default(false) | bool)

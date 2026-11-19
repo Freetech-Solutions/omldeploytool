@@ -1,0 +1,18 @@
+[Unit]
+Description=OMniLeads PostgreSQL nftables allowlist (TCP/{{ postgres_port | default(5432) }})
+Documentation=https://docs.omnileads.net/
+DefaultDependencies=no
+After=network-pre.target
+Before={{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f {{ postgres_nftables_rules_path | default('/etc/omnileads/oml-postgres.nft') }}
+# On stop, remove only this table (leave netavark / fail2ban alone).
+# Leading "-" ignores failure if the table is already gone.
+ExecStop=-/usr/sbin/nft delete table inet oml_postgres
+
+[Install]
+WantedBy=multi-user.target

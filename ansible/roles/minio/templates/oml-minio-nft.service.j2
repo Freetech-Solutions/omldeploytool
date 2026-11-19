@@ -1,0 +1,18 @@
+[Unit]
+Description=OMniLeads MinIO nftables allowlist (TCP/{{ minio_api_port | default(9000) }},{{ minio_console_port | default(9001) }})
+Documentation=https://docs.omnileads.net/
+DefaultDependencies=no
+After=network-pre.target
+Before={{ data_statefull_pod_systemd_unit | default('data_statefull-pod.service') }}
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f {{ minio_nftables_rules_path | default('/etc/omnileads/oml-minio.nft') }}
+# On stop, remove only this table (leave netavark / fail2ban alone).
+# Leading "-" ignores failure if the table is already gone.
+ExecStop=-/usr/sbin/nft delete table inet oml_minio
+
+[Install]
+WantedBy=multi-user.target

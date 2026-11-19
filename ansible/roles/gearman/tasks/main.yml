@@ -1,3 +1,9 @@
 ---
 - name: GEARMAN Load generated tasks
   ansible.builtin.import_tasks: generated.yml
+
+- name: GEARMAN Apply nftables allowlist for TCP gearman_port
+  ansible.builtin.import_tasks: nftables.yml
+  when:
+    - gearman_nftables | default(false) | bool
+    - not (oml_devenv | default(false) | bool)
