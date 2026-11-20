@@ -1,0 +1,18 @@
+[Unit]
+Description=OMniLeads Observability nftables allowlist (exporters / Prometheus)
+Documentation=https://docs.omnileads.net/
+DefaultDependencies=no
+After=network-pre.target
+Before={{ observability_pod_systemd_unit | default('observability-pod.service') }}
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f {{ observability_nftables_rules_path | default('/etc/omnileads/oml-observability.nft') }}
+# On stop, remove only this table (leave netavark / fail2ban alone).
+# Leading "-" ignores failure if the table is already gone.
+ExecStop=-/usr/sbin/nft delete table inet oml_observability
+
+[Install]
+WantedBy=multi-user.target

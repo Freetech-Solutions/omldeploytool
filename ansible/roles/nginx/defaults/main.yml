@@ -1,2 +1,6 @@
 ---
 component_nginx_enabled: false
+nginx_nftables: false
+nginx_nftables_extra_src: []
+nginx_nftables_rules_path: /etc/omnileads/oml-nginx.nft
+nginx_nftables_unit: oml-nginx-nft.service

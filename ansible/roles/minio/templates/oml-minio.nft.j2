@@ -1,0 +1,25 @@
+# Managed by Ansible (role minio). Do not edit by hand.
+# Allowlist TCP/{{ minio_api_port | default(9000) }} (API) and
+# TCP/{{ minio_console_port | default(9001) }} (console) on the MinIO host.
+# Uses a dedicated table so netavark and fail2ban rulesets stay intact.
+destroy table inet oml_minio
+
+table inet oml_minio {
+  set minio_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in minio_nftables_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  chain minio {
+    type filter hook prerouting priority -150; policy accept;
+    tcp dport { {{ minio_api_port | default(9000) }}, {{ minio_console_port | default(9001) }} } ip saddr @minio_clients accept
+    tcp dport { {{ minio_api_port | default(9000) }}, {{ minio_console_port | default(9001) }} } drop
+    meta nfproto ipv6 tcp dport { {{ minio_api_port | default(9000) }}, {{ minio_console_port | default(9001) }} } drop
+  }
+}

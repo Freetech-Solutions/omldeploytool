@@ -1,0 +1,44 @@
+# Managed by Ansible (role nginx). Do not edit by hand.
+# Allowlist omlapp_web PublishPorts: TCP/9191 (stats); TCP/80+443 when edge present.
+# Uses a dedicated table so netavark and fail2ban rulesets stay intact.
+destroy table inet oml_nginx
+
+table inet oml_nginx {
+  set nginx_stats_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in nginx_nftables_stats_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+{% if nginx_nftables_http_enabled | default(false) | bool %}
+
+  set nginx_edge_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in nginx_nftables_edge_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+{% endif %}
+
+  chain nginx {
+    type filter hook prerouting priority -150; policy accept;
+
+    tcp dport 9191 ip saddr @nginx_stats_clients accept
+    tcp dport 9191 drop
+    meta nfproto ipv6 tcp dport 9191 drop
+{% if nginx_nftables_http_enabled | default(false) | bool %}
+
+    tcp dport { 80, 443 } ip saddr @nginx_edge_clients accept
+    tcp dport { 80, 443 } drop
+    meta nfproto ipv6 tcp dport { 80, 443 } drop
+{% endif %}
+  }
+}

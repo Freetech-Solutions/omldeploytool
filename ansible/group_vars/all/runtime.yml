@@ -38,6 +38,8 @@ journald_system_max_file_size: 200M
 journald_system_keep_free: 2G
 journald_runtime_keep_free: 32M
 
+dialer_agent_membership_from_redis: True
+
 # Components Ports
 websocket_port: 8000
 uwsgi_port: 8099

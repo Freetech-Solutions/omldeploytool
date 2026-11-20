@@ -1,0 +1,85 @@
+# Managed by Ansible (role acd). Do not edit by hand.
+# Allowlist ACD host-network ports (ARI, metrics, trunk SIP, agent SIP, RTP).
+# Network=host: filter hook input (no Podman DNAT). Leaves netavark/fail2ban intact.
+destroy table inet oml_acd
+
+table inet oml_acd {
+  set acd_ari_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in acd_nftables_inventory_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  set acd_metrics_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in acd_nftables_inventory_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  set acd_trunk_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in acd_nftables_edge_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  set acd_agent_sip_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in acd_nftables_inventory_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  set acd_rtp_clients {
+    type ipv4_addr
+    flags interval
+    elements = {
+{% for cidr in acd_nftables_edge_clients %}
+      {{ cidr }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    }
+  }
+
+  chain acd {
+    type filter hook input priority filter; policy accept;
+
+    tcp dport {{ acd_ari_port | default(7088) }} ip saddr @acd_ari_clients accept
+    tcp dport {{ acd_ari_port | default(7088) }} drop
+    meta nfproto ipv6 tcp dport {{ acd_ari_port | default(7088) }} drop
+
+    tcp dport {{ acd_app_metrics_port | default(7098) }} ip saddr @acd_metrics_clients accept
+    tcp dport {{ acd_app_metrics_port | default(7098) }} drop
+    meta nfproto ipv6 tcp dport {{ acd_app_metrics_port | default(7098) }} drop
+
+    udp dport {{ acd_trunk_sip_port | default(5070) }} ip saddr @acd_trunk_clients accept
+    udp dport {{ acd_trunk_sip_port | default(5070) }} drop
+    meta nfproto ipv6 udp dport {{ acd_trunk_sip_port | default(5070) }} drop
+
+    udp dport {{ acd_agent_sip_port | default(5160) }} ip saddr @acd_agent_sip_clients accept
+    udp dport {{ acd_agent_sip_port | default(5160) }} drop
+    meta nfproto ipv6 udp dport {{ acd_agent_sip_port | default(5160) }} drop
+
+    udp dport {{ acd_rtp_port_min | default(40000) }}-{{ acd_rtp_port_max | default(50000) }} ip saddr @acd_rtp_clients accept
+    udp dport {{ acd_rtp_port_min | default(40000) }}-{{ acd_rtp_port_max | default(50000) }} drop
+    meta nfproto ipv6 udp dport {{ acd_rtp_port_min | default(40000) }}-{{ acd_rtp_port_max | default(50000) }} drop
+  }
+}

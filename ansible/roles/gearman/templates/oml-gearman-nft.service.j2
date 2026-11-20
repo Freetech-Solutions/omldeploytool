@@ -1,0 +1,18 @@
+[Unit]
+Description=OMniLeads Gearman nftables allowlist (TCP/{{ gearman_port | default(4730) }})
+Documentation=https://docs.omnileads.net/
+DefaultDependencies=no
+After=network-pre.target
+Before={{ data_stateless_pod_systemd_unit | default('data_stateless-pod.service') }}
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f {{ gearman_nftables_rules_path | default('/etc/omnileads/oml-gearman.nft') }}
+# On stop, remove only this table (leave netavark / fail2ban alone).
+# Leading "-" ignores failure if the table is already gone.
+ExecStop=-/usr/sbin/nft delete table inet oml_gearman
+
+[Install]
+WantedBy=multi-user.target

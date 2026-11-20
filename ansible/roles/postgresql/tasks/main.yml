@@ -1,3 +1,9 @@
 ---
 - name: POSTGRESQL Load standard generated tasks
   ansible.builtin.import_tasks: generated.yml
+
+- name: POSTGRESQL Apply nftables allowlist for TCP postgres_port
+  ansible.builtin.import_tasks: nftables.yml
+  when:
+    - postgres_nftables | default(false) | bool
+    - not (oml_devenv | default(false) | bool)

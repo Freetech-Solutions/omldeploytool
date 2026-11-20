@@ -871,6 +871,116 @@ agents_cmd() {
 }
 
 # -----------------------------------------------------------------------------
+# Gearman queues (gearadmin --status) as JSON
+# Columns: function, jobs waiting, jobs running, capable workers
+# -----------------------------------------------------------------------------
+format_gearman_status() {
+    local filter="${1:-}"
+    local raw="${2:-}"
+
+    local tsv
+    tsv=$(printf '%s\n' "$raw" | FILTER="$filter" awk '
+        function lower(s) { return tolower(s) }
+        {
+            gsub(/\r/, "")
+            if ($0 ~ /^[[:space:]]*$/) next
+            if ($1 == ".") next
+            if (NF < 4) next
+            workers = $NF
+            running = $(NF - 1)
+            queued = $(NF - 2)
+            if (queued !~ /^[0-9]+$/ || running !~ /^[0-9]+$/ || workers !~ /^[0-9]+$/) next
+            name = $1
+            for (i = 2; i <= NF - 3; i++) name = name " " $i
+            filt = ENVIRON["FILTER"]
+            if (filt != "" && index(lower(name), lower(filt)) == 0) next
+            printf "%s\t%s\t%s\t%s\n", name, queued, running, workers
+        }
+    ')
+
+    if [[ -z "$tsv" && -n "$filter" ]]; then
+        error "No queue matches filter: $filter"
+        return 1
+    fi
+
+    local jq_program='
+        def rows:
+          split("\n")
+          | map(select(length > 0) | split("\t") | {
+              name: .[0],
+              queued: (.[1] | tonumber),
+              running: (.[2] | tonumber),
+              workers: (.[3] | tonumber)
+            });
+        (rows) as $q
+        | {
+            summary: {
+              functions: ($q | length),
+              queued: ($q | map(.queued) | add // 0),
+              running: ($q | map(.running) | add // 0),
+              without_workers: ($q | map(select(.workers == 0)) | length)
+            },
+            queues: ($q | sort_by([-.queued, -.running, .name]))
+          }
+    '
+
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s\n' "$tsv" | jq -R -s "$jq_program"
+        return
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s\n' "$tsv" | python3 -c '
+import json, sys
+rows = []
+for line in sys.stdin.read().splitlines():
+    if not line.strip():
+        continue
+    name, queued, running, workers = line.split("\t")
+    rows.append({
+        "name": name,
+        "queued": int(queued),
+        "running": int(running),
+        "workers": int(workers),
+    })
+rows.sort(key=lambda r: (-r["queued"], -r["running"], r["name"]))
+doc = {
+    "summary": {
+        "functions": len(rows),
+        "queued": sum(r["queued"] for r in rows),
+        "running": sum(r["running"] for r in rows),
+        "without_workers": sum(1 for r in rows if r["workers"] == 0),
+    },
+    "queues": rows,
+}
+json.dump(doc, sys.stdout, indent=2, ensure_ascii=False)
+sys.stdout.write("\n")
+'
+        return
+    fi
+
+    error "jq or python3 is required to format Gearman status"
+    return 1
+}
+
+gearman_status() {
+    local filter="${1:-}"
+    local cid
+    cid=$(docker_compose ps -q gearman 2>/dev/null || true)
+    if [[ -z "$cid" ]]; then
+        error "Service 'gearman' is not running."
+        exit 1
+    fi
+
+    local raw
+    raw=$(docker_compose exec -T gearman gearadmin --status) || {
+        error "gearadmin --status failed"
+        exit 1
+    }
+    format_gearman_status "$filter" "$raw"
+}
+
+# -----------------------------------------------------------------------------
 # Display Help
 # -----------------------------------------------------------------------------
 show_help() {
@@ -892,6 +1002,7 @@ show_help() {
       logs    [-f] [svc] Show or follow logs
       status             Show container status + averages + raw stats
       agents [status]    List agents: SIP (Kamailio Redis DB1) vs console (OML:AGENT DB0)
+      gearman-status [filter]  Gearman queues as JSON (queued, running, workers)
       health             Perform health check of critical services
       build-vuejs        Build VueJS assets
       clean              Prune stopped containers, unused images/volumes/networks
@@ -965,6 +1076,7 @@ main() {
         logs)           shift; docker_compose logs "$@" ;;
         status)         show_status ;;
         agents)         shift; agents_cmd "${1:-status}" ;;
+        gearman-status) shift; gearman_status "${1:-}" ;;
         reset-pass)     reset_admin_password ;;
         data-generate)  shift; generate_data "${1:-}" ;;
         bootstrap)      run_bootstrap ;;

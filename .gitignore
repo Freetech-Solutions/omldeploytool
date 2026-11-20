@@ -48,3 +48,4 @@ override.tf
 override.tf.json
 .cursor
 .CLAUDE.md
+terraform/digitalocean/__

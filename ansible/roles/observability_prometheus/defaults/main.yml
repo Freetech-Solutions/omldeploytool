@@ -18,3 +18,8 @@ prometheus_postgres_img: "{{ POSTGRES_EXPORTER_IMG }}"
 prometheus_redis_img: "{{ REDIS_EXPORTER_IMG }}"
 prometheus_node_img: "{{ PROMETHEUS_NODE_EXPORTER_IMG }}"
 prometheus_gearman_img: "{{ GEARMAN_EXPORTER_IMG }}"
+
+observability_nftables: false
+observability_nftables_extra_src: []
+observability_nftables_rules_path: /etc/omnileads/oml-observability.nft
+observability_nftables_unit: oml-observability-nft.service

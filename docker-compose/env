@@ -280,6 +280,8 @@ KAMAILIO_DEBUG_ENABLED=true
 KAMAILIO_DEBUG_LEVEL=2
 
 KAMAILIO_CERTS_LOCATION=/etc/kamailio/certs
+# SIP TLS :5061 (same certs as Nginx). Per-call TLS needs X-OML-Transport: tls on the trunk.
+KAMAILIO_TLS_ENABLE=false
 
 # ACD_NODES: comma-separated ACD trunk addresses (ip:port). Use the static
 KAMAILIO_ACD_NODES=${ACD_HOST_IP}:5070

@@ -257,6 +257,12 @@
     - upgrade
     - observability
 
+- name: OBSERVABILITY Apply nftables allowlist for exporters and Prometheus
+  ansible.builtin.import_tasks: nftables.yml
+  when:
+    - observability_nftables | default(false) | bool
+    - not (oml_devenv | default(false) | bool)
+
 - name: OBSERVABILITY Validate scrape reachability from Prometheus host
   ansible.builtin.import_tasks: validate_scrape.yml
   when: oml_runs_omlapp_web | default(false) | bool

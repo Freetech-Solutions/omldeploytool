@@ -1,0 +1,206 @@
+---
+# ISO/IEC 27001 — Control 8.9 / 8.22:
+# Restrict ACD host-network ports (ARI, metrics, trunk/agent SIP, RTP) via
+# filter hook input. Dedicated nft table; no flush ruleset.
+- name: ACD NFT Install nftables package (Debian)
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 300
+  when: ansible_os_family == "Debian"
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Ensure EPEL on Rocky or Alma Linux
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Install nftables package (Rocky/Alma)
+  ansible.builtin.dnf:
+    name: nftables
+    state: present
+  when: ansible_facts['distribution'] in ["Rocky", "AlmaLinux"]
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+# Mismo criterio que topology_normalize: omni_ip_lan o, si falta/vacío, ansible_host.
+# to_json/from_json evita acumulación en loop y coerciones de listas con >-.
+- name: ACD NFT Resolve inventory LAN CIDRs
+  ansible.builtin.set_fact:
+    acd_nftables_lan_cidrs: "{{ _nft_lan_json | from_json }}"
+  vars:
+    _nft_lan_json: |
+      {% set ns = namespace(cidrs=[]) %}
+      {% for h in groups['all'] | default([]) %}
+      {% set ip = hostvars[h].omni_ip_lan | default(hostvars[h].ansible_host | default('', true), true) | string | trim %}
+      {% if ip is match('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$') %}
+      {% set ns.cidrs = ns.cidrs + [ip ~ '/32'] %}
+      {% endif %}
+      {% endfor %}
+      {{ ns.cidrs | unique | list | to_json }}
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Build inventory client allowlist
+  ansible.builtin.set_fact:
+    acd_nftables_inventory_clients: "{{ (['127.0.0.1/8'] + _lan + _extra + _self) | unique | list }}"
+  vars:
+    _lan: "{{ acd_nftables_lan_cidrs | default([]) }}"
+    _extra: "{{ (acd_nftables_extra_src | default([]) | map('string') | map('trim') | reject('equalto', '') | list) }}"
+    _self_ip: "{{ omni_ip_lan | default(ansible_host | default('', true), true) | string | trim }}"
+    _self: "{{ [(_self_ip ~ '/32')] if (_self_ip is match('^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$')) else [] }}"
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Resolve edge LAN CIDRs
+  ansible.builtin.set_fact:
+    acd_nftables_edge_lan_cidrs: "{{ _nft_edge_json | from_json }}"
+  vars:
+    _nft_edge_json: |
+      {% set ns = namespace(cidrs=[]) %}
+      {% for h in ((groups['edge'] | default([])) + (groups['omnileads_aio'] | default([]))) | unique %}
+      {% set ip = hostvars[h].omni_ip_lan | default(hostvars[h].ansible_host | default('', true), true) | string | trim %}
+      {% if ip is match('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$') %}
+      {% set ns.cidrs = ns.cidrs + [ip ~ '/32'] %}
+      {% endif %}
+      {% endfor %}
+      {{ ns.cidrs | unique | list | to_json }}
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Build edge client allowlist (trunk SIP + RTP)
+  ansible.builtin.set_fact:
+    acd_nftables_edge_clients: "{{ (['127.0.0.1/8'] + _edge + _extra + _self) | unique | list }}"
+  vars:
+    _edge: "{{ acd_nftables_edge_lan_cidrs | default([]) }}"
+    _extra: "{{ (acd_nftables_extra_src | default([]) | map('string') | map('trim') | reject('equalto', '') | list) }}"
+    _self_ip: "{{ omni_ip_lan | default(ansible_host | default('', true), true) | string | trim }}"
+    _self: "{{ [(_self_ip ~ '/32')] if ((oml_runs_edge | default(false) | bool) and (_self_ip is match('^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$'))) else [] }}"
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Fail when allowlists are empty
+  ansible.builtin.assert:
+    that:
+      - (acd_nftables_inventory_clients | length) > 0
+      - (acd_nftables_edge_clients | length) > 0
+    fail_msg: >-
+      acd allowlists vacío
+      (inventory={{ acd_nftables_inventory_clients | default([]) | length }},
+      edge={{ acd_nftables_edge_clients | default([]) | length }},
+      host={{ inventory_hostname }},
+      omni_ip_lan={{ omni_ip_lan | default('') }},
+      ansible_host={{ ansible_host | default('') }}).
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Render allowlist rules
+  ansible.builtin.template:
+    src: oml-acd.nft.j2
+    dest: "{{ acd_nftables_rules_path }}"
+    mode: "0644"
+    owner: root
+    group: root
+  register: acd_nftables_rules_file
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Validate rules syntax
+  ansible.builtin.command:
+    argv:
+      - nft
+      - -c
+      - -f
+      - "{{ acd_nftables_rules_path }}"
+  changed_when: false
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Apply allowlist rules
+  ansible.builtin.command:
+    argv:
+      - nft
+      - -f
+      - "{{ acd_nftables_rules_path }}"
+  register: acd_nftables_apply
+  changed_when: acd_nftables_rules_file.changed
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Install systemd unit for boot reload
+  ansible.builtin.template:
+    src: oml-acd-nft.service.j2
+    dest: "/etc/systemd/system/{{ acd_nftables_unit }}"
+    mode: "0644"
+    owner: root
+    group: root
+  register: acd_nftables_unit_file
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice
+
+- name: ACD NFT Enable and start systemd unit
+  ansible.builtin.systemd:
+    name: "{{ acd_nftables_unit }}"
+    enabled: true
+    state: "{{ 'restarted' if (acd_nftables_rules_file.changed or acd_nftables_unit_file.changed) else 'started' }}"
+    daemon_reload: "{{ acd_nftables_unit_file.changed }}"
+  tags:
+    - install
+    - upgrade
+    - update
+    - acd
+    - voice

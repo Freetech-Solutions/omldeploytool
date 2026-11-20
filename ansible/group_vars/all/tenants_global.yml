@@ -109,7 +109,16 @@ postgres_utc: false
 # --- in order to split INSERT (RW node) & QUERIES (RO node)
 postgres_ha: false
 # --- Read Only connection host address (in case of RW/RO postgres cluster):
-# postgres_ro_vip: 
+# postgres_ro_vip:
+
+# --- nftables allowlist on the Postgres host (data_statefull / omnileads_aio):
+# --- TCP/postgres_port accepted only from inventory omni_ip_lan + local Podman
+# --- bridge omnileads + postgres_nftables_extra_src. Does not use nftables.service
+# --- or flush ruleset (preserves netavark + fail2ban tables). Off by default; set true per tenant to enable.
+# --- Override per tenant: instances/<tenant>/vars.yml
+postgres_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to reach TCP/5432.
+postgres_nftables_extra_src: []
 
 # Postgres performance tuning
 # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
@@ -137,6 +146,17 @@ bucket_secret_key: "{{ vault_bucket_secret_key }}"
 
 # --- if your bucket doesn't need region, leave this value (us-east-1)
 bucket_region: us-east-1
+
+# --- nftables allowlist on the MinIO host (data_statefull / omnileads_aio):
+# --- TCP/9000 (API) and TCP/9001 (console) accepted only from inventory omni_ip_lan
+# --- + local Podman bridge omnileads + minio_nftables_extra_src. Does not use
+# --- nftables.service or flush ruleset (preserves netavark + fail2ban tables).
+# --- Off by default; set true per tenant to enable. Skipped when bucket_url
+# --- points to external S3 (no local MinIO).
+# --- Override per tenant: instances/<tenant>/vars.yml
+minio_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to reach TCP/9000 and TCP/9001.
+minio_nftables_extra_src: []
 
 # --- if your bucket use a selfsigned SSL cert, uncomment and put this value to true
 # bucket_ssl_selfsigned: True
@@ -169,6 +189,15 @@ ami_user: "{{ vault_acd_api_user }}"
 ami_password: "{{ vault_acd_api_password }}"
 acd_rtp_port_min: 40000
 acd_rtp_port_max: 50000
+
+# --- nftables allowlist on ACD hosts (Network=host; filter hook input):
+# --- ARI 7088 / metrics 7098 / agent SIP 5160: inventory omni_ip_lan + localhost.
+# --- Trunk SIP + RTP range: edge omni_ip_lan (+ omnileads_aio) + localhost.
+# --- Does not use nftables.service or flush ruleset. Off by default; set true per tenant to enable.
+# --- Override per tenant: instances/<tenant>/vars.yml
+acd_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to ACD ports above.
+acd_nftables_extra_src: []
 
 # --- Log level for ACD
 acd_log_level: info
@@ -203,6 +232,15 @@ voicebot_password: "{{ vault_voicebot_password | default('', true) }}"
 # https://loadforge.com/guides/enhancing-redis-performance-top-configuration-tweaks-to-accelerate-data-access
 # scale_redis: True
 
+# --- nftables allowlist on the Redis host (data_stateless / omnileads_aio):
+# --- TCP/redis_port accepted only from inventory omni_ip_lan + local Podman
+# --- bridge omnileads + redis_nftables_extra_src. Does not use nftables.service
+# --- or flush ruleset (preserves netavark + fail2ban tables). Off by default; set true per tenant to enable.
+# --- Override per tenant: instances/<tenant>/vars.yml
+redis_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to reach TCP/6379.
+redis_nftables_extra_src: []
+
 redis_maxmemory: 2gb
 redis_maxmemory_policy: allkeys-lru
 redis_tcp_backlog: 1024
@@ -221,6 +259,9 @@ kamailio_shm_size: 1024
 kamailio_pkg_size: 256
 
 kamailio_certs_location: /etc/kamailio/certs
+# Enable SIP TLS listener :5061 (same cert.pem/key.pem as Nginx/HAProxy).
+# Per-call TLS toward the ITSP still needs X-OML-Transport: tls on the ACD trunk.
+kamailio_tls_enable: false
 
 # --- Kamailio log level
 # --- 0: Error, 1: Warning, 2: Debug
@@ -278,6 +319,15 @@ rtpengine_log_level: 1
 gearman_threads: 4
 gearman_backlog: 1024
 gearman_job_retries: 3
+
+# --- nftables allowlist on the Gearman host (data_stateless / omnileads_aio):
+# --- TCP/gearman_port accepted only from inventory omni_ip_lan + local Podman
+# --- bridge omnileads + gearman_nftables_extra_src. Does not use nftables.service
+# --- or flush ruleset (preserves netavark + fail2ban tables). Off by default; set true per tenant to enable.
+# --- Override per tenant: instances/<tenant>/vars.yml
+gearman_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to reach TCP/4730.
+gearman_nftables_extra_src: []
 
 # --- Call attempts per second
 dialer_caps: 5
@@ -421,6 +471,29 @@ wazuh_agent_group: omnileads_prod
 loki_url: "{{ vault_loki_url }}"
 loki_user: "{{ vault_loki_user }}"
 loki_password: "{{ vault_loki_password }}"
+
+# --- nftables allowlist on every host that runs observability_prometheus:
+# --- TCP exporter / Prometheus ports accepted only from inventory omni_ip_lan
+# --- + local Podman bridge omnileads + observability_nftables_extra_src.
+# --- Ports depend on host tier (node/podman always; postgres/redis/gearman/uwsgi/
+# --- prometheus/dialer-pacing when that tier is present). Off by default; set true per tenant to enable.
+# --- Override per tenant: instances/<tenant>/vars.yml
+observability_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to reach scrape ports (e.g. :9090).
+observability_nftables_extra_src: []
+
+# --- nftables allowlist on omlapp_web / AIO (role nginx; PublishPort prerouting):
+# --- TCP/9191 (uWSGI stats) always: inventory omni_ip_lan + local Podman bridge
+# ---   omnileads + nginx_nftables_extra_src.
+# --- TCP/80 and TCP/443 only when inventory has group edge: edge (+ omnileads_aio)
+# ---   omni_ip_lan + 127.0.0.1/8 + extras (HAProxy → nginx LAN backend). Without
+# ---   edge, nginx stays public on 0.0.0.0 and those ports are not filtered here.
+# --- Does not use nftables.service or flush ruleset. Off by default; set true per
+# --- tenant to enable. Skipped when oml_devenv: true.
+# --- Override per tenant: instances/<tenant>/vars.yml
+nginx_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to nginx LAN ports above.
+nginx_nftables_extra_src: []
 
 # --- HAProxy (host edge): orígenes permitidos para https://<fqdn>/prom (Prometheus bajo
 # --- /prom). Si no se define o queda vacío, HAProxy deniega /prom por defecto.

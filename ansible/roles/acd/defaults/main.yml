@@ -1,2 +1,6 @@
 ---
 component_acd_enabled: false
+acd_nftables: false
+acd_nftables_extra_src: []
+acd_nftables_rules_path: /etc/omnileads/oml-acd.nft
+acd_nftables_unit: oml-acd-nft.service
