@@ -101,7 +101,12 @@
     - update
   when: >-
     (callrec_transcriptions_engine | default('') == 'gcp')
-    or (audiosocket_enabled | default(false) | bool)
+    or (
+      (audiosocket_enabled | default(false) | bool)
+      and (audiosocket_gcp_bearer_token | default('') | string | trim | length) == 0
+      and (audiosocket_gcp_bearer_token_file | default('') | string | trim | length) == 0
+      and (audiosocket_gcp_credentials_json | default('') | string | trim | length) == 0
+    )
 
 - name: OS_CONF Ensure TLS certs directory exists
   ansible.builtin.file:

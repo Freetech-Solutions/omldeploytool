@@ -14,7 +14,15 @@ Label=tier=telephony
 PodmanArgs=--cgroups=no-conmon
 # La imagen corre como appuser (uid 10001) y no puede leer el JSON 0600 del host.
 User=0:0
+{% if (audiosocket_gcp_bearer_token | default('') | string | trim | length) == 0
+   and (audiosocket_gcp_bearer_token_file | default('') | string | trim | length) == 0
+   and (audiosocket_gcp_credentials_json | default('') | string | trim | length) == 0 %}
 Volume=/etc/omnileads/google_credential.json:/secrets/gcp.json:ro
+{% endif %}
+{% if (audiosocket_gcp_bearer_token_host_file | default('') | string | trim | length) > 0
+   and (audiosocket_gcp_bearer_token_file | default('') | string | trim | length) > 0 %}
+Volume={{ audiosocket_gcp_bearer_token_host_file | trim }}:{{ audiosocket_gcp_bearer_token_file | trim }}:ro
+{% endif %}
 
 [Service]
 Restart=on-failure
