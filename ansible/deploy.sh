@@ -42,10 +42,12 @@ Ansible Vault (required before any run):
   Set ANSIBLE_VAULT_PASSWORD_FILE to a local password file, uncomment vault_password_file
   in ansible.cfg, or pass --ask-vault-pass. See ANSIBLE_BOOTSTRAP.md.
 
-With --inventory only, tenant_folder for instances/<tenant>/ files (certs, keys) is derived:
-  - instances/<tenant>/inventory.yml  -> tenant_folder=<tenant>
-  - /path/to/prod.yml                 -> tenant_folder=prod
-Pass --tenant=<name> to override.
+With --inventory only, tenant_folder (vars.yml, certs, keys, google_credentials.json)
+is derived from the inventory path:
+  - a file named inventory.yml under instances/, including nested folders
+    instances/tenants/staging/TerraDO/inventory.yml -> tenant_folder=tenants/staging/TerraDO
+  - any other path: the filename without extension (/srv/inventories/prod.yml -> prod)
+Pass --tenant=<name> to override. --tenant alone uses instances/<tenant>/inventory.yml.
 
 Primary actions (playbooks/site.yml unless noted):
   install, upgrade, update
@@ -189,12 +191,20 @@ derive_tenant_folder() {
     return 0
   fi
 
-  local base dir
+  local base dir abs instances_root
   base="$(basename "${inventory_file}")"
   dir="$(dirname "${inventory_file}")"
+  instances_root="$ANSIBLE_DIR/instances"
 
   case "$base" in
     inventory.yml|inventory.yaml)
+      if [ -d "$dir" ]; then
+        abs="$(cd "$dir" && pwd)"
+        if [ "${abs#"$instances_root"/}" != "$abs" ]; then
+          oml_tenant="${abs#"$instances_root"/}"
+          return 0
+        fi
+      fi
       oml_tenant="$(basename "$dir")"
       ;;
     *)

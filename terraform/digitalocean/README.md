@@ -48,9 +48,9 @@ terraform apply -var-file=../../ansible/instances/<tenant>/terraform.tfvars -var
 De mañana, el mismo comando sin ese `-var`. Después, con el `init` de este directorio apuntando al Space de ese tenant:
 
 ```bash
-./sync_inventory.py <tenant>
+./sync_inventory.py /ruta/absoluta/ansible/instances/<tenant>/inventory.yml
 ```
 
-El script lee `terraform output -json ansible_hosts` y escribe en `ansible/instances/<tenant>/inventory.yml` la IP pública en `ansible_host` y la privada de la VPC en `omni_ip_lan`. Se puede invocar desde cualquier directorio como `terraform/digitalocean/sync_inventory.py <tenant>`. No crea hosts ni grupos: si un nombre del output no está en el inventario, termina con error. También falla si el output está vacío (`compute_enabled=false` o el state es de otro tenant).
+El script lee `terraform output -json ansible_hosts` y escribe en el `inventory.yml` que se le pasa la IP pública en `ansible_host` y la privada de la VPC en `omni_ip_lan`. El argumento tiene que ser un path absoluto. Se puede invocar desde cualquier directorio como `terraform/digitalocean/sync_inventory.py /ruta/absoluta/.../inventory.yml`. No crea hosts ni grupos: si un nombre del output no está en el inventario, termina con error. También falla si el output está vacío (`compute_enabled=false` o el state es de otro tenant).
 
 Hay que correr Ansible, incluido `do_edge`. El install conviene limitarlo a los grupos de `ansible_limit_when_compute_returns` más `edge`. `deploy.sh` no acepta `--limit`; un `install` del tenant entero también borra los host que alojan los Pods Edge y Data.

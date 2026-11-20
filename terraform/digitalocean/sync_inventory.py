@@ -3,11 +3,12 @@
 
 Uso, desde cualquier directorio:
 
-    terraform/digitalocean/sync_inventory.py <tenant>
+    terraform/digitalocean/sync_inventory.py <inventory.yml>
 
 Lee `terraform output -json ansible_hosts` del último init (el Space de ese
-tenant) y rellena ansible/instances/<tenant>/inventory.yml. No crea hosts ni
-grupos: si un nombre del output no está en el inventario, termina con error.
+tenant) y rellena el inventory.yml cuyo path absoluto se pasa como argumento.
+No crea hosts ni grupos: si un nombre del output no está en el inventario,
+termina con error.
 """
 
 import json
@@ -24,13 +25,15 @@ def fail(message):
     sys.exit(1)
 
 
-def tenant_name(argv):
+def inventory_path(argv):
     if len(argv) != 2 or not argv[1]:
-        fail("Uso: sync_inventory.py <tenant>")
-    name = argv[1]
-    if any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for char in name):
-        fail("El tenant solo puede tener letras, números, _ y -.")
-    return name
+        fail("Uso: sync_inventory.py <inventory.yml>")
+    path = Path(argv[1])
+    if not path.is_absolute():
+        fail("El inventario tiene que ser un path absoluto.")
+    if not path.is_file():
+        fail("No existe {0}".format(path))
+    return path
 
 
 def load_ansible_hosts():
@@ -76,10 +79,7 @@ def fill_inventory(path, hosts):
 
 
 def main():
-    tenant = tenant_name(sys.argv)
-    inventory = ROOT / "ansible" / "instances" / tenant / "inventory.yml"
-    if not inventory.is_file():
-        fail("No existe {0}".format(inventory))
+    inventory = inventory_path(sys.argv)
     hosts = load_ansible_hosts()
     fill_inventory(inventory, hosts)
     print("Inventario actualizado: {0} ({1} hosts)".format(inventory, len(hosts)))
