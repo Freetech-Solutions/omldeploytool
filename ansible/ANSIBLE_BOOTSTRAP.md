@@ -386,7 +386,7 @@ O bien, apuntando a un inventario fuera de `instances/`:
 ./deploy.sh --action=install --inventory=/ruta/absoluta/al/inventory.yml
 ```
 
-Para inventarios bajo `instances/<tenant>/inventory.yml`, `deploy.sh` deriva `tenant_folder=<tenant>` sin necesidad de `--tenant=`.
+Para un `inventory.yml` bajo `instances/`, `deploy.sh` deriva `tenant_folder` como el camino relativo a `instances/` (también si está anidado, por ejemplo `tenants/staging/TerraDO`) sin necesidad de `--tenant=`.
 
 Para la lista completa de acciones, ver `./deploy.sh --help` y la sección
 [Bash Script deploy.sh](./README.md#bash-script-deploysh-) del README.

@@ -180,7 +180,7 @@ Typical parameters:
 
 - `--action=<action>` (default `install`). Supported actions are listed below.
 - `--tenant=<tenant-folder>` to use `instances/<tenant>/inventory.yml`.
-- `--inventory=/abs/path/to/inventory.yml` to point at an inventory outside `instances/`. If you omit `--tenant`, `tenant_folder` (used to locate certs/keys under `instances/<tenant>/`) is derived from the inventory path: `instances/<tenant>/inventory.yml` → `<tenant>`, or the filename without extension for other paths (e.g. `/srv/inventories/prod.yml` → `prod`). Pass `--tenant=` to override.
+- `--inventory=/abs/path/to/inventory.yml` to point at an inventory. If you omit `--tenant`, `tenant_folder` (vars.yml, certs, keys, `google_credentials.json` under `instances/<tenant_folder>/`) is the path of that `inventory.yml` relative to `instances/`, including nested folders (`instances/tenants/staging/TerraDO/inventory.yml` → `tenants/staging/TerraDO`). Any other filename uses the name without extension (`/srv/inventories/prod.yml` → `prod`). Pass `--tenant=` to override.
 - `--ask-vault-pass` to prompt for the Vault password interactively (otherwise `deploy.sh` uses `ANSIBLE_VAULT_PASSWORD_FILE` or `vault_password_file` from `ansible.cfg`; see [ANSIBLE_BOOTSTRAP.md](ANSIBLE_BOOTSTRAP.md)).
 
 
@@ -784,7 +784,8 @@ In AIO + Edge, AIT and fully split layouts these hosts should have **no** user/I
 | Port                                                        | Protocol | Component                                                     | Scope                                                                           |
 | ----------------------------------------------------------- | -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 22                                                          | TCP      | SSH                                                           | Admin / bastion only                                                            |
-| 443                                                         | TCP      | Nginx on `omlapp_web` (HAProxy backend, TLS re-encrypt)       | **From Edge** `omni_ip_lan` **only**                                            |
+| 80 / 443                                                    | TCP      | Nginx on `omlapp_web` (HAProxy backend; TLS re-encrypt on 443)| Edge `omni_ip_lan` + localhost (nftables allowlist when `nginx_nftables`; only if inventory has group `edge`) |
+| 9191                                                        | TCP      | uWSGI stats on `omlapp_web`                                   | Inventory `omni_ip_lan` only (nftables allowlist when `nginx_nftables`; + local Podman bridge `omnileads`; optional `nginx_nftables_extra_src`) |
 | `acd_trunk_sip_port` (default **5070**)                     | UDP      | Asterisk PJSIP trunk (Kamailio PSTN → ACD)                    | Edge `omni_ip_lan` + localhost only (nftables allowlist on ACD host, hook `input`; co-located AIO: `127.0.0.1`) |
 | `acd_rtp_port_min`–`acd_rtp_port_max` (default 40000–50000) | UDP      | Asterisk RTP (internal leg toward RTPengine)                  | Edge `omni_ip_lan` + localhost only (nftables allowlist on ACD host)            |
 | `acd_agent_sip_port` (default 5160)                         | UDP      | Asterisk agent SIP                                            | Inventory `omni_ip_lan` + localhost (nftables allowlist on ACD host; optional `acd_nftables_extra_src`) |

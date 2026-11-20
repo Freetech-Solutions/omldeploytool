@@ -482,6 +482,19 @@ observability_nftables: false
 # --- Extra CIDRs/IPs (bastion / admin) allowed to reach scrape ports (e.g. :9090).
 observability_nftables_extra_src: []
 
+# --- nftables allowlist on omlapp_web / AIO (role nginx; PublishPort prerouting):
+# --- TCP/9191 (uWSGI stats) always: inventory omni_ip_lan + local Podman bridge
+# ---   omnileads + nginx_nftables_extra_src.
+# --- TCP/80 and TCP/443 only when inventory has group edge: edge (+ omnileads_aio)
+# ---   omni_ip_lan + 127.0.0.1/8 + extras (HAProxy → nginx LAN backend). Without
+# ---   edge, nginx stays public on 0.0.0.0 and those ports are not filtered here.
+# --- Does not use nftables.service or flush ruleset. Off by default; set true per
+# --- tenant to enable. Skipped when oml_devenv: true.
+# --- Override per tenant: instances/<tenant>/vars.yml
+nginx_nftables: false
+# --- Extra CIDRs/IPs (bastion / admin) allowed to nginx LAN ports above.
+nginx_nftables_extra_src: []
+
 # --- HAProxy (host edge): orígenes permitidos para https://<fqdn>/prom (Prometheus bajo
 # --- /prom). Si no se define o queda vacío, HAProxy deniega /prom por defecto.
 haproxy_prom_allowed_src: "{{ vault_haproxy_prom_allowed_src }}"

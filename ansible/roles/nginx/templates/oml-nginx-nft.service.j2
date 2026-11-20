@@ -1,0 +1,18 @@
+[Unit]
+Description=OMniLeads nginx/omlapp_web nftables allowlist (TCP/9191{% if nginx_nftables_http_enabled | default(false) | bool %}+80/443{% endif %})
+Documentation=https://docs.omnileads.net/
+DefaultDependencies=no
+After=network-pre.target
+Before={{ omlapp_web_pod_systemd_unit | default('omlapp_web-pod.service') }}
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f {{ nginx_nftables_rules_path | default('/etc/omnileads/oml-nginx.nft') }}
+# On stop, remove only this table (leave netavark / fail2ban alone).
+# Leading "-" ignores failure if the table is already gone.
+ExecStop=-/usr/sbin/nft delete table inet oml_nginx
+
+[Install]
+WantedBy=multi-user.target

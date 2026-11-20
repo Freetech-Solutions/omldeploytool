@@ -12,7 +12,7 @@ Controles relacionados:
 
 | Control | Doc / rol |
 |---------|-----------|
-| Allowlists TCP/UDP por servicio (este doc) | Roles `postgresql`, `redis`, `minio`, `gearman`, `observability_prometheus`, `acd` |
+| Allowlists TCP/UDP por servicio (este doc) | Roles `postgresql`, `redis`, `minio`, `gearman`, `observability_prometheus`, `acd`, `nginx` |
 | Brute-force SSH / SIP / probes HTTPS | Rol `fail2ban` — ver [README](../README.md) sección Fail2ban |
 | TLS en HAProxy (ISO 27001 A.8.24) | [haproxy_tls_iso27001.md](haproxy_tls_iso27001.md) |
 | Tabla de puertos por layout | [README](../README.md) — Network exposure |
@@ -41,11 +41,13 @@ minio_nftables: true
 gearman_nftables: true
 observability_nftables: true
 acd_nftables: true
+nginx_nftables: true
 
 # Bastion / red de admin (opcional, por servicio)
 postgres_nftables_extra_src: ["10.0.0.5/32"]
 observability_nftables_extra_src: ["10.0.0.5/32"]
 acd_nftables_extra_src: []
+nginx_nftables_extra_src: []
 ```
 
 Cada rol también saltea las reglas si `oml_devenv: true`.
@@ -65,7 +67,7 @@ Dos hooks según cómo escucha el servicio:
 
 | Hook | Cuándo | Roles |
 |------|--------|-------|
-| `filter hook prerouting priority -150` | Puerto publicado con Podman `PublishPort` (DNAT). Hay que filtrar **antes** del DNAT (`-100`) | postgres, redis, minio, gearman, observability |
+| `filter hook prerouting priority -150` | Puerto publicado con Podman `PublishPort` (DNAT). Hay que filtrar **antes** del DNAT (`-100`) | postgres, redis, minio, gearman, observability, nginx |
 | `filter hook input priority filter` | `Network=host` (sin DNAT); el socket escucha en el host | acd |
 
 ### Clientes permitidos (regla general)
@@ -193,6 +195,28 @@ Tras aplicar, el mismo rol corre `validate_scrape.yml` desde el host Prometheus.
 Riesgo: alto (rompe llamadas si el set de edge está mal). Validar PSTN + WebRTC
 después de activar.
 
+### 2.7 Nginx / omlapp_web — `inet oml_nginx`
+
+PublishPort en el pod `omlapp_web`; hook **prerouting**. Dos sets:
+
+| Puerto | Proto | Set | Orígenes permitidos |
+|--------|-------|-----|---------------------|
+| 9191 | TCP | `nginx_stats_clients` | Inventario `omni_ip_lan` + bridge `omnileads` + extras (siempre) |
+| 80 / 443 | TCP | `nginx_edge_clients` | Solo si hay grupo `edge`: LAN de `edge` + `omnileads_aio` + `127.0.0.1/8` + extras |
+
+Sin grupo `edge` (AIO clásico con nginx en `0.0.0.0`): **no** se filtran 80/443;
+solo se cierra `:9191`.
+
+| | |
+|--|--|
+| **Rol** | `nginx` |
+| **Flag** | `nginx_nftables` |
+| **Extras** | `nginx_nftables_extra_src` |
+| **Archivos** | `roles/nginx/tasks/nftables.yml`, `templates/oml-nginx.nft.j2` |
+| **Deploy** | `./deploy.sh --action=nginx --tenant=<tenant>` (o `app`) |
+
+Validar HTTPS vía FQDN (HAProxy → nginx LAN) tras activar en cluster.
+
 ---
 
 ## 3. Qué no cubren estas reglas
@@ -205,7 +229,7 @@ después de activar.
 | TCP 22 | Bastion / fail2ban `sshd`; no es inventario de pods |
 | TCP 10060 WSS Kamailio | Backend local de HAProxy en el edge |
 | TCP 8404 / 9273 / 9274 / 22223 | Métricas edge (candidato futuro; 8404 ya tiene ACL en HAProxy) |
-| TCP 443 en `omlapp_web` (solo desde edge) | Candidato futuro; hoy “LAN-only” por PublishPort |
+| TCP 80/443 en `omlapp_web` sin grupo `edge` | Nginx público en AIO; el allowlist no aplica a esos puertos |
 
 ---
 
@@ -215,7 +239,7 @@ después de activar.
 
 1. Poner `*_nftables: true` en `instances/<tenant>/vars.yml`.
 2. Redeploy del rol o del lote (`postgres`, `redis`, `minio`, `gearman`,
-   `data`, `observability`, `acd` / `voice`).
+   `data`, `observability`, `acd` / `voice`, `nginx` / `app`).
 3. Comprobar tablas:
 
 ```bash
@@ -225,12 +249,14 @@ nft list table inet oml_minio
 nft list table inet oml_gearman
 nft list table inet oml_observability
 nft list table inet oml_acd
+nft list table inet oml_nginx
 ```
 
 4. Smoke:
    - Datos: conectar desde una VM del inventario y desde una IP LAN ajena.
    - Obs: `./deploy.sh --action=observability` y revisar validate scrape.
    - ACD: llamada PSTN + WebRTC.
+   - Nginx (con `edge`): HTTPS vía FQDN; `:9191` solo desde inventario.
 
 ### Desactivar
 
@@ -249,7 +275,8 @@ manual: `nft delete table inet oml_postgres`.
 | Assert “allowlist vacío” | Sin `omni_ip_lan` / `ansible_host` en inventario |
 | Exporter o AIO no llega a Postgres/Redis | Bridge `omnileads` no existía al aplicar; re-correr tras `prerequisitos` |
 | PSTN cae tras `acd_nftables: true` | Falta el host `edge` en inventario o su `omni_ip_lan` |
-| Bastion no abre `:9090` / `:5432` | Añadir CIDR en el `*_nftables_extra_src` del servicio |
+| HTTPS cae tras `nginx_nftables: true` (con edge) | Falta LAN del edge en el set; HAProxy debe salir con `omni_ip_lan` del edge |
+| Bastion no abre `:9090` / `:5432` / `:9191` | Añadir CIDR en el `*_nftables_extra_src` del servicio |
 
 ---
 
@@ -283,6 +310,7 @@ Detalle: [README](../README.md) — Fail2ban.
 | `gearman_nftables` | `false` | `oml_gearman` | data_stateless / AIO |
 | `observability_nftables` | `false` | `oml_observability` | todo host con el rol |
 | `acd_nftables` | `false` | `oml_acd` | acd / AIO |
+| `nginx_nftables` | `false` | `oml_nginx` | omlapp_web / AIO |
 
 ISO/IEC 27001: evidencia de **gestión de configuración** (A.8.9) y
 **segmentación de red** (A.8.22) cuando estas allowlists están activas y
