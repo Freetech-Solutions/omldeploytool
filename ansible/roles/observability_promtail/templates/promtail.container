@@ -21,7 +21,7 @@ Label=service=promtail
 Label=node_type={{ 'aio' if (oml_is_aio | default(false)) else ('data_statefull' if ('data_statefull' in group_names) else 'data_stateless' if ('data_stateless' in group_names) else 'edge' if ('edge' in group_names) else 'web' if ('omlapp_web' in group_names) else 'workers' if ('omlapp_workers' in group_names) else 'dialer' if ('dialer_workers' in group_names) else 'acd' if ('acd' in group_names) else 'callrec' if ('callrec_processor' in group_names) else 'standalone') }}
 Exec=-config.file=/etc/promtail/config.yml -config.expand-env=true
 LogDriver=journald
-PodmanArgs=--cgroups=no-conmon --cpus=1 --cpu-shares=256
+PodmanArgs=--cgroups=no-conmon --cpus={{ promtail_cpus | default('0.25') }} --cpu-shares={{ promtail_cpu_shares | default(64) }}
 Notify=false
 
 [Service]
@@ -34,6 +34,8 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=promtail
 MemoryMax={{ promtail_memory_limit | default('512M') }}
+# Peso relativo cgroup v2 (1–10000, default systemd 100). Bajo = cede CPU bajo contención.
+CPUWeight={{ promtail_cpu_weight | default(10) }}
 CPUQuota={{ promtail_cpu_quota | default('50%') }}
 
 [Install]
